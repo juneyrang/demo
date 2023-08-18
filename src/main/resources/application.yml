@@ -1,0 +1,46 @@
+server:
+  port: 8888
+  servlet:
+    context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  mvc:
+    view:
+      prefix: /WEB-INF/views/
+      suffix: .jsp
+
+  devtools:
+    livereload:
+      enabled: true
+
+  datasource:
+    hikari:
+      driver-class-name: oracle.jdbc.driver.OracleDriver
+      #url: jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB
+      jdbc-url: jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB
+      username: zshp
+      password: zshp_345#
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 100000
+
+  # spring data jpa 설정
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL57Dialect
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+
+mybatis:
+  mapper-locations: mapper/*.xml
+  type-aliases-package: com.qae.demo
+
+# HikariPool에 대한 로깅을 수행함
+logging:
+  level:
+    com.zaxxer.hikari.pool.HikariPool: debug
