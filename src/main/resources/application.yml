@@ -1,5 +1,5 @@
 server:
-  port: 8888
+  port: 9090
   servlet:
     context-path: /
     encoding:
@@ -8,10 +8,11 @@ server:
       force: true
 
 spring:
-  mvc:
-    view:
-      prefix: /WEB-INF/views/
-      suffix: .jsp
+  thymeleaf:
+    cache: false
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
 
   devtools:
     livereload:
@@ -19,14 +20,26 @@ spring:
 
   datasource:
     hikari:
-      driver-class-name: oracle.jdbc.driver.OracleDriver
+      pool-name: master-hikari-cp
+      driver-class-name: org.mariadb.jdbc.Driver
+      jdbc-url: jdbc:mariadb://localhost:3306/job_manager?allowMultiQueries=true&characterEncoding=utf-8&verifyServerCertificate=true&requireSSL=false&requireSSL=false
+      username: jobmanager
+      password: manager2023!@
+      connection-timeout: 10000
+      minimum-idle: 2
+      maximum-pool-size: 4
+      idle-timeout: 10000
+      max-lifetime: 30000
+      auto-commit: false
+      connection-test-query: SELECT 1
+      #driver-class-name: oracle.jdbc.driver.OracleDriver
       #url: jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB
-      jdbc-url: jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB
-      username: zshp
-      password: zshp_345#
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 100000
+      #jdbc-url: jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB
+      #username: zshp
+      #password: zshp_345#
+      #maximum-pool-size: 10
+      #minimum-idle: 5
+      #connection-timeout: 100000
 
   # spring data jpa 설정
   jpa:
@@ -37,8 +50,23 @@ spring:
       ddl-auto: update
 
 mybatis:
-  mapper-locations: mapper/*.xml
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
   type-aliases-package: com.qae.demo
+
+springdoc:
+  api-docs:
+    path: /api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui/index.html
+    groups-order: DESC
+    doc-expansion: none
+    tags-sorter: alpha
+    operationsSorter: method
+    disable-swagger-default-url: true
+    display-request-duration: true
 
 # HikariPool에 대한 로깅을 수행함
 logging:
