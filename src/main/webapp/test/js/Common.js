@@ -1,0 +1,2 @@
+const Common = (function($) {
+})(jQuery);
