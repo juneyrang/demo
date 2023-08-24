@@ -1,242 +1,180 @@
-create table JS_MENU
-(
-    menu_seq          int(11) not null AUTO_INCREMENT,
-    menu_id      VARCHAR(100) not null,
-    menu_name_ko      VARCHAR(100) not null,
-    menu_name_en      VARCHAR(100) not null,
-    menu_up_seq       int(11) not null,
-    menu_path         VARCHAR(100),
-    menu_order        int(11),
-    delegate_flag     VARCHAR(1) default 'N',
-    trans_yn          VARCHAR(1) default 'N' not null,
-    defail_project_yn VARCHAR(1) default 'N' not null,
-    reg_id        VARCHAR(100) not null,
-    reg_dt     DATE not null,
-    upd_id   VARCHAR(100) not null,
-    upd_dt  DATE not null,
-    mobile_yn         VARCHAR(1) default 'N',
-    PRIMARY KEY (menu_seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_MENU_AUTH
-(
-    auth_seq         int(11) not null,
-    menu_seq         int(11) not null,
-    auth_code        VARCHAR(100) not null,
-    auth_name        VARCHAR(100) not null,
-    reg_id       VARCHAR(100) not null,
-    reg_dt    DATE not null,
-    upd_id  VARCHAR(100) not null,
-    upd_dt DATE not null,
-    PRIMARY KEY (auth_seq, menu_seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_USER
-(
-    user_id          VARCHAR(100) not null,
-    user_name        VARCHAR(100) not null,
-    TEL_NO varchar(20) DEFAULT NULL ,
-    EMAIL varchar(128) DEFAULT NULL,
-    user_pw          VARCHAR(300),
-    dept_name        VARCHAR(720),
-    user_pw_salt     VARCHAR(300),
-    mail             VARCHAR(100),
-    client_id varchar(20) DEFAULT NULL,
-    USER_STAT_CD varchar(10) DEFAULT NULL COMMENT '사용자상태(10:활성,20:잠김,30:보류,90:삭제)',
-    delegate_flag    VARCHAR(1) default 'N',
-    expire_flag      VARCHAR(1) default 'N',
-    DEVI_ID varchar(50) DEFAULT NULL COMMENT '디바이스',
-    DEVI_TP_CD varchar(10) DEFAULT NULL COMMENT '단말기타입',
-    DEVI_OS_VER varchar(10) DEFAULT NULL COMMENT '단말OS버전',
-    APP_REG varchar(250) DEFAULT NULL COMMENT '앱레지스트값',
-    APP_VER varchar(10) DEFAULT NULL COMMENT 'APP버전',
-    reg_id       VARCHAR(100) not null,
-    reg_dt    DATE not null,
-    upd_id  VARCHAR(100) not null,
-    upd_dt DATE not null,
-    PRIMARY KEY (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_USER_ROLE
-(
-    user_id          VARCHAR(100) not null,
-    role_seq         int(11) not null,
-    reg_id       VARCHAR(100) not null,
-    reg_dt    DATE not null,
-    upd_id  VARCHAR(100) not null,
-    upd_dt DATE not null,
-    PRIMARY KEY (user_id. role_seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_ROLE
-(
-    role_seq         int(11) not null AUTO_INCREMENT,
-    role_name        VARCHAR(100) not null,
-    delegate_flag    VARCHAR(1) default 'N',
-    reg_id       VARCHAR(100) not null,
-    reg_dt    DATE not null,
-    upd_id  VARCHAR(100) not null,
-    upd_dt DATE not null,
-    site_yn          VARCHAR(1) default 'N' not null,
-    PRIMARY KEY (role_seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_ROLE_MENU
-(
-    role_seq         int(11) not null,
-    menu_seq         int(11) not null,
-    reg_id       VARCHAR(100) not null,
-    reg_dt    DATE not null,
-    upd_id  VARCHAR(100) not null,
-    upd_dt DATE not null,
-    PRIMARY KEY (role_seq, menu_seq)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_ROLE_MENU_AUTH
-(
-    role_seq         int(11) not null,
-    menu_seq         int(11) not null,
-    auth_code        VARCHAR(100),
-    reg_id       VARCHAR(100) not null,
-    reg_dt    DATE not null,
-    upd_id  VARCHAR(100) not null,
-    upd_dt DATE not null,
-    PRIMARY KEY (role_seq, menu_seq, auth_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_SCHEDULE
-(
-    sche_no          int(11) not null AUTO_INCREMENT,
-    sche_name        VARCHAR(50) not null,
-    sche_type        VARCHAR(10) not null,
-    sche_value       VARCHAR(20) not null,
-    sche_status      VARCHAR(1) not null,
-    sche_status_name VARCHAR(10) not null,
-    job_class        VARCHAR(50) not null,
-    is_use           VARCHAR(1),
-    reg_id       VARCHAR(100),
-    reg_dt    DATE,
-    upd_id  VARCHAR(100),
-    upd_dt DATE,
-    PRIMARY KEY (sche_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-create table JS_SCHEDULE_HISTORY
-(
-    hist_no           int(11) not null AUTO_INCREMENT,
-    sche_no           int(11),
-    job_key           VARCHAR(50),
-    job_firetime      TIMESTAMP(6),
-    job_runtime       INTEGER,
-    job_next_firetime TIMESTAMP(6),
-    job_status        VARCHAR(10),
-    error_message     VARCHAR(300),
-    PRIMARY KEY (hist_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-## Imsi
 코드관리
 CREATE TABLE JS_CODE (
-    CD_KEY VARCHAR(10) PRIMARY KEY,
-    CD_MST_KEY VARCHAR(10),
-    CD_NAME VARCHAR(50),
-    CD_NAME_EN VARCHAR(50),
-    CD_ORDER TINYINT,
-    USE_YN VARCHAR(1),
-    ETC1 VARCHAR(300),
-    REG_ID VARCHAR(50),
-    REG_DTTM DATE
-    UPD_ID VARCHAR(50),
-    UPD_DTTM DATE
+	CD_KEY VARCHAR(10) PRIMARY KEY,
+	CD_MST_KEY VARCHAR(10),
+	CD_NAME VARCHAR(50),
+	CD_NAME_EN VARCHAR(50),
+	CD_ORDER TINYINT,
+	USE_YN VARCHAR(1),
+	ETC1 VARCHAR(300),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 
 권한관리
 CREATE TABLE JS_ROLE (
-    ROLE_NO INT PRIMARY KEY,
-    ROLE_NAME VARCHAR(50),
-    USE_YN VARCHAR(1),
-    ETC1 VARCHAR(300),
-    REG_ID VARCHAR(50),
-    REG_DTTM DATE
-    UPD_ID VARCHAR(50),
-    UPD_DTTM DATE
+	ROLE_NO INT PRIMARY KEY,
+	ROLE_NAME VARCHAR(50),
+	USE_YN VARCHAR(1),
+	ETC1 VARCHAR(300),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 
 메뉴관리
 CREATE TABLE JS_MENU (
-    MENU_NO INT PRIMARY KEY,
-    MENU_NAME VARCHAR(50),
-    MENU_NAME_EN VARCHAR(50),
-    MENU_UP_NO INT,
-    MENU_PATH VARCHAR(50),
-    MENU_ORDER TINYINT,
-    USE_YN VARCHAR(1),
-    MOBILE_YN VARCHAR(1),
-    ETC1 VARCHAR(300),
-    REG_ID VARCHAR(50),
-    REG_DTTM DATE
-    UPD_ID VARCHAR(50),
-    UPD_DTTM DATE
+	MENU_NO INT PRIMARY KEY,
+	MENU_NAME VARCHAR(50),
+	MENU_NAME_EN VARCHAR(50),
+	MENU_UP_NO INT,
+	MENU_PATH VARCHAR(50),
+	MENU_ORDER TINYINT,
+	USE_YN VARCHAR(1),
+	MOBILE_YN VARCHAR(1),
+	ETC1 VARCHAR(300),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 
 권한별메뉴관리
 CREATE TABLE JS_ROLE_MENU (
-    ROLE_NO INT PRIMARY KEY,
-    MENU_NO INT PRIMARY KEY
-    ETC1 VARCHAR(300),
-    REG_ID VARCHAR(50),
-    REG_DTTM DATE
-    UPD_ID VARCHAR(50),
-    UPD_DTTM DATE
+	ROLE_NO INT PRIMARY KEY,
+	MENU_NO INT PRIMARY KEY
+	ETC1 VARCHAR(300),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 
 메뉴별인증관리
 CREATE TABLE JS_AUTH_MENU (
-    ROLE_NO INT PRIMARY KEY,
-    MENU_NO INT,
-    AUTH_CODE VARCHAR(10),
-    AUTH_NAME VARCHAR(50),
-    USE_YN VARCHAR(1),
-    ETC1 VARCHAR(300),
-    REG_ID VARCHAR(50),
-    REG_DTTM DATE
-    UPD_ID VARCHAR(50),
-    UPD_DTTM DATE
+	ROLE_NO INT PRIMARY KEY,
+	MENU_NO INT,
+	AUTH_CODE VARCHAR(10),
+	AUTH_NAME VARCHAR(50),
+	USE_YN VARCHAR(1),
+	ETC1 VARCHAR(300),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
-
 
 앱관리
 CREATE TABLE JS_APP (
 )
-고객관리
-CREATE TABLE JS_CUSTOMER (
+
+공지사항
+CREATE TABLE JS_NOTICE (
+	NOTI_SEQ INT PRIMARY KEY,
+	WIRTER_ID VARCHAR(20),
+	NOTI_TITLE VARCHAR(255),
+	NOTI_CONTENT VARCHAR(2000),
+	FILE_GRP_CD VARCHAR(50),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 장비관리
 CREATE TABLE JS_LOCK (
-)
-공지사항
-CREATE TABLE JS_NOTICE (
+	LOCK_KEY VARCHAR(126) PRIMARY KEY,
+	LOCK_MODEL VARCHAR(30),
+	LOCK_TYPE VARCHAR(2),
+	LOCK_MANUFACTURING VARCHAR(30),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 파일관리
 CREATE TABLE JS_FILE (
+	FILE_SEQ INT PRIMARY KEY,
+	FILE_NAME VARCHAR(100),
+	FILE_ORGN_NAME VARCHAR(100),
+	FILE_PATH VARCHAR(255),
+	FILE_SIZE INT,
+	FILE_MEMO VARCHAR(2000),
+	FILE_SORT INT,
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 고객관리
 CREATE TABLE JS_CUSTOMER (
+	CUST_ID VARCHAR(20) PRIMARY KEY,
+	CUST_NAME VARCHAR(30),
+	CUST_PHONE VARCHAR(10),
+	CUST_STATUS VARCHAR(10),
+	CUST_STATUS VARCHAR(1),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 사용자관리
 CREATE TABLE JS_USER (
+	USER_ID VARCHAR(20) PRIMARY KEY,
+	USER_PASS VARCHAR(20),
+	CLIENT_ID VARCHAR(20),
+	USER_NAME VARCHAR(30),
+	USER_EMAIL VARCHAR(20),
+	USER_PHONE VARCHAR(20),
+	USER_ROLE VARCHAR(2),
+	USER_STATUS VARCHAR(1),
+	EXPIRE_FLAG VARCHAR(1),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
-고객별사용자관리
-CREATE TABLE JS_CUSTOMER_USER (
+
+작업장관리
+CREATE TABLE JS_WORK_PLACE (
+	PLACE_ID VARCHAR(10) PRIMARY KEY,
+	LOCK_KEY VARCHAR(126),
+	CUST_ID VARCHAR(20),
+	IS_USE VARCHAR(1),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
-고객별출입문관리
-CREATE TABLE JS_CUSTOMER_LOCK (
-)
-출입문관리마스터
-CREATE TABLE JS_LOCK_MST (
-)
-출입문관리상세
-CREATE TABLE JS_LOCK_DETAIL (
-)
-출입관리
-CREATE TABLE JS_SCHEDULE (
+작업관리
+CREATE TABLE JS_JOB_SCHEDULE (
+	SCHE_SEQ INT PRIMARY KEY,
+	SCHE_TITLE VARCHAR(500),
+	SCHE_DETAIL VARCHAR(2000),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 출입자관리
-CREATE TABLE JS_SCHEDULE_USER (
+CREATE TABLE JS_COMING_GOING_WORKER (
+	SCHE_SEQ INT PRIMARY KEY,
+	WORKER_SSN VARCHAR(13) PRIMARY KEY,
+	WORKER_NAME VARCHAR(30),
+	WORKER_PHONE VARCHAR(20),
+	REG_ID VARCHAR(50),
+	REG_DTTM DATE
+	UPD_ID VARCHAR(50),
+	UPD_DTTM DATE
 )
 출입이력
-create table js_coming_going (
+CREATE TABLE JS_COMING_GOING_HISTORY (
+	HIST_SEQ INT PRIMARY KEY,
+	SCHE_SEQ INT,
+	WORKER_SSN VARCHAR(13),
+	WORK_TIME DATE
 )
 
 
