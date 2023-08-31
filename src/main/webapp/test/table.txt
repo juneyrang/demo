@@ -180,3 +180,1206 @@ CREATE TABLE JS_COMING_GOING_HISTORY (
 
 
 Grid : Tabulator
+
+
+
+=====================================================================================================
+
+WPF(Windows Presentation Foundation) 애플리케이션에서 Bluetooth 통신을 구현하려면 .NET Framework의 Bluetooth 관련 라이브러리를 사용해야 합니다.
+가장 일반적으로 사용되는 라이브러리 중 하나는 32feet.NET입니다.
+이 라이브러리는 Bluetooth 디바이스 검색, 페어링, 데이터 송수신 등 Bluetooth 기능을 다루는데 사용됩니다.
+
+아래는 32feet.NET을 사용하여 WPF 애플리케이션에서 Bluetooth 통신을 구현하는 예제입니다.
+이 예제에서는 주변 Bluetooth 디바이스 검색 및 연결을 다룹니다.
+
+32feet.NET 설치:
+Visual Studio NuGet 패키지 관리자를 사용하여 InTheHand.Net.Personal 패키지를 프로젝트에 추가합니다.
+
+XAML 파일 (MainWindow.xaml):
+<Window x:Class="BluetoothApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Bluetooth App" Height="350" Width="525">
+    <Grid>
+        <Button Content="Search Devices" HorizontalAlignment="Left" VerticalAlignment="Top" Width="100" Height="30" Margin="10" Click="SearchDevices_Click"/>
+        <ListView x:Name="deviceListView" HorizontalAlignment="Left" VerticalAlignment="Top" Width="500" Height="250" Margin="10">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Device Name" Width="200" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Device Address" Width="300" DisplayMemberBinding="{Binding Address}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </Grid>
+</Window>
+
+코드 파일 (MainWindow.xaml.cs):
+using System.Windows;
+using System.Windows.Controls;
+using InTheHand.Net.Bluetooth;
+using InTheHand.Net.Sockets;
+
+namespace BluetoothApp
+{
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+
+        private void SearchDevices_Click(object sender, RoutedEventArgs e)
+        {
+            deviceListView.Items.Clear();
+            BluetoothClient bluetoothClient = new BluetoothClient();
+
+            var devices = bluetoothClient.DiscoverDevices();
+            foreach (var device in devices)
+            {
+                deviceListView.Items.Add(new { Name = device.DeviceName, Address = device.DeviceAddress });
+            }
+        }
+    }
+}
+
+이 예제에서는 BluetoothClient를 사용하여 주변 Bluetooth 디바이스를 검색하고, 그 결과를 ListView에 표시합니다.
+실제 애플리케이션에서는 디바이스 페어링 및 데이터 송수신 등 더 많은 작업이 필요할 수 있습니다.
+32feet.NET의 문서와 다른 예제를 참고하여 더 많은 기능을 구현할 수 있습니다.
+
+또한, Bluetooth 통신은 특정한 디바이스와의 통신 프로토콜, 서비스 디스커버리 등에 따라 매우 다양한 구현이 가능합니다. 필요한 기능에 따라 추가 작업이 필요할 수 있습니다.
+
+
+========================================================================
+
+========================================================================
+
+InTheHand 라이브러리를 사용하여 WPF 애플리케이션에서 Bluetooth 작업을 수행하는 방법에 대한 기본 예는 다음과 같습니다. 이 예에서는 InTheHand.Net.Sockets 네임스페이스의 BluetoothClient 클래스를 사용하여 근처 Bluetooth 장치를 검색하는 방법을 다룹니다.
+
+1. InTheHand.Net.Personal NuGet 패키지를 설치합니다.
+2. Visual Studio에서 NuGet 패키지 관리자를 사용하여 InTheHand.Net.Personal 패키지를 프로젝트에 설치합니다.
+
+XAML 파일(MainWindow.xaml):
+
+<Window x:Class="BluetoothWpfApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Bluetooth App" Height="350" Width="525">
+    <Grid>
+        <Button Content="Search Devices" HorizontalAlignment="Left" VerticalAlignment="Top" Width="100" Height="30" Margin="10" Click="SearchDevices_Click"/>
+        <ListView x:Name="deviceListView" HorizontalAlignment="Left" VerticalAlignment="Top" Width="500" Height="250" Margin="10">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Device Name" Width="200" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Device Address" Width="300" DisplayMemberBinding="{Binding Address}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </Grid>
+</Window>
+
+
+Code file (MainWindow.xaml.cs):
+
+using System;
+using System.Text;
+using System.Windows;
+using InTheHand.Net.Bluetooth;
+using InTheHand.Net.Sockets;
+
+namespace BluetoothFullExample
+{
+    public partial class MainWindow : Window
+    {
+        private BluetoothClient _bluetoothClient;
+        private BluetoothDeviceInfo _selectedDevice;
+
+        public MainWindow()
+        {
+            InitializeComponent();
+            _bluetoothClient = new BluetoothClient();
+        }
+
+        private void SearchDevices_Click(object sender, RoutedEventArgs e)
+        {
+            deviceListView.Items.Clear();
+            var devices = _bluetoothClient.DiscoverDevices();
+
+            foreach (var device in devices)
+            {
+                deviceListView.Items.Add(new { Name = device.DeviceName, Address = device.DeviceAddress });
+            }
+        }
+
+        private void PairWithDevice_Click(object sender, RoutedEventArgs e)
+        {
+            BluetoothClient bluetoothClient = new BluetoothClient();
+            BluetoothDeviceInfo device = SelectBluetoothDevice(bluetoothClient);
+
+            if (device != null)
+            {
+                bool paired = PairDevice(device);
+
+                if (paired)
+                {
+                    MessageBox.Show($"Device {device.DeviceName} paired successfully.", "Pairing Result");
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to pair with device {device.DeviceName}.", "Pairing Result");
+                }
+            }
+        }
+
+        private BluetoothDeviceInfo SelectBluetoothDevice(BluetoothClient bluetoothClient)
+        {
+            BluetoothDeviceInfo[] devices = bluetoothClient.DiscoverDevices();
+            if (devices.Length == 0)
+            {
+                MessageBox.Show("No devices found for pairing.", "Pairing Error");
+                return null;
+            }
+
+            // For simplicity, we're selecting the first discovered device. You can provide user interface for device selection.
+            return devices[0];
+        }
+
+        private bool PairDevice(BluetoothDeviceInfo device)
+        {
+            try
+            {
+                return BluetoothSecurity.PairRequest(device.DeviceAddress, null);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void ConnectToDevice(BluetoothDeviceInfo device)
+        {
+            _selectedDevice = device;
+
+            // Do the pairing here if needed.
+            // You can use PairDevice method from previous examples.
+
+            // Connect to the device.
+            var endPoint = new BluetoothEndPoint(device.DeviceAddress, BluetoothService.SerialPort);
+            var client = new BluetoothClient();
+            client.Connect(endPoint);
+
+            // You can start data transmission/reception here.
+            SendData(client);
+            ReceiveData(client);
+        }
+
+        private void SendData(BluetoothClient client)
+        {
+            // Send data to the connected device.
+            string message = "Hello, Bluetooth!";
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            client.GetStream().Write(data, 0, data.Length);
+        }
+
+        private void ReceiveData(BluetoothClient client)
+        {
+            // Receive data from the connected device.
+            byte[] buffer = new byte[1024];
+            int bytesRead = client.GetStream().Read(buffer, 0, buffer.Length);
+            string receivedMessage = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            MessageBox.Show($"Received: {receivedMessage}", "Data Received");
+        }
+    }
+}
+
+
+이 예에서 "장치 검색" 버튼을 클릭하면 SearchDevices_Click 이벤트 핸들러가 트리거됩니다.
+핸들러 내부에는 BluetoothClient가 생성되고 DiscoverDevices는 근처의 Bluetooth 장치를 찾는 데 사용됩니다.
+그러면 검색된 장치가 ListView에 추가됩니다.
+
+InTheHand 라이브러리에는 Bluetooth 하드웨어, 운영 체제 및 버전에 따라 제한 사항 및 호환성 문제가 있을 수 있습니다.
+항상 라이브러리의 문서를 참조하고 특정 플랫폼을 대상으로 하는 경우 필요한 Bluetooth 권한이 있는지 확인하십시오.
+
+Bluetooth 통신에는 페어링, 서비스 검색 및 고급 기능이 포함될 수 있으며, 여기에는 애플리케이션 요구 사항에 따라 추가 코드와 고려 사항이 필요할 수 있습니다.
+
+
+========== [ WinForm ] =====================================================
+
+using BluetoothExampleWinformsDeviceSearchCS.Controls;
+using InTheHand.Net.Sockets;
+
+namespace BluetoothExampleWinformsDeviceSearchCS;
+
+public partial class Form1 : Form
+{
+    List<BluetoothDeviceInfo> _bluetoothDevices;
+
+    bool _isSearchingForDevices;
+
+    public bool IsSearchingForDevices
+    {
+        get => _isSearchingForDevices;
+        set
+        {
+            _isSearchingForDevices = value;
+            btnScanForDevices.Enabled = !_isSearchingForDevices;
+        }
+    }
+
+    public Form1()
+    {
+        InitializeComponent();
+        _bluetoothDevices = new List<BluetoothDeviceInfo>();
+        lbBluetoothDevices.DisplayMember = "DeviceName";
+    }
+
+    private async void btnScanForDevices_Click(object sender, EventArgs e)
+    {
+        IsSearchingForDevices = true;
+        _bluetoothDevices.Clear();
+        flpBluetoothDevices.Controls.Clear();
+        lbBluetoothDevices.Items.Clear();
+        BluetoothDeviceInfo[]? bluetoothDevices;
+        try
+        {
+            bluetoothDevices = await SearchDevicesAsync();
+            _bluetoothDevices.AddRange(bluetoothDevices);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Couldn't search for bluetooth devices: {ex.Message}");
+        }
+        if (_bluetoothDevices.Count > 0)
+        {
+            DisplayFlpItems();
+            DisplayLbItems();
+        }
+        IsSearchingForDevices = false;
+    }
+
+    private void DisplayFlpItems()
+    {
+        foreach (var device in _bluetoothDevices)
+        {
+            var bluetoothDeviceItem = new BluetoothDeviceItem(device);
+            bluetoothDeviceItem.Click += BluetoothDeviceItem_Click;
+            flpBluetoothDevices.Controls.Add(bluetoothDeviceItem);
+        }
+    }
+
+    private void BluetoothDeviceItem_Click(object? sender, EventArgs e)
+    {
+        var deviceItem = sender as BluetoothDeviceItem;
+        var device = deviceItem!.Device;
+        MessageBox.Show($"You clicked on device: {device!.DeviceName}");
+    }
+
+    private void DisplayLbItems()
+    {
+        lbBluetoothDevices.DataSource = _bluetoothDevices;
+    }
+
+    public async Task<BluetoothDeviceInfo[]> SearchDevicesAsync()
+    {
+        var bluetoothClient = new BluetoothClient();
+        var bluetoothDevices = await Task.Run(() => bluetoothClient.DiscoverDevices());
+        bluetoothClient.Close();
+        return bluetoothDevices;
+    }
+
+    private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+    {
+        if (flpBluetoothDevices.Controls.Count > 0)
+        {
+            foreach (var bluetoothDeviceItem in flpBluetoothDevices.Controls.OfType<BluetoothDeviceItem>())
+            {
+                bluetoothDeviceItem.Click -= BluetoothDeviceItem_Click;
+            }
+        }
+    }
+}
+
+
+
+using InTheHand.Net.Sockets;
+
+namespace BluetoothExampleWinformsDeviceSearchCS.Controls;
+
+public partial class BluetoothDeviceItem : UserControl
+{
+
+    public BluetoothDeviceInfo Device { get; set; }
+
+    public BluetoothDeviceItem(BluetoothDeviceInfo bluetoothDeviceInfo)
+    {
+        Device = bluetoothDeviceInfo;
+        InitializeComponent();
+
+        lblDeviceName.Text = Device.DeviceName;
+        lblBluetoothAddress.Text = Device.DeviceAddress.ToString();
+    }
+}
+
+========================================================================
+
+===> 목표는 애플리케이션과 가젯 모듈이 사용자 간섭 없이 양방향으로 데이터를 보낼 수 있다는 것입니다.
+사용자 상호 작용 없이는 장치를 자동으로 페어링할 수 없다는 것이 사실입니까?
+두 장치가 이미 페어링된 경우 사용자 상호 작용 없이 데이터를 교환할 수 있다는 것이 사실입니까?
+
+
+문제를 해결하는 방법을 알아냈고 이제 Bluetooth 연결에 대한 지식도 조금 더 커졌습니다.
+다른 사람이 문제를 겪고 있다면 나는 해결책을 제시합니다.
+코드 예제는 32feet Bluetooth 라이브러리를 사용하여 Bluetooth 컨트롤러의 C# 구현을 나타냅니다.
+
+[Scanning]
+
+이는 범위 내의 장치가 감지되었음을 의미합니다. 내 코드:
+
+// mac is mac address of local bluetooth device
+BluetoothEndPoint localEndpoint = new BluetoothEndPoint(mac, BluetoothService.SerialPort);
+// client is used to manage connections
+BluetoothClient localClient = new BluetoothClient(localEndpoint);
+// component is used to manage device discovery
+BluetoothComponent localComponent = new BluetoothComponent(localClient);
+// async methods, can be done synchronously too
+localComponent.DiscoverDevicesAsync(255, true, true, true, true, null);
+localComponent.DiscoverDevicesProgress += new EventHandler<DiscoverDevicesEventArgs>(component_DiscoverDevicesProgress);
+localComponent.DiscoverDevicesComplete += new EventHandler<DiscoverDevicesEventArgs>(component_DiscoverDevicesComplete);
+
+private void component_DiscoverDevicesProgress(object sender, DiscoverDevicesEventArgs e)
+{
+    // log and save all found devices
+    for (int i = 0; i < e.Devices.Length; i++)
+    {
+        if (e.Devices[i].Remembered)
+        {
+            Print(e.Devices[i].DeviceName + " (" + e.Devices[i].DeviceAddress + "): Device is known");
+        }
+        else
+        {
+            Print(e.Devices[i].DeviceName + " (" + e.Devices[i].DeviceAddress + "): Device is unknown");
+        }
+        this.deviceList.Add(e.Devices[i]);
+    }
+}
+
+private void component_DiscoverDevicesComplete(object sender, DiscoverDevicesEventArgs e)
+{
+    // log some stuff
+}
+
+[Pairing]
+
+이는 장치가 로컬 블루투스 장치와 결합됨을 의미합니다.
+이는 양쪽의 코드를 입력하여 한 번 수행해야 합니다.
+사용자가 장치가 추가되었다는 사실조차 인식하지 못하도록 코드를 통해 수행할 수 있습니다.
+이 목적을 위한 내 코드는 다음과 같습니다.
+
+// get a list of all paired devices
+BluetoothDeviceInfo[] paired = localClient.DiscoverDevices(255, false, true, false, false);
+// check every discovered device if it is already paired
+foreach (BluetoothDeviceInfo device in this.deviceList)
+{
+    bool isPaired = false;
+    for (int i = 0; i < paired.Length; i++)
+    {
+        if (device.Equals(paired[i]))
+        {
+            isPaired = true;
+            break;
+        }
+    }
+
+    // if the device is not paired, pair it!
+    if (!isPaired)
+    {
+        // replace DEVICE_PIN here, synchronous method, but fast
+        isPaired = BluetoothSecurity.PairRequest(device.DeviceAddress, DEVICE_PIN);
+        if (isPaired)
+        {
+            // now it is paired
+        }
+        else
+        {
+            // pairing failed
+        }
+    }
+}
+
+[Connecting]
+
+이는 연결을 설정하고 데이터를 교환하는 것을 의미합니다. 다시 일부 코드:
+
+// check if device is paired
+if (device.Authenticated)
+{
+    // set pin of device to connect with
+    localClient.SetPin(DEVICE_PIN);
+    // async connection method
+    localClient.BeginConnect(device.DeviceAddress, BluetoothService.SerialPort, new AsyncCallback(Connect), device);
+}
+
+// callback
+private void Connect(IAsyncResult result)
+{
+    if (result.IsCompleted)
+    {
+        // client is connected now :)
+    }
+}
+
+스캔, 페어링, 연결 순서를 유지하면 모든 것이 잘 작동합니다.
+데이터를 보내거나 받으려면 BluetoothClient의 GetStream() 메서드를 사용합니다.
+조작할 수 있는 네트워크 스트림을 제공합니다.
+
+[Receiving a connection]
+
+다른 장치를 귀하의 장치와 연결하려면 들어오는 연결 요청을 수신해야 합니다.
+이는 장치가 이전에 이미 페어링된 경우에만 작동합니다. 내 코드:
+
+BluetoothListener l = new BluetoothListener(LOCAL_MAC, BluetoothService.SerialPort);
+l.Start(10);
+l.BeginAcceptBluetoothClient(new AsyncCallback(AcceptConnection), l);
+
+void AcceptConnection(IAsyncResult result){
+    if (result.IsCompleted){
+        BluetoothClient remoteDevice = ((BluetoothListener)result.AsyncState).EndAcceptBluetoothClient(result);
+    }
+}
+
+LOCAL_MAC를 유효한 BluetoothAddress로 바꿉니다(예: BluetoothAddress.Parse(); 사용).
+장치가 연결된 후에는 기본 스트림을 통해 메시지를 교환할 수 있습니다.
+연결이 작동하지 않으면 인증 문제가 있을 수 있으므로 리스너에서 로컬 장치 핀을 설정해 보십시오(l.SetPin(LOCAL_MAC, MY_PASSWORD);
+
+========================================================================
+
+WMI를 사용하여 결과를 얻을 수도 있습니다. 다음은 네트워크 장치를 통과하는 WMI 솔루션에 대한 링크입니다.
+
+웹사이트가 다운될 경우를 대비해 여기에 코드를 게시하고 있지만 모든 크레딧은 원저자인 PsychoCoder에게 있습니다.
+WMI를 사용하여 C#에서 MAC 주소 가져오기
+
+코드는 다음과 같습니다.
+
+//Namespace reference
+using System.Management;
+
+/// <summary>
+/// Returns MAC Address from first Network Card in Computer
+/// </summary>
+/// <returns>MAC Address in string format</returns>
+public string FindMACAddress()
+{
+    //create out management class object using the
+    //Win32_NetworkAdapterConfiguration class to get the attributes
+    //af the network adapter
+    ManagementClass mgmt = new ManagementClass("Win32_NetworkAdapterConfiguration");
+    //create our ManagementObjectCollection to get the attributes with
+    ManagementObjectCollection objCol = mgmt.GetInstances();
+    string address = String.Empty;
+    //My modification to the code
+    var description = String.Empty;
+    //loop through all the objects we find
+    foreach (ManagementObject obj in objCol)
+    {
+        if (address == String.Empty)  // only return MAC Address from first card
+        {
+            //grab the value from the first network adapter we find
+            //you can change the string to an array and get all
+            //network adapters found as well
+            if ((bool)obj["IPEnabled"] == true)
+            {
+                address = obj["MacAddress"].ToString();
+                description = obj["Description"].ToString();
+            }
+        }
+       //dispose of our object
+       obj.Dispose();
+    }
+    //replace the ":" with an empty space, this could also
+    //be removed if you wish
+    address = address.Replace(":", "");
+    //return the mac address
+    return address;
+}
+
+System.Management에 대한 참조를 포함해야 합니다.
+네트워크 장치 이름을 얻으려면 obj["Description"].ToString();
+
+========================================================================
+
+
+using System;
+using System.Diagnostics;
+using System.Text;
+using System.Windows.Forms;
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Enumeration;
+
+namespace DevicePickerWinFormAppSample
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private async void Button1_Click(object sender, EventArgs e)
+        {
+            var picker = new DevicePicker();
+            picker.DeviceSelected += Picker_DeviceSelected;
+            picker.Filter.SupportedDeviceSelectors.Add(
+                BluetoothDevice.GetDeviceSelectorFromPairingState(false));
+
+            DeviceInformation di = await picker.PickSingleDeviceAsync(new Windows.Foundation.Rect(0, 0, 0, 0), Windows.UI.Popups.Placement.Default);
+            if (di == null)
+            {
+                return;
+            }
+
+            if (di.Pairing.IsPaired == false)
+            {
+                di.Pairing.Custom.PairingRequested += Custom_PairingRequested;
+
+                if (di.Pairing.CanPair == true)
+                {
+                    var pairResult = await di.Pairing.PairAsync();
+                    if (pairResult.Status == DevicePairingResultStatus.Paired)
+                    {
+                        // do something
+                    }
+                }
+                else
+                {
+                    var pairResult = await di.Pairing.Custom.PairAsync(DevicePairingKinds.ProvidePin);
+                    if (pairResult.Status == DevicePairingResultStatus.Paired)
+                    {
+                        // do something
+                    }
+                }
+            }
+        }
+
+        private void Custom_PairingRequested(DeviceInformationCustomPairing sender, DevicePairingRequestedEventArgs args)
+        {
+            if (args.PairingKind == DevicePairingKinds.ProvidePin)
+            {
+                // Microsoft.VisualBasic.dll 참조 필요
+                string result = Microsoft.VisualBasic.Interaction.InputBox("Pin?", "Pairing...", "");
+                if (string.IsNullOrEmpty(result) == false)
+                {
+                    args.Accept(result);
+                }
+            }
+            else
+            {
+                args.Accept();
+            }
+        }
+
+        private void Picker_DeviceSelected(DevicePicker sender, DeviceSelectedEventArgs args)
+        {
+            var di = args.SelectedDevice;
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine(di.Name);
+            sb.AppendLine(di.Id);
+            sb.AppendLine(di.Kind.ToString());
+            sb.AppendLine(di.Pairing.IsPaired.ToString());
+            sb.AppendLine(di.Pairing.CanPair.ToString());
+            sb.AppendLine("");
+            foreach (var item in di.Properties.Keys)
+            {
+                sb.Append(item);
+
+                string[] props = di.Properties[item] as string[];
+                if (props != null)
+                {
+                    sb.AppendLine(":");
+                    foreach (var prop in props)
+                    {
+                        sb.AppendLine("    " + prop);
+                    }
+                }
+                else
+                {
+                    sb.AppendLine(": " + di.Properties[item]);
+                }
+            }
+
+            Trace.WriteLine(sb.ToString());
+        }
+    }
+}
+
+최근에 저는 Bluetooth API를 사용해야 하는 프로젝트에 대한 아이디어를 얻었습니다.
+나는 간단한 것을 만들고 싶었지만 다음 두 가지 이유로 UWP를 사용하고 싶지 않았습니다.
+
+트레이 아이콘을 갖고 싶었습니다.
+이는 UWP에서도 가능하지만 내 시나리오에서는 완전 신뢰 애플리케이션을 만드는 것이 훨씬 더 복잡해 보였습니다.
+나는 최종 사용자가 개발자 모드를 활성화할 필요 없이 실행할 수 있는 간단한 독립형 애플리케이션을 원했습니다.
+제가 프로젝트를 위해 선택한 프레임워크는 WPF였습니다.
+단 한 가지 문제가 있었는데, BLE 수업을 이용할 수 없었습니다.
+많은 연구와 실패한 시도 끝에 실제로 WPF와 함께 사용할 수 있는 방법이 있습니다.
+
+내가 한 일은 다음과 같습니다.
+
+1. 윈도우 SDK 설치
+먼저 Windows SDK를 설치해야 합니다.
+나중에 변경할 수 없으므로 기본 위치에 설치하는 것이 이상적입니다. 저를 믿으세요!
+
+다른 위치에 설치한 경우 UWP 및 Visual Studio에서 완전 신뢰 애플리케이션 등을 만드는 데 사용할 수 없습니다.
+나도 그 것을 시도했습니다.
+
+SDK는 Windows.winmd 파일을 제공합니다.
+자세히 알아보려면 winmd(WinRT 메타데이터 파일)를 읽는 방법을 확인하세요.
+Ian Boyd는 이에 대해 아주 자세하게 설명했습니다.
+공식 문서도 있습니다.
+
+2. Windows.winmd 파일을 찾아 참조 추가
+기본 위치 경로를 따른 경우 Windows.winmd 파일은 C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.0.19041.0\Windows.winmd에 있습니다.
+계속해서 이 파일을 프로젝트에 대한 참조로 추가할 수 있습니다.
+
+불행하게도 이것은 .NET5에서는 작동하지 않습니다.
+너무 많은 것을 시도해 봤기 때문에 글을 쓰려면 또 다른 블로그 게시물을 작성해야 합니다.
+이 예와 내 프로젝트에서는 .Net Core 3.1을 사용하고 있습니다.
+
+이제 WPF, Windows Forms 및/또는 콘솔 애플리케이션에서 BLE 클래스를 사용할 수 있습니다.
+하지만 한 가지 문제가 있습니다. 아직 비동기 대기를 사용할 수 없습니다.
+
+3. 비동기 방식 수정
+이를 사용하려면 System.Runtime.WindowsRuntime.dll도 가져와야 합니다.
+.NET Framework 4를 설치한 경우 컴퓨터에 설치되어 있어야 합니다.
+내 파일 위치는 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll입니다.
+
+이 모든 작업이 끝나면 제대로 작동하는 애플리케이션이 있어야 합니다.
+
+단순화를 위해 콘솔 애플리케이션을 생성하겠습니다.
+
+.NET Core 3.1 콘솔 애플리케이션을 만듭니다.
+BleConsoleDemo라고 부르겠습니다.
+광고 패킷을 방출하는 모든 BLE 장치를 포착하는 간단한 프로그램을 작성하겠습니다.
+
+위에서 설명한 대로 System.Runtime.WindowsRuntime.dll 및 Windows.winmd 참조를 추가하는 것을 잊지 마세요.
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        var watcher = new BluetoothLEAdvertisementWatcher();
+        watcher = new BluetoothLEAdvertisementWatcher()
+        {
+            ScanningMode = BluetoothLEScanningMode.Passive
+        };
+
+        watcher.Received += Watcher_Received;
+        watcher.Start();
+
+        await Task.Delay(Timeout.Infinite);
+    }
+
+    private static async void Watcher_Received(
+        BluetoothLEAdvertisementWatcher sender,
+        BluetoothLEAdvertisementReceivedEventArgs args)
+    {
+        var device = await BluetoothLEDevice.FromBluetoothAddressAsync(args.BluetoothAddress);
+        if (device != null)
+        {
+            Console.WriteLine(device.BluetoothAddress);
+        }
+    }
+}
+
+You can find the example pfoject in my github.
+
+Originally published at https://hasan-hasanov.com on April 19, 2021.
+
+
+
+
+
+
+
+{Q}BLE(Bluetooth Low Energy) 및 WPF를 사용하여 데스크톱 앱을 만들어야 합니다.
+내 연구에 따르면 Microsoft BLE API는 WPF에 사용할 수 없습니다.
+Microsoft에는 UWP용 풍부한 UWP API가 있습니다. 그
+러면 WPF에서 UWP BLE APIS를 사용할 수 있나요?
+Windows 런타임 구성 요소를 사용해 보았지만 운이 좋지 않았습니다.
+{A}============================================================================================>
+Windows.Devices.Bluetooth API는 DualApiPartitioned이며 이는 데스크톱 앱에서 API를 호출할 수 있음을 의미합니다.
+따라서 BLE API를 사용하려는 경우 WPF에 다음 참조를 추가해 볼 수 있습니다.
+
+System.Runtime.WindowsRuntime, in: C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.dll
+Windows, in: C:\Program Files (x86)\Windows Kits\10\UnionMetadata\Facade\Windows.WinMD
+Windows.Foundation.FoundationContract, in: C:\Program Files (x86)\Windows Kits\10\References\10.0.18362.0\Windows.Foundation.FoundationContract\3.0.0.0\Windows.Foundation.FoundationContract.winmd
+Windows.Foundation.UniversalApiContract, in: C:\Program Files (x86)\Windows Kits\10\References\10.0.18362.0\Windows.Foundation.UniversalApiContract\8.0.0.0\Windows.Foundation.UniversalApiContract.winmd
+============================================================================================
+
+
+
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.Advertisement;
+using Windows.Devices.Bluetooth.GenericAttributeProfile;
+using System.Threading;
+using System.Runtime.InteropServices.WindowsRuntime;
+
+namespace SwitchBotTry
+{
+    /// <summary>
+    /// MainWindow.xaml の相互作用ロジック
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        private BluetoothLEAdvertisementWatcher advWatcher;
+
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+
+        private async void BtnScan_Click(object sender, RoutedEventArgs e)
+        {
+            await StartScan();
+        }
+
+        private async Task StartScan()
+        {
+            this.advWatcher = new BluetoothLEAdvertisementWatcher();
+            this.advWatcher.SignalStrengthFilter.SamplingInterval = TimeSpan.FromMilliseconds(1000);
+            this.advWatcher.ScanningMode = BluetoothLEScanningMode.Active;
+            this.advWatcher.Received += this.Watcher_Received;
+
+            // スキャン開始
+			//스캔 시작
+            this.advWatcher.Start();
+        }
+
+        private Guid switchUUID = new Guid("cba20d00-224d-11e6-9fb8-0002a5d5c51b");
+        private Guid commandUUID = new Guid("cba20002-224d-11e6-9fb8-0002a5d5c51b");
+        private async void Watcher_Received(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
+        {
+            var mac = args.BluetoothAddress.ToString("x");
+            var bleServiceUUID = args.Advertisement.ServiceUuids.FirstOrDefault();
+            var targetMac = "****"; // 事前に調べたMAC 사전에 조사한 MAC
+            if (mac == targetMac)
+            {
+                //アドバタイスパケットの中身を羅列する
+				//광고 패킷의 내용을 나열
+                foreach (var adv in args.Advertisement.DataSections)
+                {
+                    addLog(" " + adv.DataType.ToString("x") + ":" + BitConverter.ToString(adv.Data.ToArray()));
+                }
+            }
+            //目当てのUUIDで絞り込み
+			//목표 UUID로 필터링
+            if (bleServiceUUID == switchUUID)
+            {
+                advWatcher.Stop(); //デバイスを見つけたので止める 기기를 찾았으므로 중지
+                try
+                {
+                    //接続 연결
+                    BluetoothLEDevice device = await BluetoothLEDevice.FromBluetoothAddressAsync(args.BluetoothAddress);
+                    //サービス・キャラクタリスティックを列挙
+					//서비스 캐릭터리스틱 열거
+                    addLog("get service");
+                    foreach (var service in device.GattServices)
+                    {
+                        addLog(service.Uuid.ToString());
+                        addLog("   get characteristics");
+                        foreach (var ch in service.GetAllCharacteristics())
+                        {
+                            addLog("     "  + ch.Uuid.ToString() + "  " + ch.CharacteristicProperties.ToString());
+                            if (ch.CharacteristicProperties.HasFlag(GattCharacteristicProperties.Read)){
+                                var val = await ch.ReadValueAsync();
+                                var data = val.Value.ToArray();
+                                string text = System.Text.Encoding.UTF8.GetString(data);
+                                addLog("     value " + BitConverter.ToString(data) + " >> " + text);
+
+                            }
+                        }
+                    }
+                    //サービスUUIDを使って目的のサービスを取得
+					//서비스 UUID를 사용하여 원하는 서비스 얻기
+                    //asyncバージョンは使えない
+					//async 버전을 사용할 수 없습니다.
+                    var gattService = device.GetGattService(switchUUID);
+                    //キャラクタリスティックUUIDを使って目的のキャラクタリスティックを取得
+					//캐릭터 UUID를 사용하여 원하는 문자 얻기
+                    //asyncバージョンは使えない
+					//async 버전을 사용할 수 없습니다.
+                    var characteristics = gattService.GetCharacteristics(commandUUID);
+                    //戻ってくるのが配列なので空じゃないか確認
+					//돌아오는 것이 배열이므로 비어 있지 않은지 확인
+                    if (characteristics.Count > 0)
+                    {
+                        var command = characteristics.First();
+                        if (command.CharacteristicProperties.HasFlag(GattCharacteristicProperties.Write))
+                        {
+                            byte[] comPress = { 0x57, 0x01, 0x00};
+                            var res = await command.WriteValueAsync(comPress.AsBuffer(), GattWriteOption.WriteWithResponse);
+                            addLog(res.ToString());
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Exception...{ex.Message})");
+                }
+            }
+        }
+
+        private void addLog(String log)
+        {
+            Dispatcher.Invoke(new Action<string>(loglog =>
+            {
+                this.txtLog.Text += loglog + "\r\n";
+            }), log);
+
+            Console.WriteLine(log);
+        }
+
+        private void BtnStop_Click(object sender, RoutedEventArgs e)
+        {
+            this.advWatcher.Stop();
+        }
+    }
+}
+
+
+
+public class BluetoothClientExt : IDisposable
+{
+	public BluetoothClient handler = null;
+	public bool isConnected = false;
+	private Action<string, string> onReceive;
+	private CancellationTokenSource cancelSource;
+	public NetworkStream stream;
+	private string incomingdata = "";
+	private bool ping = false;
+	private Stopwatch sw = new Stopwatch();
+	public Action onDisconnect;
+
+	public BluetoothClientExt(BluetoothClient _handler)
+	{
+		isConnected = true;
+		handler = _handler;
+		cancelSource = new CancellationTokenSource();
+		Task.Run(() => Listener(cancelSource));
+	}
+
+	public BluetoothClientExt(BluetoothClient _handler, Action<string, string> action)
+	{
+		isConnected = true;
+		handler = _handler;
+		this.onReceive = action;
+		cancelSource = new CancellationTokenSource();
+		Task.Run(() => Listener(cancelSource));
+	}
+
+	public BluetoothClientExt(Action<string, string> action)
+	{
+		isConnected = false;
+		this.onReceive = action;
+		cancelSource = new CancellationTokenSource();
+	}
+
+	public void Start()
+	{
+		isConnected = true;
+		stream = handler.GetStream();
+		stream.ReadTimeout = 2;
+		stream.WriteTimeout = 20;
+		Task.Run(() => Listener(cancelSource));
+	}
+
+	public void SetOnReceive(Action<string, string> action)
+	{
+		onReceive = action;
+	}
+
+	public void Send(string arg)
+	{
+		if (isConnected == false)
+			return;
+		incomingdata = arg;
+	}
+
+	private void PingPong(CancellationTokenSource token)
+	{
+		while (true)
+		{
+			for (int i = 0; i < 10; i++)
+			{
+				if (token.IsCancellationRequested)
+					break;
+				Thread.Sleep(100);
+			}
+			ping = true;
+		}
+	}
+
+	public void RefreshTimer()
+	{
+		sw.Restart();
+	}
+
+	private void Listener(CancellationTokenSource token)
+	{
+		string buffer = "";
+		byte[] arg = new byte[1024 * 2];
+
+		sw.Start();
+
+		try
+		{
+			while (Common.Base.Instance.IsApplicationRunning == true)
+			{
+				Thread.Sleep(25);
+				if (token.IsCancellationRequested)
+					break;
+
+				try
+				{
+					if (handler.Connected == false)
+					{
+						isConnected = false;
+						if (handler != null)
+							handler.Client.Disconnect(true);
+						onDisconnect?.Invoke();
+						return;
+					}
+
+					if (stream.DataAvailable == true)
+					{
+						var content = stream.Read(arg, 0, (1024 * 4) - 2);
+
+						if (content != 0)
+						{
+							buffer += ASCIIEncoding.UTF8.GetString(Convert.FromBase64String(ASCIIEncoding.UTF8.GetString(arg, 0, content).Replace("\n", "").Replace("\r", "")));
+							onReceive?.Invoke(handler.RemoteEndPoint.Address.ToString(), buffer);
+							buffer = "";
+						}
+					}
+					else if (incomingdata.Length != 0)
+					{
+						byte[] ar = Encoding.UTF8.GetBytes(Convert.ToBase64String(Encoding.UTF8.GetBytes(incomingdata)));
+
+						stream.Write(ar, 0, ar.Length);
+						stream.Write(Encoding.UTF8.GetBytes("\r\n"), 0, 2);
+						incomingdata = "";
+					}
+				}
+				catch (IOException)
+				{
+					isConnected = false;
+					if (handler != null)
+						handler.Client.Disconnect(true);
+					onDisconnect?.Invoke();
+					return;
+				}
+			}
+		}
+		catch (Exception)
+		{
+			isConnected = false;
+			if (handler != null)
+				handler.Client.Disconnect(true);
+		}
+		isConnected = false;
+		onDisconnect?.Invoke();
+	}
+
+	public void Dispose()
+	{
+		Dispose(true);
+		GC.SuppressFinalize(this);
+	}
+
+	public void Stop()
+	{
+		cancelSource.Cancel();
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			if (cancelSource != null)
+			{
+				cancelSource.Dispose();
+				cancelSource = null;
+			}
+		}
+	}
+}
+
+
+[C#/WinRT] WPF로 Bluetooth v4(BLE)를 지원하는 방법
+
+BLE를 사용하면 페어링을 할 수 있고 Windows의 設定画면에서 페어링을 사용할 수 없습니다.
+프로그람중에서는 페아링이 더 이상 없습니다.
+
+여기에서 DeviceInformation을 확인하세요.
+
+페아링.cs
+private async void DoPairing(DeviceInformation devInfo)
+{
+    // devInfo는 ,watcher에서 데바이스 정보를 확인했습니다.
+    if (devInfo == null) return;
+
+    if (devInfo.Pairing.IsPaired == false)
+    {
+        DeviceInformationCustomPairing customPairing = devInfo.Pairing.Custom;
+        customPairing.PairingRequested += PairingRequestedHandler;
+        DevicePairingResult result = await customPairing.PairAsync(DevicePairingKinds.ConfirmOnly, DevicePairingProtectionLevel.Default);
+        customPairing.PairingRequested -= PairingRequestedHandler;
+        Debug.WriteLine($"페아링 결절：{result.Status}");
+    }
+    else
+    {
+        // 이미 페어링됨
+    }
+}
+
+페어링 해제.cs
+private async void DoUnpairing(DeviceInformation devInfo)
+{
+    if (devInfo == null) return;
+
+    if (devInfo.Pairing.IsPaired == true)
+    {
+        var result = await devInfo.Pairing.UnpairAsync();
+        Debug.WriteLine($"페어링 해제 결과：{result.Status}");
+    }
+    else
+    {
+        // 이미 페어링 해제됨
+    }
+}
+
+페어링 요청시 핸들러 .cs
+private static void PairingRequestedHandler(DeviceInformationCustomPairing sender, DevicePairingRequestedEventArgs args)
+{
+    switch (args.PairingKind)
+    {
+        case DevicePairingKinds.ConfirmOnly:
+            args.Accept();
+            break;
+    }
+}
+
+페어링 요청시 핸들러 정보
+아래에 위 코드를 기반으로 한 Microsoft 페어링 샘플이 있습니다.
+
+■ 코드 샘플
+https://github.com/microsoft/Windows-universal-samples/blob/master/Samples/DeviceEnumerationAndPairing/cs/Scenario9_CustomPairDevice.xaml.cs
+
+■DevicePairingKinds의 enum에 대해서
+https://docs.microsoft.com/en-us/uwp/api/windows.devices.enumeration.devicepairingkinds
+
+이 핸들러 (여기서 PairingRequestedHandler)를 사용하면 앱 사용자에게 "정말 페어링 할 수 있습니까?"또는 "비밀번호를 입력하십시오." "등"의 "확인"을 제어합니다.
+
+위의 샘플에서는, 간단을 위해서 아무것도 확인하지 않고 페어링을 실행하도록(듯이) 했지만, MS의 샘플에서는, 아래와 같이 각종 확인 다이얼로그의 표시를 실시하고 있었다.
+
+Scenario9_CustomPairDevice.xaml.cs
+private async void PairingRequestedHandler(
+    DeviceInformationCustomPairing sender,
+    DevicePairingRequestedEventArgs args)
+{
+    switch (args.PairingKind)
+    {
+        case DevicePairingKinds.ConfirmOnly:
+            // Windows itself will pop the confirmation dialog as part of "consent" if this is running on Desktop or Mobile
+            // If this is an App for 'Windows IoT Core' where there is no Windows Consent UX, you may want to provide your own confirmation.
+            args.Accept();
+            break;
+
+        case DevicePairingKinds.DisplayPin:
+            // We just show the PIN on this side. The ceremony is actually completed when the user enters the PIN
+            // on the target device. We automatically accept here since we can't really "cancel" the operation
+            // from this side.
+            args.Accept();
+
+            // No need for a deferral since we don't need any decision from the user
+            await rootPage.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                ShowPairingPanel(
+                    "Please enter this PIN on the device you are pairing with: " + args.Pin,
+                    args.PairingKind);
+
+            });
+            break;
+
+        case DevicePairingKinds.ProvidePin:
+            // A PIN may be shown on the target device and the user needs to enter the matching PIN on
+            // this Windows device. Get a deferral so we can perform the async request to the user.
+            var collectPinDeferral = args.GetDeferral();
+
+            await rootPage.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                string pin = await GetPinFromUserAsync();
+                if (!string.IsNullOrEmpty(pin))
+                {
+                    args.Accept(pin);
+                }
+
+                collectPinDeferral.Complete();
+            });
+            break;
+
+        case DevicePairingKinds.ProvidePasswordCredential:
+            var collectCredentialDeferral = args.GetDeferral();
+            await rootPage.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                var credential = await GetPasswordCredentialFromUserAsync();
+                if (credential != null)
+                {
+                    args.AcceptWithPasswordCredential(credential);
+                }
+                collectCredentialDeferral.Complete();
+            });
+            break;
+
+        case DevicePairingKinds.ConfirmPinMatch:
+            // We show the PIN here and the user responds with whether the PIN matches what they see
+            // on the target device. Response comes back and we set it on the PinComparePairingRequestedData
+            // then complete the deferral.
+            var displayMessageDeferral = args.GetDeferral();
+
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                bool accept = await GetUserConfirmationAsync(args.Pin);
+                if (accept)
+                {
+                    args.Accept();
+                }
+
+                displayMessageDeferral.Complete();
+            });
+            break;
+    }
+}
+
+enum  의미
+DevicePairingKinds.ConfirmOnly
+	- 페어링할지 확인만 합니다.
+	이번 샘플에서는 확인 다이얼로그를 내거나 하지는 않는다.
+	확인 다이얼로그 필요한 경우는 Accept()의 앞에 다이얼로그를 내는 처리를 써, OK를 눌렀을 때만 Accept()한다, 등해 한다
+DevicePairingKinds.ConfirmPinMatch
+	- 사용자에게 PIN을 표시하여 '표시중인 PIN이 다른 기기에 표시된 PIN과 일치합니까?'
+DevicePairingKinds.DisplayPin
+	- 사용자에게 PIN을 표시하고 "보고있는 PIN을 다른 기기에 입력하십시오."
+DevicePairingKinds.None
+	- 페어링을 지원하지 않음
+DevicePairingKinds.ProvidePasswordCredential
+	- 사용자가 암호를 입력하도록 합니다.
+DevicePairingKinds.ProvidePin
+	- 사용자가 PIN을 입력하도록 허용
+
