@@ -1,4 +1,73 @@
 const Commons = {
+    init: function() {
+    },
+    form: {
+        init: function() {
+        },
+        checkRequiredField: function(areaID) {
+            var chkValidation = true;
+
+            $("#" + areaID + " input:visible, #" + areaID + " select:visible, #" + areaID + " textarea:visible").each(function () {
+                if ($(this).hasClass("required") && $(this).attr("type") == "file") {
+                    if (getAttachedFilesCount(($(this).attr("id"))) == 0) {
+                        $(".file-input").addClass("validation-error");
+                        chkValidation = false;
+                    } else {
+                        $(".file-input").removeClass("validation-error");
+                        $(this).removeClass("validation-error");
+                    }
+                }
+                else if ($(this).hasClass("required") && ($(this).val() == null || $(this).val().IsNullOrEmpty())) {
+                    $(this).addClass("validation-error");
+                    chkValidation = false;
+                } else {
+                    $(this).removeClass("validation-error");
+                }
+            });
+
+            return chkValidation;
+        },
+        removeDisabled: function() {
+            $("input:disabled").attr("disabled", false);
+            $("select:disabled").attr("disabled", false);
+        }
+    },
+    search: {
+        init: function() {
+        }
+    },
+    grid: {
+        init: function() {
+        }
+    },
+    popup: {
+        init: function() {
+        },
+        modal: {
+            regist: function(id, showCallback, hideCallback) {
+                $(document).on('show.bs.modal', id, showCallback);
+                $(document).on('hidden.bs.modal', id, hideCallback);
+            }
+        }
+    },
+    ajax: {
+        loading: function(id, cls, clsView) {
+            $(document).ajaxStart(function( event, request, settings ) {
+                $(cls).removeClass(clsView);
+            });
+            //jquery ajax 호출 완료시 로딩 이미지 제거
+            $(document).ajaxComplete(function (event, request, settings) {
+                $(cls).addClass(clsView);
+                $(id).addClass(clsView); //로딩중 화면 제거
+            });
+        }
+    }
+    util: {
+        number: {
+        },
+        date: {
+        }
+    },
     ajaxCall: function(param) {
         $.ajax($.extend({
             contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -10,7 +79,6 @@ const Commons = {
             timeout: 10000
         }, param));
     }
-
 };
 
 function itp_fn_open_tab(param) {
