@@ -1,0 +1,830 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.StrategicMgtMapper" >	
+<!-- 
+운송관리 > 전략물자관리 > 목록 조회
+운송관리 > 전략물자관리 > 승인 상태 변경
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 상세 조회
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 조회
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 생성
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 수정
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 삭제
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 조회
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 생성
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 삭제
+운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 수정
+-->
+	<!-- 운송관리 > 전략물자관리 > 목록 조회 -->
+	<select id="selectStrategicMgtList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* StrategicMgtMapper.selectStrategicMgtList 운송관리 > 전략물자관리 > 목록 조회 */
+		SELECT
+			ROWNUM
+			, x.*
+		FROM (
+			SELECT
+				b.SHIPPING_REQ_NO		/* 운송요청 번호(Manual 입력)	*/
+				, b.PROJECT_ID			/* ERP 프로젝트 ID				*/
+				, (
+					SELECT DISTINCT z.DESCRIPTION
+					FROM ZSHP_PROJECTS_INT z
+					WHERE z.PROJECT_CODE = b.PROJECT_ID
+				) AS PROJECT_DESC		/* 프로젝트 명					*/
+				, b.INVOICE_NO	 		/* INVOICE_NO				*/
+				, CASE
+					WHEN a.STRATEGIC_ITEM_YN = 'Y' THEN 1
+					ELSE 0
+				END AS STRATEGIC_ITEM_YN/* 전략물자포함여부(전략물자대상) Y/N */
+				, DECODE( a.STATUS
+					, 'Incomplete'				, '작성중'
+					, 'Pre-Judgment'			, '판정요청'
+					, 'Pre-Approved'			, '승인요청'
+					, 'Pre-Conditional-Approved', '조건부승인요청'
+					, 'Judged'					, '판정완료'
+					, 'Approved'				, '승인완료'
+					, 'Conditional-Approved'	, '조건부승인완료'
+					, 'Rejected'				, '반려'
+					, ''
+				) AS STATUS_NM			/* 승인상태 명					*/
+				, DECODE( a.JUDGMENT_TYPE
+					, 'ab', '공급업체 전문판정'
+					, 'ba', '두산중공업 자가판정'
+					, 'bb', '두산중공업 전문판정'
+					, ''
+				) AS JUDGMENT_TYPE_NM	/* 판정종류					*/ 
+				, a.CERTIFICATE_NUMBER	/* 판정서 번호					*/
+				, (
+					SELECT DESCRIPTION
+					FROM FND_USER_INT z
+					WHERE z.USER_NAME = upper( a.JUDGED_BY )
+				) AS JUDGED_BY_NM		/* 판정자						*/
+				, a.JUDGMENT_DATE		/* 판정일						*/
+				, (
+					SELECT DESCRIPTION
+					FROM FND_USER_INT z
+					WHERE z.USER_NAME = upper( a.CREATED_BY )
+				) AS CREATED_BY_NM		/* 생성자						*/
+				, a.CREATION_DATE		/* 생성일						*/
+				, a.CERTIFICATE_ORGANIZATION	/* 판정기관			*/
+				, a.EXPORT_PERMISSION_NUMBER	/* 수출허가증 번호		*/
+				, (
+					SELECT DESCRIPTION
+					FROM FND_USER_INT z
+					WHERE z.USER_NAME = upper( a.APPROVER )
+				) AS APPROVER_NM		/* 승인자						*/
+				, a.APPROVED_DATE		/* 승인완료 날짜				*/
+				, (
+					SELECT DESCRIPTION
+					FROM FND_USER_INT z
+					WHERE z.USER_NAME = upper( a.LAST_UPDATED_BY )
+				) AS LAST_UPDATED_BY_NM	/* 수정자						*/
+				, a.LAST_UPDATE_DATE	/* 수정일						*/
+				/* 화면표시 안함 */
+				, a.STATUS AS STR_STATUS/* 전략물자 승인상태				*/
+				, a.JUDGED_BY			/* 판정자						*/
+				, a.CREATED_BY			/* 생성자						*/
+				, a.STRATEGIC_MASTER_ID	/* 전략물자SEQ					*/
+				, a.ATTACH_GRP_CD		/* 첨부파일 grp_cd				*/
+				, b.REQ_MASTER_ID		/* 운송요청 REQUEST MASTER ID(SEQUENCE NO)*/
+				, a.JUDGMENT_TYPE		/* 판정종류( ab: 공급업체 전문판정, ba: 두산중공업 자가판정, bb: 두산중공업 전문판정 ) */
+				, b.STATUS AS SHI_STATUS/* 출하요청상태					*/
+				, a.STRATEGIC_ITEM_YN AS STRATEGIC_ITEM_YN_TXT	/*  */
+				, NVL(b.ATTRIBUTE4, 'N') AS IS_MANUAL_STRATEGIC /* 전략물자 수기 생성 화인 여부 */
+				, CASE WHEN NVL(A.ATTRIBUTE3, 'N') = 'Y' THEN 1 ELSE 0 END AS FOB_YN /* FOB 건 수기생성 위의 전략물자 수기 생성과 현재는 동일한 역할 */
+				, CASE WHEN NVL(B.ATTRIBUTE5, 'N') = 'Y' THEN 1 ELSE 0 END AS SPECIAL_SHIPPING_YN /* 특송 여부 */
+			FROM
+				ZSHP_STRATEGIC_MASTER			a	/* 전략물자관리 테이블				*/
+				INNER JOIN ZSHP_SHIPPING_REQ_M	b ON/* 출하요청 Master 정보 관리 TABLE	*/
+					b.ATTRIBUTE3 IS NOT NULL
+					AND a.STRATEGIC_MASTER_ID	= b.ATTRIBUTE3	/*	전략물자SEQ		*/
+					<if test=' null != projectCode and "" != projectCode '>
+						AND b.PROJECT_ID		= #{projectCode}/* ERP 프로젝트 ID		*/
+					</if>
+			WHERE 1=1
+				<if test=' null != certificateNumber and "" != certificateNumber '>
+					/* 판정서 번호		*/
+					AND a.CERTIFICATE_NUMBER	LIKE #{certificateNumber} ||'%'
+				</if>
+				<if test=' null != shippingReqNo and "" != shippingReqNo '>
+					/* 운송요청 번호	*/
+					AND b.SHIPPING_REQ_NO		LIKE #{shippingReqNo} ||'%'
+				</if>
+				<if test=' null != invoiceNo and "" != invoiceNo '>
+					/* Invoice No.	*/
+					AND UPPER(b.INVOICE_NO)		LIKE UPPER(#{invoiceNo}) ||'%'
+				</if>
+				<if test=' null != creationDateSt and "" != creationDateSt '>
+					<if test=' null != creationDateEd and "" != creationDateEd '>
+						/* 생성일 */
+						AND a.CREATION_DATE
+							BETWEEN	to_date( #{creationDateSt}, 'yyyy/mm/dd' )
+							AND		to_date( #{creationDateEd}, 'yyyy/mm/dd' ) + 0.99999
+					</if>
+				</if>
+				<if test=' null != judgmentType and "" != judgmentType '>
+					/* 판정종류( ab: 공급업체 전문판정, ba: 두산중공업 자가판정, bb: 두산중공업 전문판정 ) */
+					AND a.JUDGMENT_TYPE			= #{judgmentType}
+				</if>
+				<if test=' null != incompleteYn and "" != incompleteYn and "N" == incompleteYn '>
+					/* 전략물자담당자는 작성중 상태의항목이 보이지 않도록 */
+					AND a.STATUS != 'Incomplete'
+				</if>
+				<choose>
+					<when test='status != null and status == "All"'>
+					</when>
+					<when test='status != null and status != "" and status != "All"'>
+						AND (a.STATUS = #{status} OR a.STATUS = 'Conditional-Approved')
+					</when>
+					<otherwise>
+						AND (a.STATUS in ('Incomplete', 'Pre-Judgment', 'Pre-Approved', 'Rejected'))
+					</otherwise>
+				</choose>
+				<if test='strategicItemYn != null and strategicItemYn != ""'>
+					/* 전략물자 포함 여부	*/
+		 			AND NVL(a.STRATEGIC_ITEM_YN, 'N') = #{strategicItemYn}
+				</if>
+				<if test='fobYn != null and fobYn != ""'>
+					/* FOB 여부	*/
+		 			AND NVL(a.ATTRIBUTE3, 'N') = #{fobYn}
+				</if>
+				<if test='specialShippingYn != null and specialShippingYn != ""'>
+					/* 특송 여부	*/
+		 			AND NVL(b.ATTRIBUTE5, 'N') = #{specialShippingYn}
+				</if>
+				<!-- 
+				<if test='status != null and status != ""'>
+					/* 승인상태	*/
+					AND (a.STATUS = #{status} OR a.STATUS = 'Conditional-Approved')
+				</if>
+				<if test='status == null or status == ""'>
+					/* 승인상태	*/
+					AND (a.STATUS in ('Incomplete', 'Pre-Judgment', 'Pre-Approved', 'Rejected'))
+				</if>
+				 -->
+			ORDER BY
+				DECODE( a.STATUS, 'Conditional-Approved', 1)	/* 조건부승인완료 먼저 */
+				, a.CREATION_DATE	DESC	/* 생성일	*/
+		) x
+	</select>
+
+	<!-- 운송관리 > 전략물자관리 > 승인 상태 변경 -->
+	<update id="updateStrategicMgtListStatus" parameterType="java.util.Map">
+		/* StrategicMgtMapper.updateStrategicMgtListStatus 운송관리 > 전략물자관리 > 승인 상태 변경 */
+		UPDATE
+			ZSHP_STRATEGIC_MASTER			/* 전략물자관리 테이블 */
+		SET
+			LAST_UPDATE_DATE			= SYSDATE
+			, LAST_UPDATED_BY			= #{USER_AD}
+			<if test=' null != btnType and "" != btnType and "comApproved" == btnType'>
+				/* 승인완료	*/
+				, STATUS				= 'Approved'
+				, JUDGMENT_DATE			= SYSDATE					/* 판정일			*/
+				, JUDGED_BY				= #{USER_AD}				/* 판정자			*/
+			</if>
+			<if test=' null != btnType and "" != btnType and "conApproved" == btnType'>
+				/* 조건부승인완료	*/
+				, STATUS				= 'Conditional-Approved'
+				, JUDGMENT_DATE			= SYSDATE					/* 판정일			*/
+				, JUDGED_BY				= #{USER_AD}				/* 판정자			*/
+			</if>
+			<if test=' null != btnType and "" != btnType and "return" == btnType'>
+				/* 반려			*/
+				/* 반려 시 JUDGEMENT_DATE , JUDGED_BY 제거*/
+				, STATUS				= 'Rejected'
+			</if>
+		WHERE
+			STRATEGIC_MASTER_ID = #{strategicMasterId}	/* 전략물자SEQ */
+	</update>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 상세 조회 -->
+	<select id="selectStrategicMgtDetailPop" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* StrategicMgtMapper.selectStrategicMgtDetailPop 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 상세 조회 */
+		SELECT
+			b.SHIPPING_REQ_NO			/* 운송요청 번호(Manual 입력)	*/
+			, a.STRATEGIC_ITEM_YN		/* 전략물자포함여부(전략물자대상)Y/N*/
+			, b.PROJECT_ID				/* ERP 프로젝트 ID				*/
+			, (
+				SELECT DISTINCT z.NAME
+				FROM PA_PROJECTS_ALL_INT z
+				WHERE z.SEGMENT1 = b.PROJECT_ID
+			) AS PROJECT_DESC			/* 프로젝트 명					*/
+			, b.INVOICE_NO				/* INVOICE_NO				*/
+			, b.DESCRIPTION        /* DESCRIPTION       */
+			, b.DELIVERY_TERMS			/* 구매인도조건					*/
+			, to_char(
+				b.SHOP_OUT_DATE, 'yyyy/mm/dd'
+			) AS SHOP_OUT_DATE			/* 출하예정일					*/
+			, (
+				SELECT
+					L.DTL_CD_NM	AS LABEL	/* 화면에 표시되는 label	*/
+				FROM
+					ESACDDT		T 
+					, ESACDDL	L 
+					, ESACDGP	G 
+				WHERE
+					G.GRP_CD		= T.GRP_CD 
+					AND G.GRP_CD	= L.GRP_CD 
+					AND T.DTL_CD	= L.DTL_CD 
+					AND T.USE_YN	= 'Y' 
+					AND G.GRP_CD	= 'C101'
+					AND T.DTL_CD	= b.DUTY_REFUND_OPTION
+					AND L.LANG_CD	= 'ko_KR'
+			) AS DUTY_REFUND_OPTION		/* 관세환급					*/
+			, b.INDEPT_FLAG				/* Supplier					*/
+			, DECODE(B.INDEPT_FLAG, 'N', (SELECT VENDOR_NAME_ALT FROM PO_VENDORS@LN_PROD_ZSHPIF T WHERE T.SEGMENT1 = B.VENDOR_ID), B.DEPT_NM) AS DEPT_NM /* Supplier	Name			*/
+			, a.STRATEGIC_MASTER_ID		/* 전략물자SEQ					*/
+			, NVL(a.IS_THIRD_COUNTRY, 'N') AS IS_THIRD_COUNTRY
+			, NVL(b.ATTRIBUTE4, 'N') AS IS_MANUAL_STRATEGIC /* 전략물자 수기 생성 화인 여부, 출하요청에서 가져옴 */
+			, b.DUTY_REFUND_OPTION AS DUTY_REFUND_OPTION_VALUE
+			, NVL(b.ATTRIBUTE5, 'N') AS IS_SPECIAL_SHIPPING -- 특송, 출하요청에서 가져옴
+			, NVL(a.ATTRIBUTE3, 'N') AS IS_FOB -- FOB운송, 전략물자에서 가져옴
+			, b.REQ_MASTER_ID AS REQ_MASTER_ID
+			, b.VENDOR_ID AS VENDOR_ID
+			, b.DEPT_ID AS DEPT_CD
+			, a.STATUS AS STATUS
+<!-- 		
+			, a.CATCH_ALL_YN			/* 전략물자포함N일 때 catch_all 여부 Y/N	*/
+			, a.JUDGMENT_TYPE			/* 판정종류( ab: 공급업체 전문판정, ba: 두산중공업 자가판정, bb: 두산중공업 전문판정 ) */
+			, a.CERTIFICATE_NUMBER		/* 판정서 번호					*/
+			, a.CERTIFICATE_ORGANIZATION/* 판정기관					*/
+			, a.EXPORT_PERMISSION_NUMBER/* 수출허가증 번호				*/
+ -->
+		FROM
+			ZSHP_STRATEGIC_MASTER			a	/* 전략물자관리 테이블				*/
+			INNER JOIN ZSHP_SHIPPING_REQ_M	b ON/* 출하요청 Master 정보 관리 TABLE	*/
+				b.ATTRIBUTE3 IS NOT NULL
+				AND a.STRATEGIC_MASTER_ID	= b.ATTRIBUTE3	/*	전략물자SEQ		*/
+		WHERE
+			a.STRATEGIC_MASTER_ID	= #{strategicMasterId}/*	전략물자SEQ		*/
+	</select>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 조회 -->
+	<select id="selectStrategicMgtDetailPopPackageNoList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* StrategicMgtMapper.selectStrategicMgtDetailPopPackageNoList 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 조회 */
+		SELECT
+			ROWNUM
+			, x.*
+		FROM (
+			SELECT
+				a.STRATEGIC_ITEM_YN			/* 전략물자포함여부(전략물자대상) Y/N		*/
+				, a.CATCH_ALL_YN			/* 전략물자포함N일 때 catch_all 여부 Y/N	*/
+				, JUDGMENT_TYPE				/* 판정종류			*/ 
+				, a.CERTIFICATE_NUMBER		/* 판정서 번호			*/
+				, a.CERTIFICATE_ORGANIZATION/* 판정기관			*/
+				, a.EXPORT_PERMISSION_NUMBER/* 수출허가증 번호		*/
+				, a.STRATEGIC_MASTER_ID		/* 전략물자SEQ			*/
+				, a.STRATEGIC_DETAIL_ID		/* 전략물자 DEATIL SEQ	*/
+				, a.EXPORT_PERMISSION_ORGANIZATION/* 수출허가기관	*/
+			FROM
+				ZSHP_STRATEGIC_DETAIL a	/* 전략물자관리 상세 테이블	*/
+			WHERE
+				a.STRATEGIC_MASTER_ID	= #{strategicMasterId}	/*	전략물자SEQ		*/
+			ORDER BY
+				a.STRATEGIC_DETAIL_ID DESC
+		) x
+	</select>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 생성 -->
+	<insert id="insertStrategicMgtDetailPopPackageNoList" parameterType="java.util.Map">
+		/* StrategicMgtMapper.insertStrategicMgtDetailPopPackageNoList 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 생성 */
+		INSERT INTO ZSHP_STRATEGIC_DETAIL /* 전략물자관리 상세 테이블 */ (
+			STRATEGIC_MASTER_ID       		/* 전략물자SEQ, SEQ_ZSHP_STRATEGIC_MASTER			*/
+			, STRATEGIC_DETAIL_ID     		/* 전략물자 DEATIL SEQ, SEQ_ZSHP_STRATEGIC_DETAIL	*/
+			, STRATEGIC_ITEM_YN       		/* 전략물자포함여부(전략물자대상) Y/N						*/
+			, CATCH_ALL_YN            		/* 전략물자포함N일 때 catch_all 여부 Y/N					*/
+			, JUDGMENT_TYPE           		/* 판정종류(공급업체 자가판정, 공급업체 전문판정, 두산중공업 자가판정, 두산중공업 전문판정)	*/
+			, CERTIFICATE_NUMBER      		/* 판증서 번호		*/
+			, CERTIFICATE_ORGANIZATION		/* 판정기관		*/
+			, EXPORT_PERMISSION_NUMBER		/* 수출허가증 번호	*/
+			, EXPORT_PERMISSION_ORGANIZATION/* 수출허가기관		*/
+			, CREATION_DATE					/* 생성일			*/
+			, CREATED_BY					/* 생성자			*/
+		) VALUES (
+			#{strategicMasterId}				/* 전략물자SEQ, SEQ_ZSHP_STRATEGIC_MASTER			*/
+			, SEQ_ZSHP_STRATEGIC_DETAIL.nextval	/* 전략물자 DEATIL SEQ, SEQ_ZSHP_STRATEGIC_DETAIL	*/
+			, #{strategicItemYn}				/* 전략물자포함여부(전략물자대상) Y/N					*/
+			, #{catchAllYn}						/* 전략물자포함N일 때 catch_all 여부 Y/N				*/
+			, #{judgmentType}					/* 판정종류(공급업체 자가판정, 공급업체 전문판정, 두산중공업 자가판정, 두산중공업 전문판정)	*/
+			, #{certificateNumber}				/* 판증서 번호		*/
+			, #{certificateOrganization}		/* 판정기관		*/
+			, #{exportPermissionNumber}			/* 수출허가증 번호	*/
+			, #{exportPermissionOrganization}	/* 수출허가기관		*/
+			, SYSDATE							/* 생성일			*/
+			, #{USER_AD}						/* 생성자			*/
+		)
+	</insert>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 수정 -->
+	<update id="updateStrategicMgtDetailPopPackageNoList" parameterType="java.util.Map">
+		/* StrategicMgtMapper.updateStrategicMgtDetailPopPackageNoList 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 수정 */
+		UPDATE ZSHP_STRATEGIC_DETAIL /* 전략물자관리 상세 테이블 */
+		SET
+			LAST_UPDATE_DATE					= SYSDATE
+			, LAST_UPDATED_BY					= #{USER_AD}
+			<if test=' null != strategicItemYn '>
+				, STRATEGIC_ITEM_YN				= #{strategicItemYn}				/* 전략물자포함여부(전략물자대상) Y/N	*/
+			</if>
+			<if test=' null != catchAllYn '>
+				, CATCH_ALL_YN					= #{catchAllYn}						/* 전략물자포함N일 때 catch_all 여부 Y/N*/
+			</if>
+			<if test=' null != judgmentType '>
+				, JUDGMENT_TYPE					= #{judgmentType}					/* 판정종류	*/
+			</if>
+			<if test=' null != certificateNumber '>
+				, CERTIFICATE_NUMBER			= #{certificateNumber}				/* 판증서 번호	*/
+			</if>
+			<if test=' null != certificateOrganization '>
+				, CERTIFICATE_ORGANIZATION		= #{certificateOrganization}		/* 판정기관	*/
+			</if>
+			<if test=' null != exportPermissionNumber '>
+				, EXPORT_PERMISSION_NUMBER		= #{exportPermissionNumber}			/* 수출허가증 번호*/
+			</if>
+			<if test=' null != exportPermissionOrganization '>
+				, EXPORT_PERMISSION_ORGANIZATION= #{exportPermissionOrganization}	/* 수출허가기관	*/
+			</if>
+		WHERE
+			STRATEGIC_MASTER_ID		= #{strategicMasterId}	/* 전략물자SEQ, SEQ_ZSHP_STRATEGIC_MASTER			*/
+			AND STRATEGIC_DETAIL_ID	= #{strategicDetailId}	/* 전략물자 DEATIL SEQ, SEQ_ZSHP_STRATEGIC_DETAIL	*/
+	</update>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 삭제 -->
+	<delete id="deleteStrategicMgtDetailPopPackageNoList" parameterType="java.util.Map">
+		/* StrategicMgtMapper.deleteStrategicMgtDetailPopPackageNoList 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 삭제 */
+		DELETE	
+			ZSHP_STRATEGIC_DETAIL /* 전략물자관리 상세 테이블 */
+ 		WHERE
+			STRATEGIC_DETAIL_ID = #{strategicDetailId}/* 전략물자 DEATIL SEQ, SEQ_ZSHP_STRATEGIC_DETAIL		*/
+	</delete>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 조회 -->
+	<select id="selectStrategicMgtDetailPopComment" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* StrategicMgtMapper.selectStrategicMgtDetailPopComment 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 조회 */
+		SELECT
+			ROWNUM
+			, x.*
+		FROM (
+			SELECT
+				a.STRATEGIC_COMMENT_ID	/* CommentSEQ, seq_zshp_strategic_comment*/
+				, a.COMMENTS
+				, (
+					SELECT DESCRIPTION
+					FROM FND_USER_INT z
+					WHERE z.USER_NAME = upper( a.CREATED_BY )
+				) AS CREATED_BY_NM	/* 생성자						*/
+				, a.CREATION_DATE	/* 생성일						*/
+				, a.CREATED_BY
+			FROM ZSHP_STRATEGIC_COMMENT a/* 전략물자관리 Comment 테이블 */
+			WHERE 
+				a.STRATEGIC_MASTER_ID = #{strategicMasterId}	/* 전략물자SEQ */
+			ORDER BY
+				a.STRATEGIC_COMMENT_ID DESC
+		) x
+	</select>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 저장 -->
+	<insert id="insertStrategicMgtDetailPopComment" parameterType="java.util.Map">
+		/* StrategicMgtMapper.insertStrategicMgtDetailPopComment 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 저장 */
+		INSERT INTO ZSHP_STRATEGIC_COMMENT /* 전략물자관리 Comment 테이블 */ (
+			STRATEGIC_MASTER_ID		/* 전략물자SEQ, zshp_strategic_master 테이블의 key	*/
+			, STRATEGIC_COMMENT_ID	/* CommentSEQ, seq_zshp_strategic_comment		*/
+			, COMMENTS				/* commentSEQ	*/
+			, CREATION_DATE			/* 생성일			*/
+			, CREATED_BY			/* 생성자			*/
+			, LAST_UPDATE_DATE		/* 수정일			*/
+			, LAST_UPDATED_BY		/* 수정자			*/
+		) VALUES (
+			#{strategicMasterId}				/* 전략물자SEQ, zshp_strategic_master 테이블의 key	*/
+			, SEQ_ZSHP_STRATEGIC_COMMENT.nextval/* CommentSEQ, seq_zshp_strategic_comment		*/
+			, #{comments}						/* commentSEQ	*/
+			, SYSDATE							/* 생성일			*/
+			, #{USER_AD}						/* 생성자			*/
+			, SYSDATE							/* 수정일			*/
+			, #{USER_AD}						/* 수정자			*/
+		)
+	</insert>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 삭제 -->
+	<delete id="deleteStrategicMgtDetailPopComment" parameterType="java.util.Map">
+		/* StrategicMgtMapper.deleteStrategicMgtDetailPopComment 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 삭제 */
+		DELETE	
+			ZSHP_STRATEGIC_COMMENT /* 전략물자관리 Comment 테이블 */
+ 		WHERE
+			STRATEGIC_COMMENT_ID = #{strategicCommentId}/* CommentSEQ, seq_zshp_strategic_comment		*/
+	</delete>
+
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 수정 -->
+	<update id="updateStrategicMgtDetailPop" parameterType="java.util.Map">
+		/* StrategicMgtMapper.updateStrategicMgtDetailPop 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 수정 */
+		UPDATE
+			ZSHP_STRATEGIC_MASTER			/* 전략물자관리 테이블 */
+		SET
+			LAST_UPDATE_DATE			= SYSDATE
+			, LAST_UPDATED_BY			= #{USER_AD}
+			, ATTACH_GRP_CD				= #{FILE_GRP_CD}			/* 첨부파일 grp_cd */
+			, IS_THIRD_COUNTRY          = #{IS_THIRD_COUNTRY}
+			
+ 			<if test=' null != ATTRIBUTE3 and "" != ATTRIBUTE3'>
+				/* FOB 여부		*/
+				, ATTRIBUTE3				= #{ATTRIBUTE3}
+			</if>
+ 			<if test=' null != ATTRIBUTE4 and "" != ATTRIBUTE4'>
+				/* 특송 여부		*/
+				, ATTRIBUTE4				= #{ATTRIBUTE4}
+			</if>
+ 			<if test=' null != btnType and "" != btnType and "preJudgment" == btnType'>
+				/* 판정요청		*/
+				, STATUS				= 'Pre-Judgment'
+			</if>
+			<if test=' null != btnType and "" != btnType and "preApprove" == btnType'>
+				/* 승인요청		*/
+				, STATUS				= 'Pre-Approved'
+			</if>
+			<if test=' null != btnType and "" != btnType and "conApprove" == btnType'>
+				/* 조건부승인요청	*/
+				, STATUS				= 'Pre-Conditional-Approved'
+			</if>
+			<if test=' null != btnType and "" != btnType and "comJudgmented" == btnType'>
+				/* 판정완료		*/
+				, STATUS				= 'Judged'
+				, JUDGMENT_DATE			= SYSDATE					/* 판정일			*/
+				, JUDGED_BY				= #{USER_AD}				/* 판정자			*/
+			</if>
+			<if test=' null != btnType and "" != btnType and "comApproved" == btnType'>
+				/* 승인완료		*/
+				, STATUS				= 'Approved'
+				, APPROVED_DATE			= SYSDATE					/* 승인완료 날짜	*/
+				, APPROVER				= #{USER_AD}				/* 승인자			*/
+			</if>
+			<if test=' null != btnType and "" != btnType and "conApproved" == btnType'>
+				/* 조건부승인완료	*/
+				, STATUS				= 'Conditional-Approved'
+				, APPROVED_DATE			= SYSDATE					/* 승인완료 날짜	*/
+				, APPROVER				= #{USER_AD}				/* 승인자			*/
+				, IS_CONDITIONAL_APPROVED='Y'
+			</if>
+			<if test=' null != btnType and "" != btnType and "return" == btnType'>
+				/* 반려			*/
+				/* 반려 시 JUDGMENT_DATE, JUDGED_BY제거 */
+				, STATUS				= 'Rejected'
+			</if>
+		WHERE
+			STRATEGIC_MASTER_ID = #{strategicMasterId}	/* 전략물자SEQ */
+	</update>
+	
+	<select id="getStrategicMgtMailMstData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZSR.SHIPPING_REQ_NO,
+		       ZSR.INVOICE_NO,
+	           ZSM.CREATED_BY,
+		         USER4.DESCRIPTION AS CREATED_BY_NM,           
+		         USER4.EMAIL_ADDRESS AS CREATED_BY_EMAIL, 		       
+		       ZSM.LAST_UPDATED_BY,
+			   USER1.DESCRIPTION AS LAST_UPDATED_BY_NM,
+			   USER1.EMAIL_ADDRESS AS LAST_UPDATED_BY_EMAIL,
+		       ZSM.APPROVER,
+			   USER2.DESCRIPTION AS APPROVER_NM,
+			   USER2.EMAIL_ADDRESS AS APPROVER_EMAIL,		       
+		       ZSM.JUDGED_BY,
+			   USER3.DESCRIPTION AS JUDGED_BY_NM,
+			   USER3.EMAIL_ADDRESS AS JUDGED_BY_EMAIL,		       
+		       ZSM.STATUS,
+			   DECODE(ZSM.STATUS
+					, 'Incomplete'				, '작성중'
+					, 'Pre-Judgment'			, '판정요청'
+					, 'Pre-Approved'			, '승인요청'
+					, 'Pre-Conditional-Approved', '조건부승인요청'
+					, 'Judged'					, '판정완료'
+					, 'Approved'				, '승인완료'
+					, 'Conditional-Approved'	, '조건부승인완료'
+					, 'Rejected'				, '반려') AS STATUS_NM,		       
+		       ZSR.PROJECT_ID,
+		       ZPI.DESCRIPTION AS PROJECT_DESC,
+		       ZSR.DESCRIPTION,
+		       ZSR.ATTRIBUTE1,
+		       NVL(ZSM.IS_THIRD_COUNTRY, 'N') AS IS_THIRD_COUNTRY,
+		       NVL(ZSR.ATTRIBUTE5, 'N') AS IS_SPECIAL_SHIPPING,
+           	   NVL(ZSM.ATTRIBUTE3, 'N') AS IS_FOB
+		  FROM ZSHP_STRATEGIC_MASTER ZSM,
+		       ZSHP_SHIPPING_REQ_M ZSR,
+		       ZSHP_PROJECTS_INT ZPI,
+		       FND_USER_INT USER1,
+		       FND_USER_INT USER2,
+		       FND_USER_INT USER3,
+		       FND_USER_INT USER4
+		 WHERE ZSM.STRATEGIC_MASTER_ID = ZSR.ATTRIBUTE3
+		   AND ZSR.PROJECT_ID = ZPI.PROJECT_CODE
+		   AND UPPER(ZSM.LAST_UPDATED_BY) = USER1.USER_NAME(+)
+		   AND UPPER(ZSM.APPROVER) = USER2.USER_NAME(+)
+		   AND UPPER(ZSM.JUDGED_BY) = USER3.USER_NAME(+)
+		   AND UPPER(ZSM.CREATED_BY) = USER4.USER_NAME(+)
+		   AND ZSM.STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID}	
+	</select>
+	
+	<select id="getStrategicMgtMailCommentData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ROW_NUMBER() OVER(ORDER BY ZSC.STRATEGIC_COMMENT_ID) AS RN,
+		       ZSC.COMMENTS,
+		       ZSC.CREATED_BY,
+		       USER1.DESCRIPTION  AS CREATED_BY_NM,
+		       TO_CHAR(ZSC.CREATION_DATE, 'YYYY-MM-DD') AS CREATION_DATE
+		  FROM ZSHP_STRATEGIC_COMMENT ZSC,
+		  	   FND_USER_INT USER1
+		 WHERE UPPER(ZSC.CREATED_BY) = USER1.USER_NAME(+)
+		   AND ZSC.STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID} 
+	</select>	
+	
+	<select id="getStrategicMgtMailReceiver" parameterType="java.util.Map" resultType="java.util.HashMap">
+	     SELECT USER1.EMAIL_ADDRESS AS EMAIL
+	      FROM DESM_ROLE DR,
+	           DESM_USER_ROLE DUR,
+	           FND_USER_INT USER1
+	     WHERE DR.ROLE_SEQ = DUR.ROLE_SEQ
+	       AND UPPER(DUR.USER_AD) = USER1.USER_NAME
+	       AND DR.DELEGATE_FLAG = 'N'
+	       AND DR.ROLE_SEQ = '51'
+	</select>	
+	
+	<select id="getStrategicMgtMailReceiverAdd" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT USER1.EMAIL AS EMAIL
+		  FROM ZSHP_SHIPPING_REQ_M ZSRM,
+		       ZSHP_SHIPPING_MAILING ZSM,
+		       ESAUSER USER1
+		 WHERE ZSRM.REQ_MASTER_ID = ZSM.REQ_MASTER_ID                
+		   AND ZSM.RECEIVER_AD = USER1.USR_ID
+		   AND USER1.USE_YN = 'Y'
+		   AND ZSRM.ATTRIBUTE3 = #{STRATEGIC_MASTER_ID}	    
+	</select>
+	
+	<select id="getStrategicShippingReqReceiverList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* StrategicMgtMapper.getStrategicShippingReqReceiverList : 승인상태의 전략물자에 대한 출하요청 메일 수신자 지정 */
+		SELECT CASE WHEN INSTR(ZSM.RECEIVER_AD, '@glonet.net') != 0 THEN ZSM.RECEIVER_AD
+                    ELSE NVL(DU.MAIL, 'hanbyul1.lee@doosan.com')
+               END AS EMAIL
+        FROM ZSHP_SHIPPING_REQ_M ZSRM
+        ,    ZSHP_SHIPPING_MAILING ZSM
+        ,    DESM_USER DU
+        WHERE 1=1
+        AND ZSRM.REQ_MASTER_ID = ZSM.REQ_MASTER_ID
+        AND DU.USER_AD(+) = ZSM.RECEIVER_AD
+        AND ZSRM.ATTRIBUTE3 = #{STRATEGIC_MASTER_ID}
+        UNION
+        SELECT 'younsuk.lee@doosan.com' AS EMAIL
+        FROM ZSHP_SHIPPING_REQ_M ZSRM
+        ,    ZSHP_STRATEGIC_MASTER ZSM
+        WHERE 1=1
+        AND ZSRM.ATTRIBUTE3 = ZSM.STRATEGIC_MASTER_ID
+        AND NVL(ZSRM.ATTRIBUTE4, 'N') = 'Y'
+        AND NVL(ZSM.ATTRIBUTE3, 'N') = 'Y'
+        AND ZSM.STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID}
+	</select>
+	
+	
+	<select id="getDlgTransStrategicMgtCopyList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZSM.STRATEGIC_MASTER_ID,
+		       ZSRM.PROJECT_ID,
+		       ZPI.DESCRIPTION,
+		       ZSRM.SHIPPING_REQ_NO,
+		       ZSRM.INVOICE_NO,
+		       DECODE(ZSM.STATUS
+		              , 'Incomplete'        , '작성중'
+		              , 'Pre-Judgment'      , '판정요청'
+		              , 'Pre-Approved'      , '승인요청'
+		              , 'Pre-Conditional-Approved', '조건부승인요청'
+		              , 'Judged'          , '판정완료'
+		              , 'Approved'        , '승인완료'
+		              , 'Conditional-Approved'  , '조건부승인완료'
+		              , 'Rejected'        , '반려'
+		              , '') AS STATUS_NM
+		        ,ZSD.STRATEGIC_DETAIL_ID
+		        ,ZSD.STRATEGIC_ITEM_YN
+		        ,ZSD.CATCH_ALL_YN   
+		        ,ZSD.JUDGMENT_TYPE    
+		        ,ZSD.CERTIFICATE_NUMBER
+		        ,ZSD.CERTIFICATE_ORGANIZATION
+		        ,ZSD.EXPORT_PERMISSION_NUMBER
+		        ,ZSD.STRATEGIC_MASTER_ID   
+		        ,ZSD.STRATEGIC_DETAIL_ID   
+		        ,ZSD.EXPORT_PERMISSION_ORGANIZATION
+		  FROM ZSHP_STRATEGIC_MASTER ZSM,
+		       ZSHP_SHIPPING_REQ_M ZSRM,
+		       ZSHP_PROJECTS_INT ZPI,
+		       ZSHP_STRATEGIC_DETAIL ZSD
+		 WHERE ZSM.STRATEGIC_MASTER_ID = ZSRM.ATTRIBUTE3           
+		   AND ZSRM.PROJECT_ID = ZPI.PROJECT_CODE
+		   AND ZSM.STRATEGIC_MASTER_ID = ZSD.STRATEGIC_MASTER_ID
+		<if test=' PROJECT_ID != null and PROJECT_ID != "" '>
+		   AND (UPPER(ZSRM.PROJECT_ID) LIKE '%' || UPPER(#{PROJECT_ID})  || '%' OR UPPER(ZPI.DESCRIPTION) LIKE '%' || UPPER(#{PROJECT_ID})  || '%')
+		</if>	
+		<if test=' SHIPPING_REQ_NO != null and SHIPPING_REQ_NO != "" '>
+		   AND (UPPER(ZSRM.SHIPPING_REQ_NO) LIKE '%' || UPPER(#{SHIPPING_REQ_NO})  || '%')
+		</if>		
+		<if test=' INVOICE_NO != null and INVOICE_NO != "" '>
+		   AND (UPPER(ZSRM.INVOICE_NO) LIKE '%' || UPPER(#{INVOICE_NO})  || '%')
+		</if>				   
+		ORDER BY ZSRM.PROJECT_ID,
+		         ZPI.DESCRIPTION,
+		         ZSRM.SHIPPING_REQ_NO,
+		         ZSRM.INVOICE_NO  
+	</select>
+	
+	<insert id="saveDlgTransStrategicMgtCopyList" parameterType="java.util.Map">
+		INSERT INTO ZSHP_STRATEGIC_DETAIL
+		(STRATEGIC_MASTER_ID   
+		, STRATEGIC_DETAIL_ID  
+		, STRATEGIC_ITEM_YN    
+		, CATCH_ALL_YN         
+		, JUDGMENT_TYPE        
+		, CERTIFICATE_NUMBER   
+		, CERTIFICATE_ORGANIZATION 
+		--, EXPORT_PERMISSION_NUMBER  
+		, EXPORT_PERMISSION_ORGANIZATION
+		, CREATION_DATE       
+		, CREATED_BY)
+		SELECT #{STRATEGIC_MASTER_ID}   
+		    , SEQ_ZSHP_STRATEGIC_DETAIL.nextval  
+		    , STRATEGIC_ITEM_YN    
+		    , CATCH_ALL_YN         
+		    , JUDGMENT_TYPE        
+		    , CERTIFICATE_NUMBER   
+		    , CERTIFICATE_ORGANIZATION 
+		    --, EXPORT_PERMISSION_NUMBER  
+		    , EXPORT_PERMISSION_ORGANIZATION
+		    , SYSDATE
+		    , #{USER_AD}
+		  FROM ZSHP_STRATEGIC_DETAIL
+		 WHERE STRATEGIC_DETAIL_ID = #{STRATEGIC_DETAIL_ID}  
+	</insert>	
+	
+	<select id="getDlgTransStrategicMgtAttCopyList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZSM.STRATEGIC_MASTER_ID,
+		       ZSRM.PROJECT_ID,
+		       ZPI.DESCRIPTION,
+		       ZSRM.SHIPPING_REQ_NO,
+		       DECODE(ZSM.STATUS
+		              , 'Incomplete'        , '작성중'
+		              , 'Pre-Judgment'      , '판정요청'
+		              , 'Pre-Approved'      , '승인요청'
+		              , 'Pre-Conditional-Approved', '조건부승인요청'
+		              , 'Judged'          , '판정완료'
+		              , 'Approved'        , '승인완료'
+		              , 'Conditional-Approved'  , '조건부승인완료'
+		              , 'Rejected'        , '반려'
+		              , '') AS STATUS_NM
+		        ,ZSM.ATTACH_GRP_CD
+		        ,ATT.ATT_ID
+		        ,ATT.ORGN_FILE_NM
+		  FROM ZSHP_STRATEGIC_MASTER ZSM,
+		       ZSHP_SHIPPING_REQ_M ZSRM,
+		       ZSHP_PROJECTS_INT ZPI,
+		       ESAATTH ATT
+		 WHERE ZSM.STRATEGIC_MASTER_ID = ZSRM.ATTRIBUTE3           
+		   AND ZSRM.PROJECT_ID = ZPI.PROJECT_CODE
+		   AND ZSM.ATTACH_GRP_CD = ATT.GRP_CD
+		   AND ATT.SYS_ID = 'EMRO'
+		   AND ATT.STS != 'D'  
+		<if test=' PROJECT_ID != null and PROJECT_ID != "" '>
+		   AND (UPPER(ZSRM.PROJECT_ID) LIKE '%' || UPPER(#{PROJECT_ID})  || '%' OR UPPER(ZPI.DESCRIPTION) LIKE '%' || UPPER(#{PROJECT_ID})  || '%')
+		</if>	
+		<if test=' SHIPPING_REQ_NO != null and SHIPPING_REQ_NO != "" '>
+		   AND (UPPER(ZSRM.SHIPPING_REQ_NO) LIKE '%' || UPPER(#{SHIPPING_REQ_NO})  || '%')
+		</if>				   
+		ORDER BY ZSRM.PROJECT_ID,
+		         ZPI.DESCRIPTION,
+		         ZSRM.SHIPPING_REQ_NO  
+	</select>
+	
+	<insert id="saveDlgTransStrategicMgtAttCopyList" parameterType="java.util.Map">
+		INSERT INTO ESAATTH
+		(SYS_ID   
+		, ATT_ID  
+		, GRP_CD    
+		, ORGN_FILE_NM         
+		, ATT_FILE_NM        
+		, ATT_FILE_PATH   
+		, ATT_FILE_SIZ
+		, FILE_CONT
+		, SORT_ORD       
+		, REM
+		, STS
+		, REG_ID
+		, REG_DT
+		, MOD_ID
+		, MOD_DT)
+		SELECT SYS_ID   
+			, #{ATT_ID}  
+			, #{ATTACH_GRP_CD}    
+			, ORGN_FILE_NM         
+			, ATT_FILE_NM        
+			, ATT_FILE_PATH   
+			, ATT_FILE_SIZ
+			, FILE_CONT
+			, SORT_ORD       
+			, REM
+			, STS
+			, #{USER_AD}
+			, SYSDATE
+			, #{USER_AD}
+			, SYSDATE
+		  FROM ESAATTH
+		 WHERE ATT_ID = #{P_ATT_ID}  
+	</insert>		
+	
+	<delete id="deleteDlgTransStrategicMgtAttCopyList" parameterType="java.util.Map">
+		DELETE FROM ESAATTH
+		WHERE GRP_CD = #{ATTACH_GRP_CD}  
+	</delete>		
+	
+	<update id="saveDlgTransStrategicMgtAttCopyListMstData" parameterType="java.util.Map">
+		UPDATE ZSHP_STRATEGIC_MASTER SET ATTACH_GRP_CD = #{ATTACH_GRP_CD}
+		WHERE STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID}
+	</update>		
+	
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 삭제 -->
+	<delete id="deleteAllStrategicMgtDetailPopPackageNoList" parameterType="java.util.Map">
+		/* StrategicMgtMapper.deleteAllStrategicMgtDetailPopPackageNoList 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 전략물자 판정 List 삭제 */
+		DELETE FROM
+			ZSHP_STRATEGIC_DETAIL /* 전략물자관리 상세 테이블 */
+ 		WHERE
+			STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID}
+	</delete>
+			
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 삭제 -->
+	<delete id="deleteStrategicMgtDetailPop" parameterType="java.util.Map">
+		/* StrategicMgtMapper.deleteStrategicMgtDetailPop 운운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 삭제 */
+		DELETE FROM
+			ZSHP_STRATEGIC_MASTER /* 전략물자관리 테이블 */
+ 		WHERE
+			STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID}/* 전략물자SEQ */
+	</delete>
+					
+	<!-- 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 삭제 -->
+	<delete id="deleteAllStrategicMgtDetailPopComment" parameterType="java.util.Map">
+		/* StrategicMgtMapper.deleteAllStrategicMgtDetailPopComment 운송관리 > 전략물자관리 > 전략물자관리 상세 팝업 > 코멘트 목록 삭제 */
+		DELETE	
+			ZSHP_STRATEGIC_COMMENT /* 전략물자관리 Comment 테이블 */
+ 		WHERE
+			STRATEGIC_MASTER_ID = #{STRATEGIC_MASTER_ID}/* 전략물자SEQ */
+	</delete>
+	
+	
+	<select id="getStrategicEwsList" parameterType="java.util.Map" resultType="java.util.HashMap">
+	    /* StrategicMgtMapper.getStrategicEwsList : 전략물자 EWS 수신대상 리스트 가져오기 */
+		SELECT DSR.EWS_NAME
+        ,      DSR.EWS_DESC
+        ,      DSR.RECEIVER_AD
+        ,      DU.USER_NAME
+        ,      DU.MAIL
+        ,	   ZE.ZORG_NM
+        FROM DESM_STRATEGIC_RECEIVER DSR
+        ,    DESM_USER DU
+        ,	 ZVTS_EMP ZE
+        WHERE 1=1
+        AND DSR.RECEIVER_AD = DU.USER_AD
+        AND DSR.RECEIVER_AD = ZE.AD_USER_ID
+        <if test='EWS_NAME != null and EWS_NAME != ""'>
+        	AND DSR.EWS_NAME = #{EWS_NAME}
+        </if>
+        <if test='P_USER_AD != null and P_USER_AD != ""'>
+        	AND DSR.RECEIVER_AD LIKE '%' || UPPER(#{P_USER_AD}) || '%'
+        </if>
+        <if test='USER_NAME != null and USER_NAME != ""'>
+        	AND UPPER(DU.USER_NAME) LIKE '%' || UPPER(#{USER_NAME}) || '%'
+        </if>
+	</select>
+	
+	<delete id="deleteStrategicEwsUser" parameterType="java.util.Map">
+		/* StrategicMgtMapper.deleteStrategicEwsUser : 전략물자 EWS 수신대상자 삭제 */
+		DELETE FROM DESM_STRATEGIC_RECEIVER
+		WHERE RECEIVER_AD = #{P_USER_AD}
+		AND EWS_NAME = #{EWS_NAME}
+	</delete>
+	
+	<select id="getStrategicEwsReceiverCount" parameterType="java.util.Map" resultType="int">
+		/* StrategicMgtMapper.getStrategicEwsReceiverCount : 전략물자 EWS 수신자 추가 중복체크 */
+		SELECT COUNT(RECEIVER_AD)
+		FROM DESM_STRATEGIC_RECEIVER
+		WHERE EWS_NAME = #{EWS_NAME}
+		AND EMAIL = #{EMAIL}
+	</select>
+	
+	<insert id="insertStrategicEwsReceiver" parameterType="java.util.Map">
+		/* StrategicMgtMapper.getStrategicEwsReceiverCount : 전략물자 EWS 수신자 추가 */
+		INSERT INTO DESM_STRATEGIC_RECEIVER  (
+			EWS_NAME,
+			EWS_DESC,
+			RECEIVER_AD,
+			EMAIL,
+			CREATED_BY,
+			CREATION_DATE,
+			LAST_UPDATED_BY,
+			LAST_UPDATE_DATE
+		) VALUES (
+			#{EWS_NAME},
+			#{EWS_DESC},
+			#{RECEIVER_AD},
+			#{EMAIL},
+			#{USER_AD},
+			SYSDATE,
+			#{USER_AD},
+			SYSDATE
+		)
+	</insert>
+	
+</mapper>

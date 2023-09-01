@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+        http://www.springframework.org/schema/jdbc  http://www.springframework.org/schema/jdbc/spring-jdbc-4.0.xsd">
+
+    <!-- 가동계
+    <bean id="dataSource_main" class="org.springframework.jdbc.datasource.DriverManagerDataSource" >
+        <property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"/>
+        <property name="url" value="jdbc:oracle:thin:@DHBPPDB.corp.doosan.com:1541:DHBPP" />
+        <property name="username" value="zshp"/>
+        <property name="password" value="zshp_345#"/>
+    </bean>-->
+
+
+
+    <!-- 개발계 -->
+    <bean id="dataSource_main" class="org.springframework.jdbc.datasource.DriverManagerDataSource" >
+        <property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"/>
+        <property name="url" value="jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB" />
+        <property name="username" value="zshp"/>
+        <property name="password" value="zshp_345#"/>
+    </bean>
+
+    <bean id="dataSource" class="net.sf.log4jdbc.Log4jdbcProxyDataSource" >
+		<constructor-arg ref="dataSource_main" />
+		<property name="logFormatter">
+			<bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+				<property name="loggingType" value="MULTI_LINE"></property>
+				<property name="sqlPrefix" value="SQL : &#10;&#09;&#09;"></property>
+			</bean>
+		</property>
+    </bean>
+
+     <!--
+    <bean id="dataSource_main" class="org.springframework.jdbc.datasource.DriverManagerDataSource" >
+        <property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"/>
+        <property name="url" value="jdbc:oracle:thin:@dherp92.doosanheavy.com:1550:DHDEV" />
+        <property name="username" value="apps"/>
+        <property name="password" value="apps"/>
+    </bean>
+
+
+    <bean id="dataSource_main" class="org.springframework.jndi.JndiObjectFactoryBean">
+		<property name="jndiName" value="myacctDS" />
+   		<property name="resourceRef" value="true" />
+	</bean>
+    -->
+
+   	<!--
+    <bean id="dataSource" class="net.sf.log4jdbc.Log4jdbcProxyDataSource" >
+		<constructor-arg ref="dataSource_main" />
+		<property name="logFormatter">
+			<bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+				<property name="loggingType" value="MULTI_LINE"></property>
+				<property name="sqlPrefix" value="SQL : "></property>
+			</bean>
+		</property>
+    </bean> -->
+
+    <!--
+    <bean id="dataSource_main_idsm" class="org.springframework.jdbc.datasource.DriverManagerDataSource" >
+        <property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"/>
+        <property name="url" value="jdbc:oracle:thin:@dherp92.doosanheavy.com:1580:DHEDU" />
+        <property name="username" value="zbpp"/>
+        <property name="password" value="zbpp_123#"/>
+    </bean>
+
+
+    <bean id="dataSource_idsm" class="net.sf.log4jdbc.Log4jdbcProxyDataSource" >
+		<constructor-arg ref="dataSource_main_idsm" />
+		<property name="logFormatter">
+			<bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+				<property name="loggingType" value="MULTI_LINE"></property>
+				<property name="sqlPrefix" value="SQL : "></property>
+			</bean>
+		</property>
+    </bean>
+
+    <bean id="dataSource_main_idsm_file" class="org.springframework.jdbc.datasource.DriverManagerDataSource" >
+        <property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"/>
+        <property name="url" value="jdbc:oracle:thin:@DHDEVDBNEW.corp.doosan.com:1541:DHDEVDB" />
+        <property name="username" value="zvts"/>
+        <property name="password" value="zvts_345#"/>
+    </bean>
+
+
+    <bean id="dataSource_idsm_file" class="net.sf.log4jdbc.Log4jdbcProxyDataSource" >
+		<constructor-arg ref="dataSource_main_idsm_file" />
+		<property name="logFormatter">
+			<bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+				<property name="loggingType" value="MULTI_LINE"></property>
+				<property name="sqlPrefix" value="SQL : "></property>
+			</bean>
+		</property>
+    </bean>
+     -->
+</beans>

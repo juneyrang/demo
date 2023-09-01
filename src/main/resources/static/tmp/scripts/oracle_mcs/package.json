@@ -1,0 +1,6 @@
+{
+  "name": "mcs",
+  "version": "18.3.3",
+  "main": "mcs.js",
+  "typings": "types/index.d.ts"
+}

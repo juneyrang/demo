@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.IdcsMapper">
+	<update id="updateUserIDCSYn" parameterType="java.util.Map">
+		UPDATE DESM_USER A
+		   SET A.IDCS_YN = #{id}
+		   <if test='email != null and email !=""'>
+		   ,A.MAIL = #{email}
+		   </if>
+		   <if test='federated_yn != null and federated_yn !=""'>
+		   ,A.FEDERATED_YN = #{federated_yn}
+		   </if>
+		 WHERE UPPER(A.USER_AD) = UPPER(#{userName})
+	</update>
+
+	<update id="saveResetPasswordHistory"  parameterType="java.util.Map">
+	INSERT INTO DESM_RESET_PASSWORD_HISTORY (
+			USER_AD
+			,USER_NAME
+			,RESET_USER_AD
+			,RESET_USER_NAME
+			,RESET_PASSWORD_DATE
+			)
+		VALUES (
+			#{USER_AD}
+			,(SELECT USER_NAME FROM DESM_USER WHERE USER_AD = #{USER_AD})
+			,(SELECT USER_AD FROM DESM_USER WHERE IDCS_YN = #{idcs_id})
+			,(SELECT USER_NAME FROM DESM_USER WHERE IDCS_YN = #{idcs_id})
+			,SYSDATE
+			)
+	</update>
+
+</mapper>

@@ -1,0 +1,1053 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.AdminMapper">
+
+  <select id="getMenu" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT *
+      FROM (SELECT MENU_SEQ,
+                   CASE WHEN #{lang} = 'ko' THEN MENU_NAME_KO
+                        WHEN #{lang} = 'en' THEN MENU_NAME_EN END AS MENU_NAME,
+                   MENU_NAME_KO,
+                   MENU_NAME_EN,
+                   MENU_UP_SEQ,
+                   MENU_PATH,
+                   MENU_ORDER,
+                   TRANS_YN,
+                   DEFAIL_PROJECT_YN,
+                   MOBILE_YN
+              FROM DESM_MENU
+             WHERE DELEGATE_FLAG = 'N')
+    START WITH MENU_UP_SEQ = 0
+    CONNECT BY PRIOR MENU_SEQ = MENU_UP_SEQ
+    ORDER SIBLINGS BY MENU_ORDER
+  </select>
+
+  <insert id="insertMenu" parameterType="java.util.Map">
+    MERGE INTO DESM_MENU
+    USING DUAL
+    ON (MENU_SEQ = #{MENU_SEQ})
+    WHEN MATCHED THEN
+         UPDATE SET
+                MENU_NAME_KO = #{MENU_NAME_KO},
+                MENU_NAME_EN = #{MENU_NAME_EN},
+                MENU_PATH = #{MENU_PATH},
+                MENU_ORDER = #{MENU_ORDER},
+                TRANS_YN = #{TRANS_YN},
+                DEFAIL_PROJECT_YN = #{DEFAIL_PROJECT_YN},
+                MOBILE_YN = #{MOBILE_YN},
+                LAST_UPDATED_BY = #{USER_AD},
+                LAST_UPDATE_DATE = SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (MENU_SEQ
+         ,MENU_UP_SEQ
+         ,MENU_NAME_KO
+         ,MENU_NAME_EN
+         ,MENU_PATH
+         ,MENU_ORDER
+         ,TRANS_YN
+         ,DEFAIL_PROJECT_YN
+         ,MOBILE_YN
+         ,CREATED_BY
+         ,CREATION_DATE
+         ,LAST_UPDATED_BY
+         ,LAST_UPDATE_DATE)
+         VALUES
+         (SEQ_DESM_MENU.NEXTVAL
+         ,#{MENU_UP_SEQ}
+         ,#{MENU_NAME_KO}
+         ,#{MENU_NAME_EN}
+         ,#{MENU_PATH}
+         ,#{MENU_ORDER}
+         ,#{TRANS_YN}
+         ,#{DEFAIL_PROJECT_YN}
+         ,#{MOBILE_YN}
+         ,#{USER_AD}
+         ,SYSDATE
+         ,#{USER_AD}
+         ,SYSDATE)
+  </insert>
+
+  <insert id="insertMenuAuth" parameterType="java.util.Map">
+    MERGE INTO DESM_MENU_AUTH
+    USING DUAL
+    ON (AUTH_SEQ = #{AUTH_SEQ})
+    WHEN MATCHED THEN
+         UPDATE SET
+                AUTH_CODE = #{AUTH_CODE},
+                AUTH_NAME = #{AUTH_NAME},
+                LAST_UPDATED_BY = #{USER_AD},
+                LAST_UPDATE_DATE = SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (AUTH_SEQ
+         ,MENU_SEQ
+         ,AUTH_CODE
+         ,AUTH_NAME
+         ,CREATED_BY
+         ,CREATION_DATE
+         ,LAST_UPDATED_BY
+         ,LAST_UPDATE_DATE)
+         VALUES
+         (SEQ_DESM_MENU_AUTH.NEXTVAL
+         ,#{MENU_SEQ}
+         ,#{AUTH_CODE}
+         ,#{AUTH_NAME}
+         ,#{USER_AD}
+         ,SYSDATE
+         ,#{USER_AD}
+         ,SYSDATE)
+  </insert>
+
+
+  <update id="deleteMenu" parameterType="java.util.Map">
+      MERGE INTO DESM_MENU DM
+      USING (SELECT *
+               FROM (SELECT MENU_SEQ,
+                            MENU_UP_SEQ
+                       FROM DESM_MENU
+                      WHERE DELEGATE_FLAG = 'N')
+             START WITH MENU_SEQ = #{MENU_SEQ}
+             CONNECT BY PRIOR MENU_SEQ = MENU_UP_SEQ) DDM
+      ON (DM.MENU_SEQ = DDM.MENU_SEQ)
+      WHEN MATCHED THEN
+           UPDATE SET
+                  DM.DELEGATE_FLAG = 'Y',
+                  DM.LAST_UPDATED_BY = #{USER_AD},
+                  DM.LAST_UPDATE_DATE = SYSDATE
+  </update>
+
+  <update id="deleteMenuAuth" parameterType="java.util.Map">
+    DELETE FROM DESM_MENU_AUTH WHERE AUTH_SEQ = #{AUTH_SEQ}
+  </update>
+
+  <insert id="insertPermission" parameterType="java.util.Map">
+    MERGE INTO DESM_ROLE
+    USING DUAL
+    ON (ROLE_SEQ = #{ROLE_SEQ})
+    WHEN MATCHED THEN
+         UPDATE SET
+                ROLE_NAME = #{ROLE_NAME},
+                SITE_YN = #{SITE_YN},
+                LAST_UPDATED_BY = #{USER_AD},
+                LAST_UPDATE_DATE = SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (ROLE_SEQ
+         ,ROLE_NAME
+         ,SITE_YN
+         ,CREATED_BY
+         ,CREATION_DATE
+         ,LAST_UPDATED_BY
+         ,LAST_UPDATE_DATE)
+         VALUES
+         (SEQ_DESM_ROLE.NEXTVAL
+         ,#{ROLE_NAME}
+         ,#{SITE_YN}
+         ,#{USER_AD}
+         ,SYSDATE
+         ,#{USER_AD}
+         ,SYSDATE)
+  </insert>
+
+  <select id="getPermission" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT ROLE_SEQ,
+           ROLE_NAME,
+           SITE_YN
+      FROM DESM_ROLE
+     WHERE DELEGATE_FLAG = 'N'
+  </select>
+
+  <select id="getMenuAuthList" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT AUTH_SEQ,
+           MENU_SEQ,
+           AUTH_CODE,
+           AUTH_NAME
+      FROM DESM_MENU_AUTH
+     WHERE MENU_SEQ = #{MENU_SEQ}
+    ORDER BY AUTH_SEQ
+  </select>
+
+  <update id="deletePermission" parameterType="java.util.Map">
+    UPDATE DESM_ROLE
+       SET DELEGATE_FLAG = 'Y',
+           LAST_UPDATED_BY = #{USER_AD},
+           LAST_UPDATE_DATE = SYSDATE
+     WHERE ROLE_SEQ = #{ROLE_SEQ}
+  </update>
+
+  <delete id="deletePermissionMenu" parameterType="java.util.Map">
+    DELETE FROM DESM_ROLE_MENU
+     WHERE ROLE_SEQ = #{ROLE_SEQ}
+  </delete>
+
+  <delete id="deletePermissionMenuAuth" parameterType="java.util.Map">
+    DELETE FROM DESM_ROLE_MENU_AUTH
+     WHERE ROLE_SEQ = #{ROLE_SEQ}
+       AND MENU_SEQ = #{MENU_SEQ}
+  </delete>
+
+  <insert id="insertPermissionMenu" parameterType="java.util.Map">
+    INSERT INTO DESM_ROLE_MENU
+    (ROLE_SEQ
+    ,MENU_SEQ
+    ,CREATED_BY
+    ,CREATION_DATE
+    ,LAST_UPDATED_BY
+    ,LAST_UPDATE_DATE)
+    VALUES
+    (#{ROLE_SEQ}
+    ,#{MENU_SEQ}
+    ,#{USER_AD}
+    ,SYSDATE
+    ,#{USER_AD}
+    ,SYSDATE)
+  </insert>
+
+  <insert id="insertPermissionMenuAuth" parameterType="java.util.Map">
+    INSERT INTO DESM_ROLE_MENU_AUTH
+    (ROLE_SEQ
+    ,MENU_SEQ
+    ,AUTH_CODE
+    ,CREATED_BY
+    ,CREATION_DATE
+    ,LAST_UPDATED_BY
+    ,LAST_UPDATE_DATE)
+    VALUES
+    (#{ROLE_SEQ}
+    ,#{MENU_SEQ}
+    ,#{AUTH_CODE}
+    ,#{USER_AD}
+    ,SYSDATE
+    ,#{USER_AD}
+    ,SYSDATE)
+  </insert>
+
+  <select id="getPermissionMenu" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT *
+      FROM (SELECT DM.MENU_SEQ,
+                   DM.MENU_UP_SEQ,
+                   DM.MENU_ORDER,
+                   CASE WHEN #{lang} = 'ko' THEN DM.MENU_NAME_KO
+                        WHEN #{lang} = 'en' THEN DM.MENU_NAME_EN END AS MENU_NAME,
+                   CASE WHEN DRM.MENU_SEQ IS NOT NULL THEN 'Y' ELSE 'N' END AS USE_YN
+              FROM DESM_MENU DM,
+                   DESM_ROLE_MENU DRM
+             WHERE DM.MENU_SEQ = DRM.MENU_SEQ(+)
+               AND DM.DELEGATE_FLAG = 'N'
+               AND DRM.ROLE_SEQ(+) = #{ROLE_SEQ})
+        START WITH MENU_UP_SEQ = 0
+        CONNECT BY PRIOR MENU_SEQ = MENU_UP_SEQ
+        ORDER SIBLINGS BY MENU_ORDER
+  </select>
+
+  <select id="getMenuAuthUseList" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT DMA.AUTH_SEQ,
+         DMA.AUTH_CODE,
+           DMA.AUTH_NAME,
+           DMA.MENU_SEQ,
+           #{ROLE_SEQ} AS ROLE_SEQ,
+           CASE WHEN DRMA.AUTH_CODE IS NOT NULL THEN 'Y' ELSE 'N' END AS USE_YN
+      FROM DESM_MENU_AUTH DMA,
+           DESM_ROLE_MENU_AUTH DRMA
+     WHERE DMA.AUTH_CODE = DRMA.AUTH_CODE(+)
+       AND DMA.MENU_SEQ = DRMA.MENU_SEQ(+)
+       AND DMA.MENU_SEQ = #{MENU_SEQ}
+       AND DRMA.ROLE_SEQ(+) = #{ROLE_SEQ}
+    ORDER BY DMA.AUTH_SEQ
+  </select>
+
+  <select id="getUser" parameterType="java.util.Map" resultType="java.util.HashMap">
+  SELECT USER_AD
+          ,USER_NAME
+          ,DEPT_NAME
+          ,MAIL
+          ,EXPIRE_FLAG
+          ,CASE WHEN IDCS_YN != 'N' THEN 'Y' ELSE IDCS_YN END AS IDCS_YN
+          ,IDCS_YN AS IDCS_ID
+          ,NVL(FEDERATED_YN, 'N') AS FEDERATED_YN
+      FROM DESM_USER
+     WHERE DELEGATE_FLAG = 'N'
+  </select>
+
+  <select id="getUserCheckList" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT USER_AD
+          ,USER_NAME
+          ,USER_PW
+          ,USER_PW_SALT
+      FROM DESM_USER
+     WHERE DELEGATE_FLAG = 'N'
+       AND USER_AD = #{P_USER_AD}
+  </select>
+
+  <insert id="insertUser" parameterType="java.util.Map">
+    MERGE INTO DESM_USER
+    USING DUAL
+    ON (USER_AD = TRIM(UPPER(#{P_USER_AD})))
+    WHEN MATCHED THEN
+         UPDATE SET
+                USER_NAME = #{USER_NAME},
+                DEPT_NAME = #{DEPT_NAME},
+                MAIL = #{MAIL},
+           <if test='USER_PW_SALT != null and USER_PW_SALT !=""'>
+             USER_PW_SALT = #{USER_PW_SALT},
+           </if>
+           <if test='USER_PW != null and USER_PW !=""'>
+             USER_PW = #{USER_PW},
+           </if>
+                DELEGATE_FLAG = 'N',
+                <if test='EXPIRE_FLAG != null and EXPIRE_FLAG !=""'>
+                EXPIRE_FLAG = #{EXPIRE_FLAG},
+                </if>
+                LAST_UPDATED_BY = #{USER_AD},
+                LAST_UPDATE_DATE = SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (USER_AD
+         ,USER_NAME
+         ,DEPT_NAME
+         ,MAIL
+         <if test='EXPIRE_FLAG != null and EXPIRE_FLAG !=""'>
+         ,EXPIRE_FLAG
+         </if>
+       <if test='USER_PW_SALT != null and USER_PW_SALT !=""'>
+          ,USER_PW_SALT
+       </if>
+       <if test='USER_PW != null and USER_PW !=""'>
+          ,USER_PW
+       </if>
+         ,CREATED_BY
+         ,CREATION_DATE
+         ,LAST_UPDATED_BY
+         ,LAST_UPDATE_DATE
+        <if test='IDCS_YN != null and IDCS_YN !=""'>
+          ,IDCS_YN
+        </if>
+         <if test='FEDERATED_YN != null and FEDERATED_YN !=""'>
+          ,FEDERATED_YN
+        </if>
+         )
+         VALUES
+         (TRIM(UPPER(#{P_USER_AD}))
+         ,#{USER_NAME}
+         ,#{DEPT_NAME}
+         ,#{MAIL}
+         <if test='EXPIRE_FLAG != null and EXPIRE_FLAG !=""'>
+         ,#{EXPIRE_FLAG}
+         </if>
+       <if test='USER_PW_SALT != null and USER_PW_SALT !=""'>
+          ,#{USER_PW_SALT}
+       </if>
+       <if test='USER_PW != null and USER_PW !=""'>
+          ,#{USER_PW}
+       </if>
+         ,#{USER_AD}
+         ,SYSDATE
+         ,#{USER_AD}
+         ,SYSDATE
+       <if test='IDCS_YN != null and IDCS_YN !=""'>
+          ,#{IDCS_YN}
+       </if>
+       <if test='FEDERATED_YN != null and FEDERATED_YN !=""'>
+          ,#{FEDERATED_YN}
+       </if>
+         )
+  </insert>
+
+  <update id="deleteUser" parameterType="java.util.Map">
+    UPDATE DESM_USER
+       SET DELEGATE_FLAG = 'Y',
+           LAST_UPDATED_BY = #{USER_AD},
+           LAST_UPDATE_DATE = SYSDATE
+     WHERE USER_AD = #{P_USER_AD}
+  </update>
+
+  <select id="getUserPermission" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT DR.ROLE_SEQ,
+           DR.ROLE_NAME,
+           CASE WHEN DUR.ROLE_SEQ IS NOT NULL THEN 'Y' ELSE 'N' END AS USE_YN
+      FROM DESM_ROLE DR,
+           DESM_USER_ROLE DUR
+     WHERE DR.ROLE_SEQ = DUR.ROLE_SEQ(+)
+       AND DR.DELEGATE_FLAG = 'N'
+       AND DUR.USER_AD(+) = #{P_USER_AD}
+  </select>
+
+  <delete id="deleteUserPermission" parameterType="java.util.Map">
+    DELETE FROM DESM_USER_ROLE
+     WHERE USER_AD = #{P_USER_AD}
+  </delete>
+
+  <insert id="insertUserPermission" parameterType="java.util.Map">
+    INSERT INTO DESM_USER_ROLE
+    (USER_AD
+    ,ROLE_SEQ
+    ,CREATED_BY
+    ,CREATION_DATE
+    ,LAST_UPDATED_BY
+    ,LAST_UPDATE_DATE)
+    VALUES
+    (TRIM(UPPER(#{P_USER_AD}))
+    ,#{ROLE_SEQ}
+    ,#{USER_AD}
+    ,SYSDATE
+    ,#{USER_AD}
+    ,SYSDATE)
+  </insert>
+
+  <select id="getCode" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT MST_CODE,
+           MST_NAME,
+           CASE WHEN DELEGATE_FLAG = 'N' THEN 'Y' ELSE 'N' END AS USE_YN
+      FROM DESM_CODE_MST
+    ORDER BY MST_CODE
+  </select>
+
+  <select id="getMail" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT PROJECT_NO
+			,NVL(PROJECT_NAME , (	SELECT PA.NAME FROM PA_PROJECTS_ALL_INT PA WHERE PA.SEGMENT1 = PROJECT_NO)) AS PROJECT_NAME
+			,ON_YN
+			,OFF_YN
+			,L2_YN
+			,L3_YN
+			,L4_YN
+			,MPS_YN
+			,TE_YN
+			,PO_YN
+			,CARGO_YN
+			,FOB_YN
+			,ONSITE_YN
+			,EXCEPT_SCOPE
+			,TO_CHAR(CREATION_DATE, 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+			,TO_CHAR(LAST_UPDATE_DATE, 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+			,CREATED_BY
+			,LAST_UPDATED_BY
+		FROM DESM_EWS_SETUP
+		WHERE 1=1
+		<if test='ddlProjectNo != null and ddlProjectNo !=""'>
+		AND PROJECT_NO = #{ddlProjectNo}
+		</if>
+		ORDER BY CREATION_DATE DESC
+  </select>
+
+   <select id="getMailLower" parameterType="java.util.Map" resultType="egovframework.desm.cmmn.utils.LowerKeyMap">
+		SELECT PROJECT_NO
+			,NVL(PROJECT_NAME , (	SELECT PA.NAME FROM PA_PROJECTS_ALL_INT PA WHERE PA.SEGMENT1 = PROJECT_NO)) AS PROJECT_NAME
+			,ON_YN
+			,OFF_YN
+			,L2_YN
+			,L3_YN
+			,L4_YN
+			,MPS_YN
+			,TE_YN
+			,PO_YN
+			,CARGO_YN
+			,FOB_YN
+			,ONSITE_YN
+			,EXCEPT_SCOPE
+			,TO_CHAR(CREATION_DATE, 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+			,TO_CHAR(LAST_UPDATE_DATE, 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+			,CREATED_BY
+			,LAST_UPDATED_BY
+		FROM DESM_EWS_SETUP
+		WHERE 1=1
+		<if test='ddlProjectNo != null and ddlProjectNo !=""'>
+		AND PROJECT_NO = #{ddlProjectNo}
+		</if>
+		ORDER BY CREATION_DATE DESC
+  </select>
+
+  <select id="getProjectSupplyScope" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT DISTINCT NVL(ATTRIBUTE6,'N/A') AS ATTRIBUTE6 ,PROJECT_NO
+    FROM ZVTS_ITEM_MASTER
+    WHERE PROJECT_NO IS NOT NULL
+    <if test='ddlProjectNo != null and ddlProjectNo !=""'>
+    AND PROJECT_NO = #{ddlProjectNo}
+    </if>
+    ORDER BY PROJECT_NO,ATTRIBUTE6
+  </select>
+
+  <insert id="insertCode" parameterType="java.util.Map">
+    MERGE INTO DESM_CODE_MST
+    USING DUAL
+    ON (MST_CODE = #{MST_CODE})
+    WHEN MATCHED THEN
+         UPDATE SET
+                MST_NAME = #{MST_NAME},
+                DELEGATE_FLAG = #{DELEGATE_FLAG},
+                LAST_UPDATED_BY = #{USER_AD},
+                LAST_UPDATE_DATE = SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (MST_CODE
+         ,MST_NAME
+         ,DELEGATE_FLAG
+         ,CREATED_BY
+         ,CREATION_DATE
+         ,LAST_UPDATED_BY
+         ,LAST_UPDATE_DATE)
+         VALUES
+         (#{MST_CODE}
+         ,#{MST_NAME}
+         ,#{DELEGATE_FLAG}
+         ,#{USER_AD}
+         ,SYSDATE
+         ,#{USER_AD}
+         ,SYSDATE)
+  </insert>
+
+  <insert id="insertMail" parameterType="java.util.Map">
+    MERGE INTO DESM_EWS_SETUP
+    USING DUAL
+    ON (PROJECT_NO = #{ddlProjectNo})
+    WHEN MATCHED THEN
+         UPDATE SET
+          ON_YN          =    #{ddlOnYn}
+	      ,OFF_YN         =    #{ddlOffYn}
+	      ,L2_YN          =    #{ddlL2Yn}
+	      ,L3_YN          =    #{ddlL3Yn}
+	      ,L4_YN          =    #{ddlL4Yn}
+	      ,MPS_YN         =    #{ddlMpsYn}
+	      ,TE_YN          =    #{ddlTeYn}
+	      ,PO_YN          =    #{ddlPoYn}
+	      ,CARGO_YN       =    #{ddlCargoYn}
+	      ,FOB_YN         =    #{ddlFobYn}
+	      ,ONSITE_YN      =    #{ddlOnsiteYn}
+	      ,EXCEPT_SCOPE   =    #{ddlExceptScope}
+	      ,PROJECT_NAME   =    #{ddlProjectName}
+	      ,LAST_UPDATED_BY =   #{USER_AD}
+	      ,LAST_UPDATE_DATE =  SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (PROJECT_NO
+	      ,ON_YN
+	      ,OFF_YN
+	      ,L2_YN
+	      ,L3_YN
+	      ,L4_YN
+	      ,MPS_YN
+	      ,TE_YN
+	      ,PO_YN
+	      ,CARGO_YN
+	      ,FOB_YN
+	      ,ONSITE_YN
+	      ,EXCEPT_SCOPE
+	      ,PROJECT_NAME
+	      ,LAST_UPDATED_BY
+	      ,CREATED_BY
+	      )
+         VALUES
+         (
+          #{ddlProjectNo}
+         ,#{ddlOnYn}
+         ,#{ddlOffYn}
+         ,#{ddlL2Yn}
+         ,#{ddlL3Yn}
+         ,#{ddlL4Yn}
+         ,#{ddlMpsYn}
+         ,#{ddlTeYn}
+         ,#{ddlPoYn}
+         ,#{ddlCargoYn}
+         ,#{ddlFobYn}
+         ,#{ddlOnsiteYn}
+         ,#{ddlExceptScope}
+         ,#{ddlProjectName}
+         ,#{USER_AD}
+         ,#{USER_AD}
+         )
+  </insert>
+  <delete id="deleteMail" parameterType="java.util.Map">
+	DELETE FROM DESM_EWS_SETUP WHERE PROJECT_NO = #{PROJECT_NO}
+  </delete>
+
+  <select id="mailList" parameterType="java.util.Map" resultType="egovframework.desm.cmmn.utils.LowerKeyMap">
+		SELECT DSSV.*
+		,DSSV.TRK_ITEM_NAME AS ITEM_NAME
+		, EMP_PM.ZEMAIL AS PM_EMAIL
+		, NVL(EMP_PM.TEAM_LEADER_NUM,EMP_PM.AD_USER_ID) AS PM_TEAM_LEADER_NUM
+		, NVL(EMP_PM.TEAM_LEADER_NAME,EMP_PM.ZEMP_NM) AS PM_TEAM_LEADER_NAME
+		, EMP_PM.ZORG_ID AS PM_ZORG_ID
+		, EMP_PM.ZORG_NM AS PM_ZORG_NM
+		, EMP_PM.ZSYS_USE_YN AS PM_USER_YN
+
+		, EMP_EM.ZEMAIL AS EM_EMAIL
+		, NVL(EMP_EM.TEAM_LEADER_NUM,EMP_EM.AD_USER_ID) AS EM_TEAM_LEADER_NUM
+		, NVL(EMP_EM.TEAM_LEADER_NAME,EMP_EM.ZEMP_NM) AS EM_TEAM_LEADER_NAME
+		, EMP_EM.ZORG_ID AS EM_ZORG_ID
+		, EMP_EM.ZORG_NM AS EM_ZORG_NM
+		, EMP_EM.ZSYS_USE_YN AS EM_USER_YN
+
+		, EMP_BUYER.ZEMAIL AS BUYER_EMAIL
+		, NVL(EMP_BUYER.TEAM_LEADER_NUM,EMP_BUYER.AD_USER_ID) AS BUYER_TEAM_LEADER_NUM
+		, NVL(EMP_BUYER.TEAM_LEADER_NAME,EMP_BUYER.ZEMP_NM) AS BUYER_TEAM_LEADER_NAME
+		, EMP_BUYER.ZORG_ID AS BUYER_ZORG_ID
+		, EMP_BUYER.ZORG_NM AS BUYER_ZORG_NM
+		, EMP_BUYER.ZSYS_USE_YN AS BUYER_USER_YN
+
+		, EMP_SM.ZEMAIL AS SM_EMAIL
+		, NVL(EMP_SM.TEAM_LEADER_NUM,EMP_SM.AD_USER_ID) AS SM_TEAM_LEADER_NUM
+		, NVL(EMP_SM.TEAM_LEADER_NAME,EMP_SM.ZEMP_NM) AS SM_TEAM_LEADER_NAME
+		, EMP_SM.ZORG_ID AS SM_ZORG_ID
+		, EMP_SM.ZORG_NM AS SM_ZORG_NM
+		, EMP_SM.ZSYS_USE_YN AS SM_USER_YN
+		FROM DESM_SUPPLY_SUMMARY_V DSSV
+		,ZVTS_EMP EMP_PM
+		,ZVTS_EMP EMP_EM
+		,ZVTS_EMP EMP_BUYER
+		,ZVTS_EMP EMP_SM
+		WHERE DSSV.PROJECT_NO = #{project_no}
+		AND DSSV.PM_AD = EMP_PM.AD_USER_ID (+)
+		AND DSSV.EM_AD = EMP_EM.AD_USER_ID (+)
+		AND DSSV.BUYER_AD = EMP_BUYER.AD_USER_ID (+)
+		AND DSSV.SM_AD = EMP_SM.AD_USER_ID (+)
+  </select>
+
+  <select id="teamList"  parameterType="java.util.Map" resultType="egovframework.desm.cmmn.utils.LowerKeyMap">
+
+		SELECT
+		 NVL(EMP.TEAM_LEADER_EMAIL,EMP.ZEMAIL) AS TEAM_LEADER_EMAIL
+		, NVL(EMP.TEAM_LEADER_NUM,EMP.AD_USER_ID) AS TEAM_LEADER_NUM
+		, NVL(EMP.TEAM_LEADER_NAME,EMP.ZEMP_NM) AS TEAM_LEADER_NAME
+		, EMP.ZORG_ID AS ZORG_ID
+		, EMP.ZORG_NM AS ZORG_NM
+		FROM DESM_SUPPLY_SUMMARY_V DSSV
+		,ZVTS_EMP EMP
+		WHERE DSSV.PROJECT_NO = #{project_no}
+		AND DSSV.PM_AD = EMP.AD_USER_ID (+)
+		AND EMP.ZSYS_USE_YN = 'Y'
+		UNION
+		SELECT
+		 NVL(EMP.TEAM_LEADER_EMAIL,EMP.ZEMAIL) AS TEAM_LEADER_EMAIL
+		, NVL(EMP.TEAM_LEADER_NUM,EMP.AD_USER_ID) AS TEAM_LEADER_NUM
+		, NVL(EMP.TEAM_LEADER_NAME,EMP.ZEMP_NM) AS TEAM_LEADER_NAME
+		, EMP.ZORG_ID AS ZORG_ID
+		, EMP.ZORG_NM AS ZORG_NM
+		FROM DESM_SUPPLY_SUMMARY_V DSSV
+		,ZVTS_EMP EMP
+		WHERE DSSV.PROJECT_NO = #{project_no}
+		AND DSSV.EM_AD = EMP.AD_USER_ID (+)
+		AND EMP.ZSYS_USE_YN = 'Y'
+		UNION
+		SELECT
+		 NVL(EMP.TEAM_LEADER_EMAIL,EMP.ZEMAIL) AS TEAM_LEADER_EMAIL
+		, NVL(EMP.TEAM_LEADER_NUM,EMP.AD_USER_ID) AS TEAM_LEADER_NUM
+		, NVL(EMP.TEAM_LEADER_NAME,EMP.ZEMP_NM) AS TEAM_LEADER_NAME
+		, EMP.ZORG_ID AS ZORG_ID
+		, EMP.ZORG_NM AS ZORG_NM
+		FROM DESM_SUPPLY_SUMMARY_V DSSV
+		,ZVTS_EMP EMP
+		WHERE DSSV.PROJECT_NO = #{project_no}
+		AND DSSV.BUYER_AD = EMP.AD_USER_ID (+)
+		AND EMP.ZSYS_USE_YN = 'Y'
+		UNION
+		SELECT
+		 NVL(EMP.TEAM_LEADER_EMAIL,EMP.ZEMAIL) AS TEAM_LEADER_EMAIL
+		, NVL(EMP.TEAM_LEADER_NUM,EMP.AD_USER_ID) AS TEAM_LEADER_NUM
+		, NVL(EMP.TEAM_LEADER_NAME,EMP.ZEMP_NM) AS TEAM_LEADER_NAME
+		, EMP.ZORG_ID AS ZORG_ID
+		, EMP.ZORG_NM AS ZORG_NM
+		FROM DESM_SUPPLY_SUMMARY_V DSSV
+		,ZVTS_EMP EMP
+		WHERE DSSV.PROJECT_NO = #{project_no}
+		AND DSSV.SM_AD = EMP.AD_USER_ID (+)
+		AND EMP.ZSYS_USE_YN = 'Y'
+		ORDER BY ZORG_NM
+
+  </select>
+
+  <select id="l1ItemList"  parameterType="java.util.Map" resultType="egovframework.desm.cmmn.utils.LowerKeyMap">
+	SELECT DISTINCT DSSV.LV1_NAME
+	FROM DESM_SUPPLY_SUMMARY_V DSSV
+	WHERE DSSV.PROJECT_NO = #{project_no}
+	ORDER BY LV1_NAME
+  </select>
+
+  <select id="mailReceiverList" parameterType="java.util.Map" resultType="egovframework.desm.cmmn.utils.LowerKeyMap">
+  		/* Project Assign이 아니라, Default Project에 등록되어있는 사람들을 기준으로 함. */
+        SELECT DU.USER_AD
+        ,      DU.MAIL
+        --,      DUDP.PROJECT_CODE AS PROJECT_NO
+        --,      DU.USER_NAME
+        --,      DR.ROLE_NAME
+        FROM DESM_USER DU
+        ,    DESM_USER_ROLE DUR
+        ,    DESM_ROLE DR
+        ,    DESM_USER_DEFAULT_PROJECT DUDP
+        WHERE 1=1
+        AND DUR.ROLE_SEQ = DR.ROLE_SEQ
+        AND DR.ROLE_NAME = '사업관리담당자'
+        AND DUR.USER_AD = DU.USER_AD
+        AND DUDP.USER_AD = DU.USER_AD
+        AND DUDP.PROJECT_CODE = #{project_no}
+        UNION
+        SELECT ZHEL.TEAM_LEADER_NUM AS USER_AD
+        ,      (SELECT EMAIL_ADDRESS FROM FND_USER@LN_PROD_ZSHPIF WHERE USER_NAME = ZHEL.TEAM_LEADER_NUM) AS MAIL
+        --,      '' AS PROJECT_NO
+        --,      ZHEL.TEAM_LEADER_NAME AS USER_NAME
+        --,      '팀장' AS ROLE_NAME
+        FROM APPS.ZFIN_HR_EMP_LEADERS@LN_PROD_ZSHPIF ZHEL
+        ,    DESM_USER DU
+        ,    DESM_USER_ROLE DUR
+        ,    DESM_ROLE DR
+        ,    DESM_USER_DEFAULT_PROJECT DUDP
+        WHERE 1=1
+        AND ZHEL.EMPLOYEE_NUMBER = DU.USER_AD(+)
+        AND DUR.ROLE_SEQ = DR.ROLE_SEQ
+        AND DR.ROLE_NAME = '사업관리담당자'
+        AND DUR.USER_AD = DU.USER_AD
+        AND DUDP.USER_AD = DU.USER_AD
+        AND DUDP.PROJECT_CODE = #{project_no}
+        AND ZHEL.TEAM_LEADER_NUM IS NOT NULL
+  </select>
+
+  <select id="getCodeDetail" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT MST_CODE,
+           DTL_CODE,
+         CASE WHEN #{lang} = 'ko' THEN DTL_NAME_KO
+                WHEN #{lang} = 'en' THEN DTL_NAME_EN END AS DTL_NAME,
+           DTL_NAME_KO,
+           DTL_NAME_EN,
+           DTL_ORDER,
+           CASE WHEN DELEGATE_FLAG = 'N' THEN 'Y' ELSE 'N' END AS USE_YN
+      FROM DESM_CODE_DTL
+     WHERE MST_CODE = #{MST_CODE}
+    ORDER BY DTL_ORDER
+  </select>
+
+  <insert id="insertCodeDetail" parameterType="java.util.Map">
+    MERGE INTO DESM_CODE_DTL
+    USING DUAL
+    ON (MST_CODE = #{MST_CODE} AND DTL_CODE = #{DTL_CODE})
+    WHEN MATCHED THEN
+         UPDATE SET
+                DTL_NAME_KO = #{DTL_NAME_KO},
+                DTL_NAME_EN = #{DTL_NAME_EN},
+                DTL_ORDER = #{DTL_ORDER},
+                DELEGATE_FLAG = #{DELEGATE_FLAG},
+                LAST_UPDATED_BY = #{USER_AD},
+                LAST_UPDATE_DATE = SYSDATE
+    WHEN NOT MATCHED THEN
+         INSERT
+         (MST_CODE
+         ,DTL_CODE
+         ,DTL_NAME_KO
+         ,DTL_NAME_EN
+         ,DTL_ORDER
+         ,DELEGATE_FLAG
+         ,CREATED_BY
+         ,CREATION_DATE
+         ,LAST_UPDATED_BY
+         ,LAST_UPDATE_DATE)
+         VALUES
+         (#{MST_CODE}
+         ,#{DTL_CODE}
+         ,#{DTL_NAME_KO}
+         ,#{DTL_NAME_EN}
+         ,#{DTL_ORDER}
+         ,#{DELEGATE_FLAG}
+         ,#{USER_AD}
+         ,SYSDATE
+         ,#{USER_AD}
+         ,SYSDATE)
+  </insert>
+
+  <select id="getTest" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT TRK_ITEM_SEQ,
+            TRK_ITEM_NAME,
+            NVL(TRK_ITEM_GROUP, -1) AS TRK_ITEM_GROUP,
+            ORGANIZATION_ID,
+            PROJECT_ID,
+            PROJECT_NO,
+            PROJECT_NAME,
+            TASK_ID,
+            TASK_NUMBER,
+            TASK_NAME,
+            BATCH,
+            OFFSHORE,
+            PRIMAVERA_ID,
+            TO_CHAR(MPS_PLAN_DATE, 'YYYY/MM/DD') AS MPS_PLAN_DATE,
+            TO_CHAR(MPS_EXPECTED_DATE, 'YYYY/MM/DD') AS MPS_EXPECTED_DATE,
+            TO_CHAR(MPS_ACTUAL_DATE, 'YYYY/MM/DD') AS MPS_ACTUAL_DATE,
+            PURCHASE_DURATION,
+            TO_CHAR(PO_PLAN_DATE, 'YYYY/MM/DD') AS PO_PLAN_DATE,
+            TO_CHAR(PO_EXPECTED_DATE, 'YYYY/MM/DD') AS PO_EXPECTED_DATE,
+            TO_CHAR(PO_ATCUAL_DATE, 'YYYY/MM/DD') AS PO_ATCUAL_DATE,
+            MAKE_DURATION,
+            PROGRESS,
+            TO_CHAR(CARGO_PLAN_DATE, 'YYYY/MM/DD') AS CARGO_PLAN_DATE,
+            TO_CHAR(CARGO_EXPECTED_DATE, 'YYYY/MM/DD') AS CARGO_EXPECTED_DATE,
+            TO_CHAR(CARGO_PROMISED_DATE, 'YYYY/MM/DD') AS CARGO_PROMISED_DATE,
+            CARGO_ACTUAL_DATE,
+            SHIPMENT_DURATION,
+            TO_CHAR(FOB_PLAN_DATE, 'YYYY/MM/DD') AS FOB_PLAN_DATE,
+            TO_CHAR(FOB_EXPECTED_DATE, 'YYYY/MM/DD') AS FOB_EXPECTED_DATE,
+            TO_CHAR(FOB_ACTUAL_DATE, 'YYYY/MM/DD') AS FOB_ACTUAL_DATE,
+            TRANS_DURATION,
+            TO_CHAR(ATD_DATE, 'YYYY/MM/DD') AS ATD_DATE,
+            TO_CHAR(POD_DATE, 'YYYY/MM/DD') AS POD_DATE,
+            TO_CHAR(ATA_DATE, 'YYYY/MM/DD') AS ATA_DATE,
+            TO_CHAR(SKB_PPN_APPLY_DATE, 'YYYY/MM/DD') AS SKB_PPN_APPLY_DATE,
+            TO_CHAR(SKB_PPN_ISSUED_DATE, 'YYYY/MM/DD') AS SKB_PPN_ISSUED_DATE,
+            TO_CHAR(EBILLING_DATE, 'YYYY/MM/DD') AS EBILLING_DATE,
+            TO_CHAR(EBILLING_PAYMENT_DATE, 'YYYY/MM/DD') AS EBILLING_PAYMENT_DATE,
+            TO_CHAR(CUSTOMS_PASS_DATE, 'YYYY/MM/DD') AS CUSTOMS_PASS_DATE,
+            TO_CHAR(CHANNEL_DATE, 'YYYY/MM/DD') AS CHANNEL_DATE,
+            TO_CHAR(CUSTOMS_INSPECTION_DATE, 'YYYY/MM/DD') AS CUSTOMS_INSPECTION_DATE,
+            TO_CHAR(SPPB_DATE, 'YYYY/MM/DD') AS SPPB_DATE,
+            ONSITE_PLAN_DATE,
+            ONSITE_EXPECTED_DATE,
+            ONSITE_ACTUAL_DATE,
+            PAYMENT_MILESTONE,
+            TRK_ITEM_DEFAULT,
+            PM_AD,
+            PM_NAME,
+            EM_AD,
+            EM_NAME,
+            BUYER_AD,
+            BUYER_NAME,
+            QC_AD,
+            QC_NAME,
+            SM_AD,
+            SM_NAME,
+            ISSUE_FLAG,
+            INVOICE_NUM,
+            ATTRIBUTE1,
+            ATTRIBUTE2,
+            ATTRIBUTE3,
+            ATTRIBUTE4,
+            ATTRIBUTE5,
+            ATTRIBUTE6,
+            ATTRIBUTE7,
+            ATTRIBUTE8,
+            ATTRIBUTE9,
+            ATTRIBUTE10,
+            LAST_UPDATE_DATE,
+            LAST_UPDATED_BY,
+            CREATION_DATE,
+            CREATED_BY,
+            PM_DEPT_CODE,
+            PM_DEPT_NAME,
+            EM_DEPT_CODE,
+            EM_DEPT_NAME,
+            BUYER_DEPT_CODE,
+            BUYER_DEPT_NAME,
+            QC_DEPT_CODE,
+            QC_DEPT_NAME,
+            SEL_INVOICE_NUM,
+            ATTH_CNT,
+            FILE_GRP_CD,
+            CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'NODE' ELSE 'ITEM' END AS Def
+      FROM DESM_TEST
+
+    START WITH TRK_ITEM_GROUP IS NULL
+    CONNECT BY PRIOR TRK_ITEM_SEQ = TRK_ITEM_GROUP
+    ORDER SIBLINGS BY TRK_ITEM_SEQ
+  </select>
+
+  <update id="updatePwdUser" parameterType="java.util.Map">
+    UPDATE DESM_USER A
+       SET A.USER_PW = #{USER_PW},
+           A.USER_PW_SALT = #{USER_PW_SALT},
+           A.LAST_UPDATED_BY = #{USER_AD},
+           A.LAST_UPDATE_DATE = SYSDATE
+     WHERE A.USER_AD = #{P_USER_AD}
+  </update>
+
+  <update id="updatePwdEditYn" parameterType="java.util.Map">
+    UPDATE DESM_SUBCON_USER A
+       SET A.PWS_EDIT_YN = #{PWS_EDIT_YN},
+           A.LAST_UPDATED_BY = #{USER_AD},
+           A.LAST_UPDATE_DATE = SYSDATE
+     WHERE A.USER_AD = #{P_USER_AD}
+  </update>
+
+  <select id="getDesmDefaultProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT DISTINCT
+           TO_CHAR(PPA.PROJECT_ID) AS PROJECT_ID,
+           PPA.SEGMENT1,
+           PPA.NAME,
+           CASE WHEN DUDP.PROJECT_CODE IS NOT NULL THEN 1 ELSE 0 END AS DEFAULT_YN
+      FROM ZVTS_ITEM_MASTER IM,
+           PA_PROJECTS_ALL_INT PPA,
+           (SELECT COUNT(*) AS PROJECT_ALL_CNT
+              FROM DESM_USER_PROJECT_ALL
+             WHERE USER_AD = #{USER_AD}  ) DUPA,
+           (SELECT PROJECT_CODE
+              FROM DESM_USER_DEFAULT_PROJECT
+             WHERE USER_AD = #{USER_AD}  ) DUDP
+     WHERE IM.PROJECT_NO = PPA.SEGMENT1
+       AND IM.PROJECT_NO = DUDP.PROJECT_CODE(+)
+       AND (DUPA.PROJECT_ALL_CNT = 1 OR
+           (EXISTS (SELECT 1 FROM DESM_USER_PROJECT DUP
+                     WHERE DUP.PROJECT_CODE = PPA.SEGMENT1 AND DUP.USER_AD = #{USER_AD})))
+       <if test='PROJECT_CODE != null and PROJECT_CODE !=""'>
+       AND (UPPER(PPA.SEGMENT1) LIKE '%' || UPPER(#{PROJECT_CODE}) || '%'  OR UPPER(PPA.NAME) LIKE '%' || UPPER(#{PROJECT_CODE}) || '%')
+       </if>
+    ORDER BY PROJECT_ID
+  </select>
+
+  <select id="getDesmDefaultCountry" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT COUNTRY,
+           OPERATOR,
+           CASE WHEN CNT = 0 AND COUNTRY = 'South Korea' THEN 1
+                WHEN CNT > 0 AND USER_AD IS NOT NULL THEN 1
+                ELSE 0 END AS DEFAULT_YN
+      FROM (SELECT DCD.DTL_CODE AS COUNTRY,
+                   DCD.DTL_NAME_KO AS OPERATOR,
+                   DUDC.USER_AD,
+                   DCD.DTL_ORDER,
+                   (SELECT COUNT(*) FROM DESM_USER_DEFAULT_COUNTRY WHERE USER_AD = #{USER_AD}) AS CNT
+              FROM DESM_CODE_MST DCM,
+                   DESM_CODE_DTL DCD,
+                   DESM_USER_DEFAULT_COUNTRY DUDC
+             WHERE DCM.MST_CODE = DCD.MST_CODE
+               AND DCD.DTL_CODE = DUDC.COUNTRY_CODE(+)
+               AND DCM.DELEGATE_FLAG = 'N'
+               AND DCM.MST_CODE = 'R003'
+               AND DCD.DELEGATE_FLAG = 'N'
+           <if test='COUNTRY_CODE != null and COUNTRY_CODE !=""'>
+           AND UPPER(DCD.DTL_CODE) LIKE '%' || UPPER(#{COUNTRY_CODE}) || '%'
+           </if>
+               AND DUDC.USER_AD(+) = #{USER_AD})
+    ORDER BY DTL_ORDER
+  </select>
+
+  <delete id="deleteDesmDefaultProject" parameterType="java.util.Map">
+    DELETE FROM DESM_USER_DEFAULT_PROJECT
+     WHERE USER_AD = #{P_USER_AD}
+  </delete>
+
+  <insert id="saveDesmDefaultProject" parameterType="java.util.Map">
+    INSERT INTO DESM_USER_DEFAULT_PROJECT
+    (USER_AD
+    ,PROJECT_CODE
+    ,CREATED_BY
+    ,CREATION_DATE
+    ,LAST_UPDATED_BY
+    ,LAST_UPDATE_DATE)
+    VALUES
+    (#{P_USER_AD}
+    ,#{PROJECT_CODE}
+    ,#{USER_AD}
+    ,SYSDATE
+    ,#{USER_AD}
+    ,SYSDATE)
+  </insert>
+
+  <delete id="deleteDesmDefaultCountry" parameterType="java.util.Map">
+    DELETE FROM DESM_USER_DEFAULT_COUNTRY
+     WHERE USER_AD = #{P_USER_AD}
+  </delete>
+
+  <insert id="saveDesmDefaultCountry" parameterType="java.util.Map">
+    INSERT INTO DESM_USER_DEFAULT_COUNTRY
+    (USER_AD
+    ,COUNTRY_CODE
+    ,CREATED_BY
+    ,CREATION_DATE
+    ,LAST_UPDATED_BY
+    ,LAST_UPDATE_DATE)
+    VALUES
+    (#{P_USER_AD}
+    ,#{COUNTRY_CODE}
+    ,#{USER_AD}
+    ,SYSDATE
+    ,#{USER_AD}
+    ,SYSDATE)
+  </insert>
+
+  <select id="getRolefcmToken" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT *
+      FROM (SELECT DU.USER_AD,
+                   DFT.LAST_UPDATE_DATE,
+                   DFT.FCM_TOKEN,
+                   DFT.PLATFORM,
+                   <if test='PROJECT_NO != null and PROJECT_NO !=""'>
+                   (SELECT COUNT(*) FROM DESM_USER_PROJECT_ALL DUPA WHERE DUPA.USER_AD = DU.USER_AD) AS DUPA_CNT,
+                   (SELECT COUNT(*) FROM DESM_USER_PROJECT DUP WHERE DUP.USER_AD = DU.USER_AD AND DUP.PROJECT_CODE = #{PROJECT_NO}) AS DUP_CNT,
+                   </if>
+                   ROW_NUMBER() OVER(PARTITION BY DU.USER_AD ORDER BY DU.USER_AD,DFT.LAST_UPDATE_DATE DESC) AS RN
+              FROM DESM_USER DU,
+                   DESM_USER_ROLE DUR,
+                   DESM_FCM_TOKEN DFT
+             WHERE DU.USER_AD = DUR.USER_AD
+               AND DU.USER_AD = DFT.USER_AD
+               AND DU.DELEGATE_FLAG = 'N'
+               AND DU.EXPIRE_FLAG = 'N'
+           AND DUR.ROLE_SEQ IN
+          <foreach collection="list" item="item" separator="," open="(" close=")">
+            #{item.ROLE_SEQ}
+          </foreach>
+               AND DFT.FCM_TOKEN IS NOT NULL)
+     WHERE RN = 1
+         <if test='PROJECT_NO != null and PROJECT_NO !=""'>
+           AND (DUPA_CNT > 0 OR DUP_CNT > 0)
+         </if>
+  </select>
+
+  <update id="updateUserPwNull" parameterType="java.util.Map">
+    UPDATE DESM_USER A
+       SET A.USER_PW = ''
+     WHERE A.USER_AD = #{P_USER_AD}
+  </update>
+  
+  <select id="getMaterialSetup" parameterType="java.util.Map" resultType="java.util.HashMap">
+  		/* AdminMapper.getMaterialSetup : 현장자재관리 Project Setup 정보 가져오기 */
+		SELECT PROJECT_NO
+        ,      NVL(PROJECT_NAME, (SELECT PA.NAME FROM PA_PROJECTS_ALL_INT PA WHERE PA.SEGMENT1 = PROJECT_NO)) AS PROJECT_NAME
+        ,      MRR_YN
+        ,      MIR_YN
+        ,      OSDM_YN
+        ,      TO_CHAR(CREATION_DATE, 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+        ,      TO_CHAR(LAST_UPDATE_DATE, 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+        ,      CREATED_BY
+        ,      LAST_UPDATED_BY
+        FROM DESM_MATERIAL_SETUP
+        WHERE 1=1
+        <if test='ddlProjectNo != null and ddlProjectNo !=""'>
+            AND PROJECT_NO = #{ddlProjectNo}
+        </if>
+        ORDER BY CREATION_DATE DESC
+  </select>
+  
+  <insert id="saveMaterialSetup" parameterType="java.util.Map">
+  		/* AdminMapper.saveMaterialSetup : 현장자재관리 Project Setup 정보 저장 */
+        MERGE INTO DESM_MATERIAL_SETUP
+        USING DUAL
+        ON (PROJECT_NO = #{ddlProjectNo})
+        WHEN MATCHED THEN
+          UPDATE SET
+            MRR_YN = #{ddlMrrYn}
+            ,MIR_YN = #{ddlMirYn}
+            ,OSDM_YN = #{ddlOsdmYn}
+            ,LAST_UPDATED_BY = #{USER_AD}
+            ,LAST_UPDATE_DATE = SYSDATE
+        WHEN NOT MATCHED THEN
+          INSERT
+             (
+              PROJECT_NO
+              ,MRR_YN
+              ,MIR_YN
+              ,OSDM_YN
+              ,CREATION_DATE
+              ,CREATED_BY
+              ,LAST_UPDATE_DATE
+              ,LAST_UPDATED_BY
+             )
+          VALUES
+             (
+              #{ddlProjectNo}
+              ,#{ddlMrrYn}
+              ,#{ddlMirYn}
+              ,#{ddlOsdmYn}
+              ,SYSDATE
+              ,#{USER_AD}
+              ,SYSDATE
+              ,#{USER_AD}
+             )
+  </insert>
+  
+  <delete id="deleteMaterialSetup" parameterType="java.util.Map">
+  	DELETE FROM DESM_MATERIAL_SETUP WHERE PROJECT_NO = #{PROJECT_NO}
+  </delete>
+</mapper>

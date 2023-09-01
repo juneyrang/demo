@@ -1,0 +1,1042 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="OnshoreMapper">
+
+	<select id="getIdsmSetupDlgContractSearch" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getIdsmSetupDlgContractSearch : 계약관리 검색 정보 */
+		SELECT A.CONTRACT_HEADER_ID,
+	           A.PROJECT_NO,
+	           PPA.NAME AS PROJECT_NAME,
+	           A.CONTRACT_SEQ,
+	           A.REVISION,
+	           A.CATEGORY,
+	           A.STATUS,
+	           A.CONTRACT_NO,
+	           A.CONTRACT_NAME,
+	           A.DESCRIPTION,
+	           A.CONTRACTOR,
+	           TO_CHAR(A.CONTRACT_DATE, 'YYYY/MM/DD') AS CONTRACT_DATE,
+	           A.ATTACH_GRP_CD
+	      FROM DESM_ONSHORE_CONTRACT_HEADERS A,
+				 PA_PROJECTS_ALL_INT PPA
+	      WHERE A.PROJECT_NO = PPA.SEGMENT1
+	      	AND A.PROJECT_NO = #{PROJECT_NO}
+	      	AND UPPER(A.CONTRACT_SEQ) LIKE '%' || UPPER(#{CONTRACT_SEQ}) || '%'
+	</select>
+	
+	<select id="getDesmContractHeader" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmContractHeader : 계약관리 헤더 정보 */
+		SELECT DOCH.CONTRACT_HEADER_ID,
+	           DOCH.PROJECT_NO,
+	           PPA.NAME AS PROJECT_NAME,
+	           DOCH.CONTRACT_SEQ,
+	           DOCH.REVISION,
+	           DOCH.CATEGORY,
+	           DOCH.STATUS,
+               DOCH.REVISION,
+	           DOCH.CONTRACT_NO,
+	           DOCH.CONTRACT_NAME,
+	           DOCH.CLOSED,
+	           DOCH.DESCRIPTION,
+	           DOCH.CONTRACTOR,
+	           TO_CHAR(DOCH.CONTRACT_DATE, 'YYYY/MM/DD') AS CONTRACT_DATE,
+	           TO_CHAR(DOCH.TERM_FROM, 'YYYY/MM/DD') AS TERM_FROM,
+	           TO_CHAR(DOCH.TERM_TO, 'YYYY/MM/DD') AS TERM_TO,
+	           DOCH.CONTRACT_CURRENCY,
+	           DOCH.CONTRACT_AMOUNT,
+	           DOCH.ATTACH_GRP_CD,
+	           DOCH.REMARKS,
+	           CASE WHEN DOCH.REQUESTED_BY IS NOT NULL THEN DOCH.REQUESTED_BY END AS REQUESTED_BY,
+	           CASE WHEN DOCH.APPROVED_BY IS NOT NULL THEN DOCH.APPROVED_BY END AS APPROVED_BY,
+	           TO_CHAR(DOCH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+	           TO_CHAR(DOCH.APPROVE_DATE, 'YYYY/MM/DD') AS APPROVE_DATE,
+	           DOCH.CREATED_BY,
+	           TO_CHAR(DOCH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE,
+	           DOCH.LAST_UPDATED_BY,
+	           TO_CHAR(DOCH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE,
+	           (SELECT COUNT(*)
+	              FROM ESAATTH A
+	             WHERE A.SYS_ID = 'EMRO'
+	               AND A.STS  <![CDATA[ <> ]]>   'D'
+	               AND A.GRP_CD = DOCH.ATTACH_GRP_CD) AS ATT_CNT
+	      FROM DESM_ONSHORE_CONTRACT_HEADERS DOCH,
+	             (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+	                FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+	                     DESM_CODE_DTL DCD
+	               WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+	                 AND DCD.DELEGATE_FLAG = 'N'
+	                 AND DUDC.USER_AD = #{USER_AD}) CT,
+	             DESM_USER DU1,
+	             DESM_USER DU2,
+				 PA_PROJECTS_ALL_INT PPA
+	      WHERE DOCH.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+	       	AND DOCH.REQUESTED_BY = DU1.USER_AD(+)
+	        AND DOCH.APPROVED_BY = DU2.USER_AD(+)
+	        AND DOCH.PROJECT_NO = PPA.SEGMENT1
+	</select>
+	
+	<select id="getDesmContractList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmContractList : 계약관리 헤더 목록 정보 */
+		SELECT AA.*
+		       , CP.CONTACT_NAME
+		       , CP.CONTACT_TITLE
+		       , CP.CONTACT_EMAIL
+		       , CP.CONTACT_MOBILE
+		FROM (
+			SELECT DOCH.CONTRACT_HEADER_ID,
+	           DOCH.PROJECT_NO,
+	           DOCH.CATEGORY,
+	           DOCH.CONTRACT_SEQ,
+	           DOCH.STATUS,
+               DOCH.REVISION,
+	           DOCH.CONTRACT_NO,
+	           DOCH.CONTRACT_NAME,
+	           DOCH.CLOSED,
+	           DOCH.DESCRIPTION,
+	           DOCH.CONTRACTOR,
+	           TO_CHAR(DOCH.CONTRACT_DATE, 'YYYY/MM/DD') AS CONTRACT_DATE,
+	           TO_CHAR(DOCH.TERM_FROM, 'YYYY/MM/DD') AS TERM_FROM,
+	           TO_CHAR(DOCH.TERM_TO, 'YYYY/MM/DD') AS TERM_TO,
+	           DOCH.CONTRACT_CURRENCY,
+	           DOCH.CONTRACT_AMOUNT,
+	           DOCH.ATTACH_GRP_CD,
+	           DOCH.REMARKS,
+	           CASE WHEN DOCH.REQUESTED_BY IS NOT NULL THEN DOCH.REQUESTED_BY END AS REQUESTED_BY,
+	           CASE WHEN DOCH.APPROVED_BY IS NOT NULL THEN DOCH.APPROVED_BY END AS APPROVED_BY,
+	           TO_CHAR(DOCH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+	           TO_CHAR(DOCH.APPROVE_DATE, 'YYYY/MM/DD') AS APPROVE_DATE,
+	           DOCH.CREATED_BY,
+	           TO_CHAR(DOCH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE,
+	           DOCH.LAST_UPDATED_BY,
+	           TO_CHAR(DOCH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE,
+	           (SELECT COUNT(*)
+	              FROM ESAATTH A
+	             WHERE A.SYS_ID = 'EMRO'
+	               AND A.STS  <![CDATA[ <> ]]>   'D'
+	               AND A.GRP_CD = DOCH.ATTACH_GRP_CD) AS ATT_CNT
+	      FROM DESM_ONSHORE_CONTRACT_HEADERS DOCH,
+	             (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+	                FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+	                     DESM_CODE_DTL DCD
+	               WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+	                 AND DCD.DELEGATE_FLAG = 'N'
+	                 AND DUDC.USER_AD = #{USER_AD}) CT,
+	             DESM_USER DU1,
+	             DESM_USER DU2
+	       WHERE DOCH.REQUESTED_BY = DU1.USER_AD(+)
+	         AND DOCH.APPROVED_BY = DU2.USER_AD(+)
+		 <if test='PROJECT_NO != null and PROJECT_NO != ""'>
+		   AND UPPER(DOCH.PROJECT_NO) LIKE '%' || UPPER(#{PROJECT_NO}) || '%'
+		 </if>		 
+		 <if test='CONTRACT_SEQ != null and CONTRACT_SEQ != ""'>
+		   AND UPPER(DOCH.CONTRACT_SEQ) LIKE '%' || UPPER(#{CONTRACT_SEQ}) || '%'
+		 </if>			 
+		 <if test='CONTRACT_NO != null and CONTRACT_NO != ""'>
+		   AND UPPER(DOCH.CONTRACT_NO) LIKE '%' || UPPER(#{CONTRACT_NO}) || '%'
+		 </if>	 
+		 <if test='CONTRACT_NAME != null and CONTRACT_NAME != ""'>
+		   AND UPPER(DOCH.CONTRACT_NAME) LIKE '%' || UPPER(#{CONTRACT_NAME}) || '%'
+		 </if>		 
+		 <if test='CONTRACTOR != null and CONTRACTOR != ""'>
+		   AND UPPER(DOCH.CONTRACTOR) LIKE '%' || UPPER(#{CONTRACTOR}) || '%'
+		 </if>
+		 <if test='TERM_FROM != null and TERM_FROM != ""'>
+		   AND DOCH.TERM_FROM >= TO_DATE(#{TERM_FROM}, 'YYYY/MM/DD')
+		 </if>
+		 <if test='TERM_TO != null and TERM_TO != ""'>
+		   AND DOCH.TERM_TO <![CDATA[ < ]]> TO_DATE(#{TERM_TO}, 'YYYY/MM/DD') + 1
+		 </if>
+		 <if test='CONTRACT_DATE != null and CONTRACT_DATE != ""'>
+		   AND DOCH.CONTRACT_DATE = TO_DATE(#{CONTRACT_DATE}, 'YYYY/MM/DD')
+		 </if>
+		 <if test='STATUS != null and STATUS != ""'>
+		   AND DOCH.STATUS = #{STATUS}
+		 </if>
+		 <if test='CLOSED != null and CLOSED != ""'>
+		   AND DOCH.CLOSED = #{CLOSED}
+		 </if>
+		) AA,
+		(
+		  SELECT CONTRACT_HEADER_ID, CONTACT_NAME, CONTACT_TITLE, CONTACT_EMAIL, CONTACT_MOBILE
+		  FROM DESM_ONSHORE_CONTRACT_CONTACT
+		  WHERE IS_MAIN_CONTACT = 'Y'
+		) CP
+		WHERE AA.CONTRACT_HEADER_ID = CP.CONTRACT_HEADER_ID(+)
+		ORDER BY AA.CONTRACT_HEADER_ID DESC
+
+	</select>
+	
+	<select id="getDesmContractLineList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmContractLineList : 계약관리 라인 목록 정보 */
+		SELECT   A.CONTRACT_HEADER_ID
+				,A.CONTRACT_LINE_ID
+				,A.REVISION
+				,A.TYPE
+				,A.ITEM1
+				,A.ITEM2
+				,A.ITEM3
+				,A.ITEM4
+				,A.ITEM_NO
+				,A.SEPC
+				,A.UOM
+				,A.QUANTITY
+				,A.NET
+				,A.GROSS
+				,A.CURRENCY
+				,A.UNIT_PRICE
+				,A.AMOUNT
+				,A.PROMISED_DATE
+				,A.PAYMENT_METHOD
+				,A.FOB
+				,A.REMARKS
+				--,A.CREATED_BY
+				--,TO_CHAR(A.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+				--,A.LAST_UPDATED_BY
+				--,TO_CHAR(A.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+	      FROM DESM_ONSHORE_CONTRACT_LINES A
+	      WHERE A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+	</select>
+	
+	<select id="getDesmContractContactList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmContractContactList : 계약관리 연락처 목록 정보 */
+		SELECT   A.CONTRACT_HEADER_ID
+				,A.CONTACT_ID
+				,A.CONTACT_TITLE
+				,A.CONTACT_NAME
+				,A.CONTACT_EMAIL
+				,A.CONTACT_MOBILE
+				,A.IS_MAIN_CONTACT
+	      FROM DESM_ONSHORE_CONTRACT_CONTACT A
+	      WHERE A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+	</select>
+	
+	<select id="getDesmContractPaymentList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmContractPaymentList : 계약관리 결제 정보 */
+		SELECT   
+			A.CONTRACT_HEADER_ID
+		    ,A.CONTRACT_PAYMENT_ID
+		    ,A.TYPE
+		    ,A.CURRENCY
+		    ,A.AMOUNT
+		    ,A.IS_BOND_RECEIVED
+		    ,A.BOND_NO
+		    ,A.BOND_CURRENCY
+		    ,A.BOND_AMOUNT
+		    ,A.ISSUE_DATE
+		    ,A.EXPIRE_DATE
+		    ,A.FIRM
+		    ,A.REMARKS
+		FROM DESM_ONSHORE_CONTRACT_PAYMENT A
+		WHERE A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+		ORDER BY A.CONTRACT_PAYMENT_ID ASC
+	</select>
+	
+	<select id="getDesmContractHeaderId" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmContractHeaderId : 계약관리 헤더 ID */
+		SELECT SEQ_DESM_ONSHORE_CONTRACT_HEADERS.NEXTVAL AS CONTRACT_HEADER_ID
+		FROM DUAL
+	</select>
+	
+	<update id="saveDesmContractHeader" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractHeader : 계약관리 헤더 정보 저장 */
+		MERGE INTO DESM_ONSHORE_CONTRACT_HEADERS A
+		USING DUAL
+		ON (A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.REVISION = #{REVISION},
+		     A.PROJECT_NO = #{PROJECT_NO},
+		     A.CATEGORY = #{CATEGORY},
+		     A.STATUS = #{STATUS},
+		     A.CONTRACT_SEQ = #{CONTRACT_SEQ},
+		     A.CONTRACT_NO = #{CONTRACT_NO},
+		     A.CONTRACT_NAME = #{CONTRACT_NAME},
+		     A.DESCRIPTION = #{DESCRIPTION},
+		     A.CONTRACTOR = #{CONTRACTOR},
+		     A.CONTRACT_DATE = #{CONTRACT_DATE},
+		     A.TERM_FROM = #{TERM_FROM},
+		     A.TERM_TO = #{TERM_TO},
+		     A.CONTRACT_CURRENCY = #{CONTRACT_CURRENCY},
+		     A.CONTRACT_AMOUNT = #{CONTRACT_AMOUNT},
+		     A.ATTACH_GRP_CD = #{ATTACH_GRP_CD},
+		     A.REMARKS = #{REMARKS},
+			 <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+			     A.REQUESTED_BY = #{REQUESTED_BY},
+			     A.REQUEST_DATE = SYSDATE,
+			 </if>
+			 <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+			     A.APPROVED_BY = #{APPROVED_BY},
+			     A.APPROVE_DATE = SYSDATE,
+			 </if>
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.CONTRACT_HEADER_ID
+		     ,A.REVISION
+		     ,A.PROJECT_NO
+		     ,A.CATEGORY
+		     ,A.STATUS
+		     ,A.CONTRACT_SEQ
+		     ,A.CONTRACT_NO
+		     ,A.CONTRACT_NAME
+		     ,A.CLOSED
+		     ,A.DESCRIPTION
+		     ,A.CONTRACTOR
+		     ,A.CONTRACT_DATE
+		     ,A.TERM_FROM
+		     ,A.TERM_TO
+		     ,A.CONTRACT_CURRENCY
+		     ,A.CONTRACT_AMOUNT
+		     ,A.ATTACH_GRP_CD
+		     ,A.REMARKS
+			 <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+			     ,A.REQUESTED_BY
+				 <if test='STATUS != null and STATUS != "Request"'>
+				     ,A.REQUEST_DATE
+				 </if>
+			 </if>
+			 <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+			     ,A.APPROVED_BY
+				 <if test='STATUS != null and STATUS != "Approved"'>
+			     	,A.APPROVE_DATE
+				 </if>
+			 </if>
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{CONTRACT_HEADER_ID}
+		     ,#{REVISION}
+		     ,#{PROJECT_NO}
+		     ,#{CATEGORY}
+		     ,#{STATUS}
+		     ,(
+		     	SELECT 'PO' || TO_CHAR(SYSDATE, 'YYYY') || NVL(LPAD(MAX(SUBSTR(CONTRACT_SEQ, 7)) + 1, 6, '0'), '000001')
+				FROM DESM_ONSHORE_CONTRACT_HEADERS
+				WHERE SUBSTR(CONTRACT_SEQ, 0, 6) = 'PO' || TO_CHAR(SYSDATE, 'YYYY')
+		     )
+		     ,#{CONTRACT_NO}
+		     ,#{CONTRACT_NAME}
+		     ,'OPEN'
+		     ,#{DESCRIPTION}
+		     ,#{CONTRACTOR}
+		     ,#{CONTRACT_DATE}
+		     ,#{TERM_FROM}
+		     ,#{TERM_TO}
+		     ,#{CONTRACT_CURRENCY}
+		     ,#{CONTRACT_AMOUNT}
+		     ,#{ATTACH_GRP_CD}
+		     ,#{REMARKS}
+			 <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+			     ,#{REQUESTED_BY}
+				 <if test='STATUS != null and STATUS != "Request"'>
+			     	,SYSDATE
+				 </if>
+			 </if>
+			 <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+			     ,#{APPROVED_BY}
+				 <if test='STATUS != null and STATUS != "Approved"'>
+			     	,SYSDATE
+				 </if>
+			 </if>
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+	
+	<update id="saveDesmContractLine" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractLine : 계약관리 라인 정보 저장 */
+		MERGE INTO DESM_ONSHORE_CONTRACT_LINES A
+		USING DUAL
+		ON (A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID} AND A.CONTRACT_LINE_ID = #{CONTRACT_LINE_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.REVISION = #{REVISION},
+		     A.TYPE = #{TYPE},
+		     A.ITEM1 = #{ITEM1},
+		     A.ITEM2 = #{ITEM2},
+		     A.ITEM3 = #{ITEM3},
+		     A.ITEM4 = #{ITEM4},
+		     A.ITEM_NO = #{ITEM_NO},
+		     A.SEPC = #{SEPC},
+		     A.UOM = #{UOM},
+		     A.QUANTITY = #{QUANTITY},
+		     A.NET = #{NET},
+		     A.GROSS = #{GROSS},
+		     A.CURRENCY = #{CURRENCY},
+		     A.UNIT_PRICE = #{UNIT_PRICE},
+		     A.AMOUNT = #{AMOUNT},
+		     A.PROMISED_DATE = #{PROMISED_DATE},
+		     A.PAYMENT_METHOD = #{PAYMENT_METHOD},
+		     A.FOB = #{FOB},
+		     A.REMARKS = #{REMARKS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.CONTRACT_LINE_ID
+		     ,A.CONTRACT_HEADER_ID
+		     ,A.REVISION
+		     ,A.TYPE
+		     ,A.ITEM1
+		     ,A.ITEM2
+		     ,A.ITEM3
+		     ,A.ITEM4
+		     ,A.ITEM_NO
+		     ,A.SEPC
+		     ,A.UOM
+		     ,A.QUANTITY
+		     ,A.NET
+		     ,A.GROSS
+		     ,A.CURRENCY
+		     ,A.UNIT_PRICE
+		     ,A.AMOUNT
+		     ,A.PROMISED_DATE
+		     ,A.PAYMENT_METHOD
+		     ,A.FOB
+		     ,A.REMARKS
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (
+		     SEQ_DESM_ONSHORE_CONTRACT_LINES.NEXTVAL
+		     ,#{CONTRACT_HEADER_ID}
+		     ,#{REVISION}
+		     ,#{TYPE}
+		     ,#{ITEM1}
+		     ,#{ITEM2}
+		     ,#{ITEM3}
+		     ,#{ITEM4}
+		     ,#{ITEM_NO}
+		     ,#{SEPC}
+		     ,#{UOM}
+		     ,#{QUANTITY}
+		     ,#{NET}
+		     ,#{GROSS}
+		     ,#{CURRENCY}
+		     ,#{UNIT_PRICE}
+		     ,#{AMOUNT}
+		     ,#{PROMISED_DATE}
+		     ,#{PAYMENT_METHOD}
+		     ,#{FOB}
+		     ,#{REMARKS}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+	
+	<update id="saveDesmContractContact" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractContact : 계약관리 연락처 정보 저장 */
+		MERGE INTO DESM_ONSHORE_CONTRACT_CONTACT A
+		USING DUAL
+		ON (A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID} AND A.CONTACT_ID = #{CONTACT_ID, jdbcType=VARCHAR})
+		WHEN MATCHED THEN
+		     UPDATE SET
+			     A.CONTACT_TITLE = #{CONTACT_TITLE, jdbcType=VARCHAR},
+			     A.CONTACT_NAME = #{CONTACT_NAME},
+			     A.CONTACT_EMAIL = #{CONTACT_EMAIL},
+			     A.CONTACT_MOBILE = #{CONTACT_MOBILE, jdbcType=VARCHAR},
+			     A.IS_MAIN_CONTACT = #{IS_MAIN_CONTACT},
+			     A.LAST_UPDATED_BY = #{USER_AD},
+			     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (
+			      A.CONTRACT_HEADER_ID
+			     ,A.CONTACT_ID
+			     ,A.CONTACT_TITLE
+			     ,A.CONTACT_NAME
+			     ,A.CONTACT_EMAIL
+			     ,A.CONTACT_MOBILE
+			     ,A.IS_MAIN_CONTACT
+			     ,A.CREATED_BY
+			     ,A.CREATION_DATE
+			     ,A.LAST_UPDATED_BY
+			     ,A.LAST_UPDATE_DATE
+		     ) VALUES (
+			      #{CONTRACT_HEADER_ID}
+			     ,(
+			     	SELECT NVL(MAX(CONTACT_ID), 0) + 1
+					FROM DESM_ONSHORE_CONTRACT_CONTACT
+					WHERE CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+				 )
+			     ,#{CONTACT_TITLE, jdbcType=VARCHAR}
+			     ,#{CONTACT_NAME}
+			     ,#{CONTACT_EMAIL}
+			     ,#{CONTACT_MOBILE, jdbcType=VARCHAR}
+			     ,#{IS_MAIN_CONTACT}
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{USER_AD}
+			     ,SYSDATE
+		     )
+	</update>
+	
+	<update id="saveDesmContractPayment" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractPayment : 계약관리 결제 정보 저장 */
+		MERGE INTO DESM_ONSHORE_CONTRACT_PAYMENT A
+		USING DUAL
+		ON (A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID} AND A.CONTRACT_PAYMENT_ID = #{CONTRACT_PAYMENT_ID, jdbcType=VARCHAR})
+		WHEN MATCHED THEN
+		     UPDATE SET
+			     A.TYPE = #{TYPE},
+			     A.CURRENCY = #{CURRENCY},
+			     A.AMOUNT = #{AMOUNT},
+			     A.IS_BOND_RECEIVED = #{IS_BOND_RECEIVED},
+			     A.BOND_NO = #{BOND_NO},
+			     A.BOND_CURRENCY = #{BOND_CURRENCY},
+			     A.BOND_AMOUNT = #{BOND_AMOUNT},
+			     A.ISSUE_DATE = #{ISSUE_DATE},
+			     A.EXPIRE_DATE = #{EXPIRE_DATE},
+			     A.FIRM = #{FIRM},
+			     A.REMARKS = #{REMARKS},
+			     A.LAST_UPDATED_BY = #{USER_AD},
+			     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (
+			     A.CONTRACT_HEADER_ID
+			     ,A.CONTRACT_PAYMENT_ID
+			     ,A.TYPE
+			     ,A.CURRENCY
+			     ,A.AMOUNT
+			     ,A.IS_BOND_RECEIVED
+			     ,A.BOND_NO
+			     ,A.BOND_CURRENCY
+			     ,A.BOND_AMOUNT
+			     ,A.ISSUE_DATE
+			     ,A.EXPIRE_DATE
+			     ,A.FIRM
+			     ,A.REMARKS
+			     ,A.CREATED_BY
+			     ,A.CREATION_DATE
+			     ,A.LAST_UPDATED_BY
+			     ,A.LAST_UPDATE_DATE
+		     ) VALUES (
+			     #{CONTRACT_HEADER_ID}
+			     ,(
+			     	SELECT NVL(MAX(CONTRACT_PAYMENT_ID), 0) + 1
+					FROM DESM_ONSHORE_CONTRACT_PAYMENT
+					WHERE CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+				 )
+			     ,#{TYPE}
+			     ,#{CURRENCY}
+			     ,#{AMOUNT}
+			     ,#{IS_BOND_RECEIVED}
+			     ,#{BOND_NO}
+			     ,#{BOND_CURRENCY}
+			     ,#{BOND_AMOUNT}
+			     ,#{ISSUE_DATE}
+			     ,#{EXPIRE_DATE}
+			     ,#{FIRM}
+			     ,#{REMARKS}
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{USER_AD}
+			     ,SYSDATE
+		     )
+	</update>
+	
+	<update id="saveDesmContractReject" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractReject : 계약관리 반려 */
+		UPDATE DESM_ONSHORE_CONTRACT_HEADERS
+		   SET STATUS = 'Rejected',
+		   	   --REQUESTED_BY = '',
+		   	   REQUEST_DATE = '',
+		   	   --APPROVED_BY = '',
+		   	   APPROVE_DATE = ''
+			 <if test='REMARK != null and REMARK != ""'>
+			   ,REMARK = #{REMARK}
+			 </if>
+		 WHERE CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+	</update>
+	
+	<update id="saveDesmContractHeaderHistory" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractHeaderHistory : 계약관리 헤더 정보 이력 저장 */
+		INSERT INTO DESM_ONSHORE_CONTRACT_HEADERS_H
+		SELECT * 
+		FROM DESM_ONSHORE_CONTRACT_HEADERS
+		WHERE CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+	</update>
+	
+	<update id="saveDesmContractLineHistory" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractLineHistory : 계약관리 라인 정보 이력 저장 */
+		INSERT INTO DESM_ONSHORE_CONTRACT_LINES_H
+		SELECT * 
+		FROM DESM_ONSHORE_CONTRACT_LINES
+		WHERE CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+			AND CONTRACT_LINE_ID = #{CONTRACT_LINE_ID}
+	</update>
+	
+	<update id="saveDesmContractFileGrpCd" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmContractLineHistory : 계약관리 파일 정보 수정 */
+		UPDATE DESM_ONSHORE_CONTRACT_HEADERS
+		   SET ATTACH_GRP_CD = #{FILE_GRP_CD}
+		 WHERE CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID}
+	</update>
+	
+	<select id="getDesmOnshoreOrderHeaderInfo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreOrderHeaderInfo : 납품관리 헤더 정보 */
+		SELECT 
+		     A.ORDER_SEQ
+		    ,A.ORDER_NAME
+		    ,A.DESCRIPTION
+            ,TO_CHAR(A.ORDER_DATE, 'YYYY/MM/DD') AS ORDER_DATE
+		    ,A.INVOICE_NO
+            ,TO_CHAR(A.PLAN_DATE_FROM, 'YYYY/MM/DD') AS PLAN_DATE_FROM
+            ,TO_CHAR(A.PLAN_DATE_TO, 'YYYY/MM/DD') AS PLAN_DATE_TO
+		    ,A.STATUS
+		    ,A.ORDER_STATUS
+		    ,A.REMARKS
+	    FROM DESM_ONSHORE_ORDER_HEADERS A
+	    WHERE A.ORDER_HEADER_ID = #{ORDER_HEADER_ID}
+	</select>
+	
+	<select id="getDesmOnshoreOrderHeaderList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreOrderHeaderList : 납품관리 헤더 목록 정보 */
+		SELECT 
+			DOOH.ORDER_HEADER_ID
+		     ,DOOH.PROJECT_NO
+		     ,DOOH.CONTRACT_HEADER_ID
+	         ,DOCH.CONTRACT_NO
+	         ,DOCH.CONTRACTOR
+		     ,DOOH.REVISION
+		     ,DOOH.ORDER_SEQ
+		     ,DOOH.ORDER_NAME
+		     ,DOOH.DESCRIPTION
+             ,TO_CHAR(DOOH.ORDER_DATE, 'YYYY/MM/DD') AS ORDER_DATE
+		     ,DOOH.INVOICE_NO
+             ,TO_CHAR(DOOH.PLAN_DATE_FROM, 'YYYY/MM/DD') AS PLAN_DATE_FROM
+             ,TO_CHAR(DOOH.PLAN_DATE_TO, 'YYYY/MM/DD') AS PLAN_DATE_TO
+		     ,DOOH.STATUS
+		     ,DOOH.ORDER_STATUS
+		     ,DOOH.REMARKS
+	         ,DOOH.ATTACH_GRP_CD
+             ,CASE WHEN DOOH.REQUESTED_BY IS NOT NULL THEN DOOH.REQUESTED_BY END AS REQUESTED_BY
+             ,CASE WHEN DOOH.APPROVED_BY IS NOT NULL THEN DOOH.APPROVED_BY END AS APPROVED_BY
+             ,TO_CHAR(DOOH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE
+             ,TO_CHAR(DOOH.APPROVE_DATE, 'YYYY/MM/DD') AS APPROVE_DATE
+	         ,DOOH.CREATED_BY
+	         ,TO_CHAR(DOOH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+	         ,DOOH.LAST_UPDATED_BY
+	         ,TO_CHAR(DOOH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+             ,(SELECT COUNT(*)
+              FROM ESAATTH A
+              WHERE A.SYS_ID = 'EMRO'
+                AND A.STS  <![CDATA[ <> ]]>   'D'
+                AND A.GRP_CD = DOOH.ATTACH_GRP_CD) AS ATT_CNT
+	    FROM DESM_ONSHORE_ORDER_HEADERS DOOH,
+	    	 DESM_ONSHORE_CONTRACT_HEADERS DOCH,
+	             (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+	                FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+	                     DESM_CODE_DTL DCD
+	               WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+	                 AND DCD.DELEGATE_FLAG = 'N'
+	                 AND DUDC.USER_AD = #{USER_AD}) CT,
+	             DESM_USER DU1,
+	             DESM_USER DU2
+	     WHERE DOOH.CONTRACT_HEADER_ID = DOCH.CONTRACT_HEADER_ID
+	     	AND DOOH.REQUESTED_BY = DU1.USER_AD(+)
+	     	AND DOOH.APPROVED_BY = DU2.USER_AD(+)	
+		 <if test='PROJECT_NO != null and PROJECT_NO != ""'>
+		   	AND UPPER(DOOH.PROJECT_NO) LIKE '%' || UPPER(#{PROJECT_NO}) || '%'
+		 </if>			 
+		 <if test='CONTRACT_NO != null and CONTRACT_NO != ""'>
+		    AND UPPER(DOOH.CONTRACT_NO) LIKE '%' || UPPER(#{CONTRACT_NO}) || '%'
+		 </if>
+		 <if test='CONTRACT_NAME != null and CONTRACT_NAME != ""'>
+		    AND UPPER(DOOH.CONTRACT_NAME) LIKE '%' || UPPER(#{CONTRACT_NAME}) || '%'
+		 </if>
+		 <if test='CONTRACTOR != null and CONTRACTOR != ""'>
+		   	AND UPPER(DOOH.CONTRACTOR) LIKE '%' || UPPER(#{CONTRACTOR}) || '%'
+		 </if>	
+		 <if test='PLAN_DATE_FROM != null and PLAN_DATE_FROM != ""'>
+		   	AND DOOH.PLAN_DATE_FROM >= TO_DATE(#{PLAN_DATE_FROM}, 'YYYY/MM/DD')
+		 </if>
+		 <if test='PLAN_DATE_TO != null and PLAN_DATE_TO != ""'>
+		   	AND DOOH.PLAN_DATE_TO <![CDATA[ < ]]> TO_DATE(#{PLAN_DATE_TO}, 'YYYY/MM/DD') + 1
+		 </if>
+		 <if test='ORDER_NO != null and ORDER_NO != ""'>
+		   	AND UPPER(DOOH.ORDER_NO) LIKE '%' || UPPER(#{ORDER_NO}) || '%'
+		 </if>		 
+		 <if test='ORDER_NAME != null and ORDER_NAME != ""'>
+		   	AND UPPER(DOOH.ORDER_NAME) LIKE '%' || UPPER(#{ORDER_NAME}) || '%'
+		 </if>
+		ORDER BY DOOH.ORDER_HEADER_ID DESC
+
+	</select>
+	
+	<select id="getDesmOnshoreOrderLineList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreOrderLineList : 납품관리 라인 목록 정보 */
+		SELECT   
+		   A.ORDER_HEADER_ID
+		  ,A.ORDER_LINE_ID
+		  ,A.CONTRACT_LINE_ID
+		  ,A.REQ_QTY
+		  ,A.PLAN_DATE
+		  ,A.REMARKS
+		  ,B.TYPE
+		  ,B.ITEM1
+		  ,B.ITEM2
+		  ,B.ITEM3
+		  ,B.ITEM4
+		  ,B.ITEM_NO
+		  ,B.SEPC
+		  ,B.QUANTITY
+		FROM DESM_ONSHORE_ORDER_LINES A, DESM_ONSHORE_CONTRACT_LINES B
+		WHERE A.CONTRACT_LINE_ID = B.CONTRACT_LINE_ID
+	      AND A.ORDER_HEADER_ID = #{ORDER_HEADER_ID}
+	</select>
+	
+	<select id="getDesmOnshoreOrderHeaderId" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreOrderHeaderId : 납품관리 헤더 ID */
+		SELECT SEQ_DESM_ONSHORE_ORDER_HEADERS.NEXTVAL AS ORDER_HEADER_ID
+		FROM DUAL
+	</select>
+	
+	<update id="saveDesmOnshoreOrderHeader" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmOnshoreOrderHeader : 납품관리 헤더 정보 저장 */
+		MERGE INTO DESM_ONSHORE_ORDER_HEADERS A
+		USING DUAL
+		ON (A.ORDER_HEADER_ID = #{ORDER_HEADER_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+			     A.PROJECT_NO = #{PROJECT_NO},
+			     A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID},
+			     A.ORDER_SEQ = #{ORDER_SEQ},
+			     A.ORDER_NAME = #{ORDER_NAME},
+			     A.DESCRIPTION = #{DESCRIPTION},
+			     A.ORDER_DATE = #{ORDER_DATE},
+			     A.INVOICE_NO = #{INVOICE_NO},
+			     A.PLAN_DATE_FROM = #{PLAN_DATE_FROM},
+			     A.PLAN_DATE_TO = #{PLAN_DATE_TO},
+			     A.STATUS = #{STATUS},
+			     A.ORDER_STATUS = #{ORDER_STATUS},
+			     A.REMARKS = #{REMARKS},
+				 <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+				     A.REQUESTED_BY = #{REQUESTED_BY},
+				     A.REQUEST_DATE = SYSDATE,
+				 </if>
+				 <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+				     A.APPROVED_BY = #{APPROVED_BY},
+				     A.APPROVE_DATE = SYSDATE,
+				 </if>
+			     A.LAST_UPDATED_BY = #{USER_AD},
+			     A.LAST_UPDATE_DATE = SYSDATE,
+			     A.ATTACH_GRP_CD = #{ATTACH_GRP_CD}
+		WHEN NOT MATCHED THEN
+		     INSERT (
+			     A.ORDER_HEADER_ID
+			     ,A.PROJECT_NO
+			     ,A.CONTRACT_HEADER_ID
+			     ,A.ORDER_SEQ
+			     ,A.ORDER_NAME
+			     ,A.DESCRIPTION
+			     ,A.ORDER_DATE
+			     ,A.INVOICE_NO
+			     ,A.PLAN_DATE_FROM
+			     ,A.PLAN_DATE_TO
+			     ,A.STATUS
+			     ,A.ORDER_STATUS
+			     ,A.REMARKS
+				 <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+				     ,A.REQUESTED_BY
+					 <if test='STATUS != null and STATUS != "Request"'>
+					     ,A.REQUEST_DATE
+					 </if>
+				 </if>
+				 <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+				     ,A.APPROVED_BY
+					 <if test='STATUS != null and STATUS != "Approved"'>
+				     	,A.APPROVE_DATE
+					 </if>
+				 </if>
+			     ,A.CREATED_BY
+			     ,A.CREATION_DATE
+			     ,A.LAST_UPDATED_BY
+			     ,A.LAST_UPDATE_DATE
+			     ,A.ATTACH_GRP_CD
+		     ) VALUES (
+			      SEQ_DESM_ONSHORE_ORDER_HEADERS.NEXTVAL
+			     ,#{PROJECT_NO}
+			     ,#{CONTRACT_HEADER_ID}
+			     ,(
+			     	SELECT 'POD' || TO_CHAR(SYSDATE, 'YYYY') || NVL(LPAD(MAX(SUBSTR(ORDER_SEQ, 7)) + 1, 6, '0'), '000001')
+					FROM DESM_ONSHORE_ORDER_HEADERS
+					WHERE SUBSTR(ORDER_SEQ, 0, 6) = 'PO' || TO_CHAR(SYSDATE, 'YYYY')
+			     )
+			     ,#{ORDER_NAME}
+			     ,#{DESCRIPTION}
+			     ,#{ORDER_DATE}
+			     ,#{INVOICE_NO}
+			     ,#{PLAN_DATE_FROM}
+			     ,#{PLAN_DATE_TO}
+			     ,#{STATUS}
+			     ,#{ORDER_STATUS}
+			     ,#{REMARKS}
+				 <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+				     ,#{REQUESTED_BY}
+					 <if test='STATUS != null and STATUS != "Request"'>
+				     	,SYSDATE
+					 </if>
+				 </if>
+				 <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+				     ,#{APPROVED_BY}
+					 <if test='STATUS != null and STATUS != "Approved"'>
+				     	,SYSDATE
+					 </if>
+				 </if>
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{ATTACH_GRP_CD}
+		     )
+	</update>
+	
+	<update id="saveDesmOnshoreOrderLine" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmOnshoreOrderLine : 납품관리 라인 정보 저장 */
+		MERGE INTO DESM_ONSHORE_ORDER_LINES A
+		USING DUAL
+		ON (A.ORDER_HEADER_ID = #{ORDER_HEADER_ID} AND A.ORDER_LINE_ID = #{ORDER_LINE_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+			     A.CONTRACT_LINE_ID = #{CONTRACT_LINE_ID}
+			     ,A.REQ_QTY = #{REQ_QTY}
+			     ,A.PLAN_DATE = #{PLAN_DATE}
+			     ,A.REMARKS = #{REMARKS}
+			     ,A.LAST_UPDATED_BY = #{USER_AD}
+			     ,A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT (
+			      A.ORDER_HEADER_ID
+			     ,A.ORDER_LINE_ID
+			     ,A.CONTRACT_LINE_ID
+			     ,A.REQ_QTY
+			     ,A.PLAN_DATE
+			     ,A.REMARKS
+			     ,A.CREATED_BY
+			     ,A.CREATION_DATE
+			     ,A.LAST_UPDATED_BY
+			     ,A.LAST_UPDATE_DATE
+		     ) VALUES (			     
+			      #{ORDER_HEADER_ID}
+			     ,SEQ_DESM_ONSHORE_ORDER_LINES.NEXTVAL
+			     ,#{CONTRACT_LINE_ID}
+			     ,#{REQ_QTY}
+			     ,#{PLAN_DATE}
+			     ,#{REMARKS}
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{USER_AD}
+			     ,SYSDATE
+		     )
+	</update>
+	
+	<select id="getDesmOnshoreReceivedHeaderList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreReceivedHeaderList : 입고관리 헤더 목록 정보 */
+		SELECT 
+			DORH.RECEIVED_HEADER_ID
+		    ,DORH.PROJECT_NO
+		    ,DORH.ORDER_HEADER_ID
+		    ,DORH.CONTRACT_HEADER_ID
+		    ,DORH.RECEIVED_SEQ
+		    ,DORH.INVOICE_NO
+		    ,DORH.DELIVERY_NOTE
+		    ,DORH.TRUCK_NO
+            ,TO_CHAR(DORH.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE
+		    ,DORH.REMARKS
+	        ,DORH.CREATED_BY
+	        ,TO_CHAR(DORH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+	        ,DORH.LAST_UPDATED_BY
+	        ,TO_CHAR(DORH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+	    FROM DESM_ONSHORE_RECEIVED_HEADERS DORH,
+	             (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+	                FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+	                     DESM_CODE_DTL DCD
+	               WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+	                 AND DCD.DELEGATE_FLAG = 'N'
+	                 AND DUDC.USER_AD = #{USER_AD}) CT
+	     WHERE 1 = 1
+		 <if test='RECEIVED_HEADER_ID != null and RECEIVED_HEADER_ID != ""'>
+		   	AND UPPER(DORH.RECEIVED_HEADER_ID) LIKE '%' || UPPER(#{RECEIVED_HEADER_ID}) || '%'
+		 </if>
+		 <if test='PROJECT_NO != null and PROJECT_NO != ""'>
+		   	AND UPPER(DORH.PROJECT_NO) LIKE '%' || UPPER(#{PROJECT_NO}) || '%'
+		 </if>		 
+		 <if test='ORDER_HEADER_ID != null and ORDER_HEADER_ID != ""'>
+		   	AND UPPER(DORH.ORDER_HEADER_ID) LIKE '%' || UPPER(#{ORDER_HEADER_ID}) || '%'
+		 </if>
+		 <if test='CONTRACT_HEADER_ID != null and CONTRACT_HEADER_ID != ""'>
+		   	AND UPPER(DORH.CONTRACT_HEADER_ID) LIKE '%' || UPPER(#{CONTRACT_HEADER_ID}) || '%'
+		 </if>		 
+		 <if test='RECEIVED_SEQ != null and RECEIVED_SEQ != ""'>
+		   	AND UPPER(DORH.RECEIVED_SEQ) LIKE '%' || UPPER(#{RECEIVED_SEQ}) || '%'
+		 </if>
+		 <if test='INVOICE_NO != null and INVOICE_NO != ""'>
+		   	AND DORH.INVOICE_NO = #{INVOICE_NO}
+		 </if>
+		 <if test='DELIVERY_NOTE != null and DELIVERY_NOTE != ""'>
+		   	AND DORH.DELIVERY_NOTE = #{DELIVERY_NOTE}
+		 </if>
+		 <if test='TRUCK_NO != null and TRUCK_NO != ""'>
+		   	AND DORH.TRUCK_NO = #{TRUCK_NO}
+		 </if>
+		 <if test='RECEIVED_DATE != null and RECEIVED_DATE != ""'>
+		   	AND DORH.RECEIVED_DATE = TO_DATE(#{RECEIVED_DATE}, 'YYYY/MM/DD')
+		 </if>
+		ORDER BY DORH.RECEIVED_HEADER_ID DESC
+
+	</select>
+	
+	<select id="getDesmOnshoreReceivedLineList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreReceivedLineList : 입고관리 라인 목록 정보 */
+		SELECT   
+		    A.RECEIVED_HEADER_ID
+		    ,A.RECEIVED_LINE_ID
+		    ,A.ORDER_HEADER_ID
+		    ,A.ORDER_LINE_ID
+		    ,A.CONTRACT_LINE_ID
+            ,TO_CHAR(A.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE
+		    ,A.RECEIVED_QTY
+		    ,A.RECEIVED_UNIT_PRICE
+		    ,A.INVOICE_NO
+		    ,A.DELIVERY_NOTE
+		    ,A.TRUCK_NO
+		    ,A.REMARKS
+			--,A.CREATED_BY
+			--,TO_CHAR(A.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE
+			--,A.LAST_UPDATED_BY
+			--,TO_CHAR(A.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+	      FROM DESM_ONSHORE_RECEIVED_LINES A
+	      WHERE A.RECEIVED_HEADER_ID = #{RECEIVED_HEADER_ID}
+	</select>
+	
+	<select id="getDesmOnshoreReceivedHeaderId" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* OnshoreMapper.xml -> getDesmOnshoreReceivedHeaderId : 입고관리 헤더 ID */
+		SELECT SEQ_DESM_ONSHORE_RECEIVED_HEADERS.NEXTVAL AS RECEIVED_HEADER_ID
+		FROM DUAL
+	</select>
+	
+	<update id="saveDesmOnshoreReceivedHeader" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmOnshoreReceivedHeader : 입고관리 헤더 정보 저장 */
+		MERGE INTO DESM_ONSHORE_RECEIVED_HEADERS A
+		USING DUAL
+		ON (A.RECEIVED_HEADER_ID = #{RECEIVED_HEADER_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+			     A.PROJECT_NO = #{PROJECT_NO},
+			     A.ORDER_HEADER_ID = #{ORDER_HEADER_ID},
+			     A.CONTRACT_HEADER_ID = #{CONTRACT_HEADER_ID},
+			     A.RECEIVED_SEQ = #{RECEIVED_SEQ},
+			     A.INVOICE_NO = #{INVOICE_NO},
+			     A.DELIVERY_NOTE = #{DELIVERY_NOTE},
+			     A.TRUCK_NO = #{TRUCK_NO},
+			     A.RECEIVED_DATE = #{RECEIVED_DATE},
+			     A.ORDER_STATUS = #{ORDER_STATUS},
+			     A.REMARKS = #{REMARKS},
+			     A.LAST_UPDATED_BY = #{USER_AD},
+			     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT (
+			     A.RECEIVED_HEADER_ID
+			     ,A.PROJECT_NO
+			     ,A.ORDER_HEADER_ID
+			     ,A.CONTRACT_HEADER_ID
+			     ,A.RECEIVED_SEQ
+			     ,A.INVOICE_NO
+			     ,A.DELIVERY_NOTE
+			     ,A.TRUCK_NO
+			     ,A.RECEIVED_DATE
+			     ,A.REMARKS
+			     ,A.CREATED_BY
+			     ,A.CREATION_DATE
+			     ,A.LAST_UPDATED_BY
+			     ,A.LAST_UPDATE_DATE
+		     ) VALUES (
+			      SEQ_DESM_ONSHORE_RECEIVED_HEADERS.NEXTVAL
+			     ,#{PROJECT_NO}
+			     ,#{ORDER_HEADER_ID}
+			     ,#{CONTRACT_HEADER_ID}
+			     ,(
+			     	SELECT 'POR' || TO_CHAR(SYSDATE, 'YYYY') || NVL(LPAD(MAX(SUBSTR(RECEIVED_SEQ, 7)) + 1, 6, '0'), '000001')
+					FROM DESM_ONSHORE_RECEIVED_HEADERS
+					WHERE SUBSTR(RECEIVED_SEQ, 0, 6) = 'PO' || TO_CHAR(SYSDATE, 'YYYY')
+			     )
+			     ,#{INVOICE_NO}
+			     ,#{DELIVERY_NOTE}
+			     ,#{TRUCK_NO}
+			     ,#{RECEIVED_DATE}
+			     ,#{REMARKS}
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{USER_AD}
+			     ,SYSDATE
+		     )
+	</update>
+	
+	<update id="saveDesmOnshoreReceivedLine" parameterType="java.util.Map">
+		/* OnshoreMapper.xml -> saveDesmOnshoreReceivedLine : 입고관리 라인 정보 저장 */
+		MERGE INTO DESM_ONSHORE_RECEIVED_LINES A
+		USING DUAL
+		ON (A.RECEIVED_HEADER_ID = #{RECEIVED_HEADER_ID} AND A.RECEIVED_LINE_ID = #{RECEIVED_LINE_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.ORDER_HEADER_ID = #{ORDER_HEADER_ID},
+		     A.ORDER_LINE_ID = #{ORDER_LINE_ID},
+		     A.CONTRACT_LINE_ID = #{CONTRACT_LINE_ID},
+		     A.RECEIVED_DATE = #{RECEIVED_DATE},
+		     A.RECEIVED_QTY = #{RECEIVED_QTY},
+		     A.RECEIVED_UNIT_PRICE = #{RECEIVED_UNIT_PRICE},
+		     A.INVOICE_NO = #{INVOICE_NO},
+		     A.DELIVERY_NOTE = #{DELIVERY_NOTE},
+		     A.TRUCK_NO = #{TRUCK_NO},
+		     A.REMARKS = #{REMARKS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT (
+			     A.RECEIVED_HEADER_ID
+			     ,A.RECEIVED_LINE_ID
+			     ,A.ORDER_HEADER_ID
+			     ,A.ORDER_LINE_ID
+			     ,A.CONTRACT_LINE_ID
+			     ,A.RECEIVED_DATE
+			     ,A.RECEIVED_QTY
+			     ,A.RECEIVED_UNIT_PRICE
+			     ,A.INVOICE_NO
+			     ,A.DELIVERY_NOTE
+			     ,A.TRUCK_NO
+			     ,A.REMARKS
+			     ,A.CREATED_BY
+			     ,A.CREATION_DATE
+			     ,A.LAST_UPDATED_BY
+			     ,A.LAST_UPDATE_DATE
+		     ) VALUES (
+		     	  #{RECEIVED_HEADER_ID}
+			     ,SEQ_DESM_ONSHORE_RECEIVED_LINES.NEXTVAL
+			     ,#{ORDER_HEADER_ID}
+			     ,#{ORDER_LINE_ID}
+			     ,#{CONTRACT_LINE_ID}
+			     ,#{RECEIVED_DATE}
+			     ,#{RECEIVED_QTY}
+			     ,#{RECEIVED_UNIT_PRICE}
+			     ,#{INVOICE_NO}
+			     ,#{DELIVERY_NOTE}
+			     ,#{TRUCK_NO}
+			     ,#{REMARKS}
+			     ,#{USER_AD}
+			     ,SYSDATE
+			     ,#{USER_AD}
+			     ,SYSDATE
+		     )
+	</update>
+	
+</mapper>

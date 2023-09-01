@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd">
+
+	<bean name="propertiesService" class="egovframework.rte.fdl.property.impl.EgovPropertyServiceImpl" destroy-method="destroy">
+		<property name="properties">
+	        <map>
+	        	<entry key="pageUnit" value="10"/>
+	        	<entry key="pageSize" value="10"/>
+	        	
+	        	<!-- mail Properties, dhbppap1 zshp 공유 -->	        	
+	        	<entry key="mail.host" value="krrelay.corp.doosan.com"/>
+	        	<entry key="mail.port" value="25"/>
+	        	<entry key="mail.encoding" value="EUC-KR"/>
+	        	<entry key="mail.password" value=""/>
+	        	<entry key="mail.username" value=""/>
+	        	<entry key="mail.login.url.dev" value="http://dhbppdev.corp.doosan.com:7140/"/>
+	        	<entry key="mail.login.url.prod" value="http://dhbppap1.corp.doosan.com:5560"/>
+	        	<!-- treegrid license -->
+	        	<entry key="grid.code" value="STRECFHZMGRVOC"/>
+	        	<!-- file upload path -->
+	        	<entry key="file.upload.path" value="D:\\DESM\\upload"/>
+
+	        	<!-- file apk download path -->
+	        	<entry key="file.apk.download.path" value="D:\\DESM\\apk\\mDESM.apk"/>
+	        	<entry key="file.apk.dev.download.path" value="D:\\DESM\\apk\\dev_mDESM.apk"/>
+	        	
+	        	<!-- Mobile Call Check -->
+	        	<entry key="prod.mobile.idcs.service.url" value = "https://idcs-4f17d54755df4b698b84d30191a87d33.identity.oraclecloud.com:443" />
+	        	<entry key="prod.mobile.in.appid" value="9A262222275E48D3B1150B45BFDF2220_APPID" />
+	        	<entry key="prod.mobile.ex.appid" value="" />
+	        	<!-- firebase -->
+	        	<entry key="fcm.key.path" value="/mdesm-f5aa6-firebase-adminsdk-5jr7j-2883ec1f92.json" />
+	        	<entry key="fcm.key.scope" value="https://www.googleapis.com/auth/cloud-platform" />
+	        	<!-- vessel -->
+	        	<entry key="vessel.api.url" value="https://api.vesselfinder.com/vessels?userkey=" />
+	        	<entry key="vessel.user.key" value="AABBCCDD" />
+	        	<!-- Scheduler -->
+	        	<entry key="quartz.schedule.use" value="N" />
+	        	<!-- region bah / seoul -->
+	        	<entry key="region" value="seoul" />
+	        	<!-- location -->
+	        	<entry key="location" value="dev"/>
+	        	<!-- 가동계 
+	        	<entry key="prod.defaultdns" value="http://dhbppap1.corp.doosan.com:7140"/>
+	        	<entry key="prod.customdns" value="http://bppdesm.doosanenerbility.com:7140"/>
+	        	<entry key="sso.port" value="5560"/>
+	        	-->
+	        	<!-- 개발계 -->
+	        	<entry key="prod.defaultdns" value="http://dhbppdev.corp.doosan.com:7140"/>
+	        	<entry key="prod.customdns" value="http://desmdev.doosanheavy.com:7140"/>
+	        	<entry key="sso.port" value="5559"/>
+	        </map>
+		</property>
+		
+	
+	</bean>
+	
+</beans>	

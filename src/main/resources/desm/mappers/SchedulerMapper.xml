@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.SchedulerMapper">
+
+	<select id="getScheduleList" resultType="map">
+		SELECT SCHE_NO
+		       , SCHE_NAME
+		       , SCHE_TYPE
+		       , SCHE_VALUE
+		       , SCHE_STATUS
+		       , DECODE(SCHE_STATUS, '1', 'Stop', 'Running') AS SCHE_STATUS_NAME
+		       , JOB_CLASS
+		       , IS_USE
+		FROM DESM_SCHEDULER
+		WHERE 1 = 1
+		<if test="SCHE_NO != null and SCHE_NO != ''">
+			AND SCHE_NO = ${SCHE_NO}
+		</if>
+		<if test="SCHE_NAME != null and SCHE_NAME != ''">
+			AND UPPER(SCHE_NAME) = #{SCHE_NAME}
+		</if>
+    </select>
+    
+	<!-- Schedule insert/update -->
+	<insert id="saveSchedule" parameterType="java.util.Map">
+    	/* sql.SchedulerMapper.insertSchedule: 스케쥴 정보 등록/수정  */
+		MERGE INTO DESM_SCHEDULER
+			USING DUAL
+			ON (SCHE_NO = #{SCHE_NO})
+			WHEN MATCHED THEN
+				UPDATE SET
+					SCHE_NAME = #{SCHE_NAME},
+					SCHE_TYPE = #{SCHE_TYPE},
+					SCHE_VALUE = #{SCHE_VALUE},
+					SCHE_STATUS = #{SCHE_STATUS},
+					SCHE_STATUS_NAME = #{SCHE_STATUS_NAME},
+					JOB_CLASS = #{JOB_CLASS},
+					LAST_UPDATED_BY = #{USER_AD},
+					LAST_UPDATE_DATE = SYSDATE
+			WHEN NOT MATCHED THEN
+				INSERT (
+					SCHE_NO
+					, SCHE_NAME
+			        , SCHE_TYPE
+			        , SCHE_VALUE
+			        , SCHE_STATUS
+			        , SCHE_STATUS_NAME
+			        , JOB_CLASS
+			        , CREATED_BY
+			        , CREATION_DATE
+			        , LAST_UPDATED_BY
+			        , LAST_UPDATE_DATE
+				) VALUES (
+					DESM_SCHEDULER_SEQ.NEXTVAL,
+					#{SCHE_NAME},
+					#{SCHE_TYPE},
+					#{SCHE_VALUE},
+					#{SCHE_STATUS},
+					#{SCHE_STATUS_NAME},
+					#{JOB_CLASS},
+					#{USER_AD},
+					SYSDATE,
+					#{USER_AD},
+					SYSDATE
+				)
+				<selectKey keyProperty="SCHE_NO" resultType="int" order="AFTER">
+					SELECT DESM_SCHEDULER_SEQ.CURRVAL FROM DUAL
+				</selectKey>
+	</insert>
+	
+	<delete id="deleteSchedule" parameterType="java.util.Map">
+		DELETE FROM DESM_SCHEDULER
+		WHERE SCHE_NO = #{SCHE_NO}
+	</delete>	
+	
+	<delete id="chgStatusSchedule" parameterType="java.util.Map">
+		UPDATE DESM_SCHEDULER
+		SET 
+			SCHE_STATUS = #{SCHE_STATUS},
+			SCHE_STATUS_NAME = #{SCHE_STATUS_NAME}
+		WHERE SCHE_NO = #{SCHE_NO}
+	</delete>	
+	
+	<select id="getHistoryList" resultType="map">
+    	/* sql.SchedulerMapper.getHistoryList: 스케쥴 실행 이력  */
+		SELECT HIST_NO
+				, SCHE_NO
+				, JOB_KEY
+		        , TO_CHAR(JOB_FIRETIME, 'YYYY/MM/DD HH:mm:dd') AS JOB_FIRETIME
+		        , JOB_RUNTIME
+		        , TO_CHAR(JOB_NEXT_FIRETIME, 'YYYY/MM/DD HH:mm:dd') AS JOB_NEXT_FIRETIME
+		        , JOB_STATUS
+		        , ERROR_MESSAGE
+		FROM DESM_SCHEDULE_HISTORY
+		WHERE 1 = 1
+		<if test="SCHE_NO != null and SCHE_NO != ''">
+			AND SCHE_NO = ${SCHE_NO}
+		</if>
+		<if test="SCHE_NAME != null and SCHE_NAME != ''">
+			AND UPPER(SCHE_NAME) = #{SCHE_NAME}
+		</if>
+    </select>
+    
+	<insert id="saveHistory" parameterType="java.util.Map">
+    	/* sql.SchedulerMapper.saveHistory: 스케쥴 실행 이력 등록  */
+		INSERT INTO DESM_SCHEDULE_HISTORY (
+			  HIST_NO
+			, SCHE_NO
+			, JOB_KEY
+	        , JOB_FIRETIME
+	        , JOB_RUNTIME
+	        , JOB_NEXT_FIRETIME
+	        , JOB_STATUS
+	        , ERROR_MESSAGE
+		) VALUES (
+			DESM_SCHEDULER_HISTORY_SEQ.NEXTVAL,
+			#{SCHE_NO},
+			#{JOB_KEY},
+			#{JOB_FIRETIME},
+			#{JOB_RUNTIME},
+			#{JOB_NEXT_FIRETIME},
+			#{JOB_STATUS},
+			#{ERROR_MESSAGE}
+		)
+	</insert>
+	
+	<select id="getAsyncUser" parameterType="java.util.Map" resultType="java.util.HashMap">
+	  	SELECT DISTINCT A.*
+		FROM DESM_USER A
+			,    DESM_USER_LOG B
+		WHERE DELEGATE_FLAG = 'N'
+			AND NVL(IDCS_YN, 'N') = 'N'
+			AND A.USER_AD = B.USER_AD
+			AND A.USER_AD NOT IN ('JOONGKEON.SHIN', 'ADMIN')
+	</select>
+	
+	<update id="updateAsyncUser" parameterType="java.util.Map">
+		UPDATE DESM_USER
+		SET 
+			IDCS_YN = #{IDCS_YN},
+			DELEGATE_FLAG = #{DELEGATE_FLAG},
+			FEDERATED_YN = #{FEDERATED_YN}
+		WHERE USER_AD = #{USER_AD}
+	</update>	
+	
+	<update id="updateDeniedUser" parameterType="java.util.Map">
+		UPDATE DESM_USER
+		SET DELEGATE_FLAG = 'Y'
+		WHERE USER_AD IN (
+			SELECT USER_AD
+			FROM (
+				SELECT USER_AD, CREATION_DATE, TRUNC(SYSDATE) - TRUNC(CREATION_DATE) AS DIFF
+				FROM (
+					SELECT USER_AD, MAX(CREATION_DATE) AS CREATION_DATE
+					FROM DESM_USER_LOG
+					GROUP BY USER_AD
+				)
+			)
+			WHERE DIFF > 300
+		)
+	</update>	
+	
+</mapper>

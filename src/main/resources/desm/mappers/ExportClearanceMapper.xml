@@ -1,0 +1,915 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.ExportClearanceMapper">
+	<update id="updateSetLanguage" parameterType="java.util.Map">
+	    <![CDATA[
+	    	alter session set nls_language = 'AMERICAN'
+	    ]]>
+	</update>
+
+	<select id="getErpCodeCombo" parameterType="java.util.Map" resultType="java.util.HashMap">
+            SELECT DESCRIPTION, MEANING AS DISPLAYED_FIELD
+            FROM FND_LOOKUP_VALUES@ln_prod_zshpif
+            WHERE  UPPER(LOOKUP_TYPE) = UPPER(#{LOOKUP_TYPE})
+            AND    ENABLED_FLAG = 'Y'
+	</select>
+
+	<select id="getUnitCodeList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT UNIT_OF_MEASURE
+		FROM MTL_UNITS_OF_MEASURE_VL@LN_PROD_ZSHPIF
+		WHERE (DISABLE_DATE > SYSDATE OR DISABLE_DATE IS NULL)
+		  	<if test='keyword != null and keyword !=""'>
+		   	AND (UPPER(UNIT_OF_MEASURE) like '%'|| UPPER(#{keyword}) ||'%')
+		  	</if>
+		ORDER BY UNIT_OF_MEASURE
+	</select>
+
+	<select id="getErpProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT PJT.SEGMENT1  PROJECT_NO
+		,      PJT.NAME      PROJECT_NAME
+		,      TO_CHAR(PJT.PROJECT_ID) AS PROJECT_ID
+		,      PJT.SEGMENT1  CODE
+		,      PJT.NAME      DESCRIPTION
+		,      HAO.attribute11  BU
+		,      HAO.internal_address_line  COST_CENTER
+		FROM PA_PROJECTS_ALL_INT PJT
+			LEFT OUTER JOIN HR_ALL_ORGANIZATION_UNITS_INT HAO ON PJT.carrying_out_organization_id = HAO.organization_id
+		WHERE 1=1
+		  	<if test='keyword != null and keyword !=""'>
+		   	AND (UPPER(PJT.SEGMENT1) like '%'|| UPPER(#{keyword}) ||'%' OR UPPER(PJT.NAME) like '%'|| UPPER(#{keyword}) ||'%')
+		  	</if>
+			<if test='keyword2 != null and keyword2 !=""'>
+			AND PJT.PROJECT_ID IN (
+			                      SELECT INTERNAL_PROJECT_ID
+			                      FROM ZPJM_PM_INTERNAL_PROJECT_V@LN_PROD_ZSHPIF
+			                      WHERE MAIN_PROJECT_ID = #{keyword2}
+			                    )
+		  	</if>
+		ORDER BY PJT.PROJECT_ID, PJT.SEGMENT1, PJT.NAME
+	</select>
+
+	<select id="getErpEpcProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZPOR.ORDER_REPORT_NUMBER PROJECT_NO
+		,      PPA.NAME                 PROJECT_NAME
+		,      PPA.PROJECT_ID           PROJECT_ID
+		FROM ZPJM_PT_ORDER_REPORTS@LN_PROD_ZSHPIF ZPOR
+		,    PA_PROJECTS_ALL_INT       PPA
+		,    PA_PROJECT_CLASSES_INT    PPC_BU
+		WHERE ZPOR.INACTIVE_DATE IS NULL
+			AND ZPOR.FIXED_DATE IS NOT NULL
+			AND PPA.SEGMENT1 = ZPOR.ORDER_REPORT_NUMBER
+			AND PPA.PROJECT_ID = PPC_BU.PROJECT_ID(+)
+			AND PPC_BU.CLASS_CATEGORY(+) = 'BU Classification'
+			AND PPC_BU.CLASS_CODE = '발전EPC'
+			AND ZPOR.PRODUCT_CODE = '24000'
+			AND ZPOR.ORDER_REPORT_ID = (
+			                            SELECT MAX(T.ORDER_REPORT_ID)
+			                            FROM ZPJM_PT_ORDER_REPORTS@LN_PROD_ZSHPIF T
+			                            WHERE T.ORDER_REPORT_NUMBER = ZPOR.ORDER_REPORT_NUMBER
+			                            AND   T.INACTIVE_DATE IS NULL
+			                            AND   T.FIXED_DATE    IS NOT NULL
+                           )
+		<if test='keyword != null and keyword !=""'>
+			AND (UPPER(PPA.SEGMENT1) like '%'|| UPPER(#{keyword}) ||'%' OR UPPER(PPA.NAME) like '%'|| UPPER(#{keyword}) ||'%')
+		</if>
+		ORDER BY ZPOR.ORDER_REPORT_NUMBER
+	</select>
+
+	<select id="getExportClearance" parameterType="java.util.Map" resultType="java.util.HashMap">
+        	SELECT
+		       EXPORT_NO
+		,      STATUS
+		,      NON_PROJECT
+		,      APPLY_DATE
+		,      EPC_PROJECT_NO
+		,      EPC_PROJECT_NAME
+		,      EPC_PROJECT_ID
+		,      PROJECT_NO
+		,      PROJECT_ID
+		,      TASK_NUMBER
+		,      INVOICE_NO
+		,      MAIN_ITEM
+		,      CURRENCY_CODE
+		,      TOTAL_AMOUNT
+		,      QUANTITY
+		,      QUANTITY_UNIT
+		,      PACKING_COUNT
+		,      EXCHAGE_TYPE
+		,      EXCHAGE_DATE
+		,      NET_WEIGHT
+		,      NET_WEIGHT_UNIT
+		,      GROSS_WEIGHT
+		,      GROSS_WEIGHT_UNIT
+		,      MEASUREMENT
+		,      MEASUREMENT_UNIT
+		,      CUSTOMS_TYPE
+		,      ITEM_STORED_PLACE
+		,      PORT_OF_LOADING_DESC
+		,      PORT_OF_DESTINATION_DESC
+		,      MANUFACTURER
+		,      EXPORTER
+		,      PRICE_TERMS
+		,      SHIP_NAME
+		,      REQUEST_IC_DATE
+		,      IS_CARRIED_IN_YN
+		,      STRATEGIC_ITEM_YN
+		,      LICENSE_NO
+		,      ATTRIBUTE2
+		,      ATTRIBUTE3
+		,      ATTRIBUTE4
+		,	   ATTRIBUTE5 AS IS_DESM_YN
+		,	   ATTRIBUTE7 AS FILE_GRP_CD
+		,	   ATTRIBUTE8 AS IS_RE_EXPORT
+		,	   ATTRIBUTE9 AS IS_ORIGINAL_EXPORT
+		,	   ATTRIBUTE10 AS IS_FTA_ORIGIN
+		,	   ATTRIBUTE11 AS LOADING_BONDED_AREA
+		,	   ATTRIBUTE12 AS CERTIFICATE_DUEDATE
+		,	   ATTRIBUTE13 AS IS_STRATEGIC_MATERIAL
+		,	   ATTRIBUTE14 AS EXPORT_LICENSE_NUMBER
+		,	   ATTRIBUTE15 AS FTA_NAME
+		,      DECISION_MAKER
+		,      DECISION_REASON
+		,      PROJECT_MEMBER
+		,      PROJECT_MEMBER_TEAM
+		,      ENGINEER
+		,      ENGINEER_TEAM
+		,      CREATION_DATE
+		,      CREATED_BY_NAME
+		,      APPROVED_DATE
+		,      APPROVER_NAME
+		,      COMMENTS
+		,      CL_DOCUMENT_NO
+		,      CL_LICENSE_NO
+		,      CI_LICENSE_DATE
+		,      REFUND_STATUS
+		,      EXPORT_HEADER_ID
+		,      PROJECT_ID
+		,      CREATED_BY
+		,      EXPORTER_ID
+		,      MANUFACTURER_ID
+		,      PROJECT_NAME
+		,      PORT_OF_LOADING
+		,      PORT_OF_DESTINATION
+		,      DECISION_MAKER_ID
+		,      LAST_UPDATE_DATE
+		,      LAST_UPDATED_BY
+		,      LAST_UPDATED_BY_NAME
+		,      LAST_UPDATE_LOGIN
+		,      SAGEUP_ITEM_YN
+		,      SAGEUP_PO_NO
+		,      APPROVER
+		,      DECISION_MAKER
+		,      DECISION_MAKER_CODE
+        ,      DECISION_REASON
+		,      CREATED_BY_CODE
+		,      LAST_UPDATED_BY_CODE
+		,      APPROVER_CODE
+		,      SAGEUP_PO
+		,      REMARKS
+		,      TASK_ID
+		,      PROJECT_MEMBER_ID
+		,      ENGINEER_ID
+		,      CODE_COMBINATION_ID
+		, 	   (SELECT segment1 || ',' || segment2 || ',' || segment3 || ',' || segment4 || ',' || segment5 || ',' || segment6 || ',' || segment7 || ',' || segment8
+			    FROM GL_CODE_COMBINATIONS@LN_PROD_ZSHPIF
+			    WHERE code_combination_id = P.CODE_COMBINATION_ID) CODE_COMBINATION_TEXT
+		,      CASE WHEN CREATED_BY_CODE = #{USER_AD} THEN 'Y' ELSE 'N' END IS_EDITABLE
+		FROM APPS.ZMFG_EXP_REQUEST_HEADERS_V@LN_PROD_ZSHPIF P
+		WHERE 1=1
+            <if test="PROJECT_CODE != null and PROJECT_CODE != ''">
+                  AND UPPER(P.PROJECT_NO) = UPPER(#{PROJECT_CODE})
+            </if>
+            <if test="CREATED_BY != null and CREATED_BY != ''">
+                  AND P.CREATED_BY = #{CREATED_BY}
+            </if>
+            <if test="APPROVER != null and APPROVER != ''">
+                  AND P.APPROVER = #{APPROVER}
+            </if>
+            <if test='EXPORT_NO != null and EXPORT_NO != ""' >
+                  AND EXPORT_NO LIKE '%' || #{EXPORT_NO} || '%'
+            </if>
+            <if test="STATUS != null and STATUS != ''">
+                  AND UPPER(P.STATUS) = UPPER(#{STATUS})
+            </if>
+            <if test='CL_LICENSE_NO != null and CL_LICENSE_NO != ""' >
+                  AND UPPER(CL_LICENSE_NO) LIKE '%' || UPPER(#{CL_LICENSE_NO}) || '%'
+            </if>
+            <if test="CUSTOMS_TYPE != null and CUSTOMS_TYPE != ''">
+                  AND UPPER(P.CUSTOMS_TYPE) = UPPER(#{CUSTOMS_TYPE})
+            </if>
+            <if test='INVOICE_NO != null and INVOICE_NO != ""' >
+                  AND UPPER(INVOICE_NO) LIKE '%' || UPPER(#{INVOICE_NO}) || '%'
+            </if>
+            <choose>
+                  <when test='SORTING_TYPE != null and SORTING_TYPE != ""'>
+                        ORDER BY #{SORTING_TYPE}
+                  </when>
+                  <otherwise>
+                        ORDER BY EXPORT_HEADER_ID DESC
+                  </otherwise>
+            </choose>
+	</select>
+
+	<select id="getSearchExportNo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT TO_CHAR(A.EXPORT_NO) AS EXPORT_NO
+		,      A.STATUS
+		,      TO_CHAR(A.EXPORT_HEADER_ID) AS EXPORT_HEADER_ID
+        FROM ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF A
+        	JOIN PA_PROJECTS_ALL_INT P ON P.PROJECT_ID = A.PROJECT_ID
+        WHERE 1=1
+        <if test='keyword != null and keyword != ""'>
+              AND TO_CHAR(A.EXPORT_NO) LIKE '%' || #{keyword} || '%'
+        </if>
+        <if test="keyword2 != null and keyword2 != ''">
+			AND UPPER(P.SEGMENT1) LIKE '%' || UPPER(#{keyword2}) || '%'
+        </if>
+        ORDER BY A.EXPORT_NO
+	</select>
+
+    <select id="getSearchErpInvoiceNo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.INVOICE_NO
+		,      TO_CHAR(A.EXPORT_NO) AS EXPORT_NO
+		,      A.STATUS
+            FROM ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF A
+            	JOIN PA_PROJECTS_ALL_INT P ON P.PROJECT_ID = A.PROJECT_ID
+            WHERE 1=1
+            <if test='keyword != null and keyword != ""'>
+                  AND UPPER(A.INVOICE_NO) LIKE '%' || UPPER(#{keyword}) || '%'
+            </if>
+            <if test="keyword2 != null and keyword2 != ''">
+                  AND UPPER(P.SEGMENT1) LIKE '%' || UPPER(#{keyword}) || '%'
+            </if>
+            ORDER BY EXPORT_NO
+	</select>
+
+      <select id="getSearchErpEmployee" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT FU.DESCRIPTION  NAME
+		,      PAPF.EMPLOYEE_NUMBER
+		,      TO_CHAR(FU.USER_ID) AS USER_ID
+		,      SUBSTR(ZMFG_GET_PRIOR_ORG@LN_PROD_ZSHPIF ('',PAPF.PERSON_ID,'L6','N',SYSDATE),1,100) DEPT_NAME
+		,      FU.EMAIL_ADDRESS
+		FROM   FND_USER_INT FU
+		,      PER_ALL_PEOPLE_F_INT PAPF
+		WHERE  1=1
+			AND FU.EMPLOYEE_ID = PAPF.PERSON_ID
+            AND    TRUNC(SYSDATE) BETWEEN EFFECTIVE_START_DATE AND EFFECTIVE_END_DATE
+            <if test='keyword != null and keyword != ""'>
+                  AND (
+                        UPPER(FU.DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%'
+                        OR UPPER(PAPF.EMPLOYEE_NUMBER) LIKE '%' || UPPER(#{keyword}) || '%'
+                        --OR UPPER(SUBSTR(ZMFG_GET_PRIOR_ORG@LN_PROD_ZSHPIF ('',PAPF.PERSON_ID,'L6','N',SYSDATE),1,100)) LIKE '%' || UPPER('') || '%'
+                        -- 20220829: 부서검색X
+                  )
+            </if>
+		ORDER BY FU.DESCRIPTION
+	</select>
+
+    <select id="getSearchTaskNo" parameterType="java.util.Map" resultType="java.util.HashMap">
+			SELECT
+				ZPT.ACTIVITY_CODE   TASK_NUMBER,
+				ZPT.ACTIVITY_NAME   TASK_NAME,
+				ZPT.PROJ_ELEMENT_ID TASK_ID,
+				ZPT.ACTIVITY_TYPE   ACTIVITY_TYPE,
+				ZPT.ACTIVITY_CODE   CODE,
+				ZPT.ACTIVITY_NAME   DESCRIPTION
+			FROM ZPJM_PM_CURRENT_TASK_V@LN_PROD_ZSHPIF ZPT
+			WHERE ZPT.ACTIVITY_TYPE IS NOT NULL
+			<if test='keyword != null and keyword != ""'>
+                  AND UPPER(ZPT.ACTIVITY_CODE) LIKE '%' || UPPER(#{keyword}) || '%'
+            </if>
+            <if test='keyword2 != null and keyword2 != ""'>
+				AND   ZPT.PROJECT_ID    = #{keyword2}
+            </if>
+            ORDER BY ZPT.ACTIVITY_CODE
+	</select>
+
+    <select id="getSearchExchangeType" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DCT.CONVERSION_TYPE
+		FROM GL_DAILY_CONVERSION_TYPES_V@LN_PROD_ZSHPIF PAPF DCT
+		WHERE DCT.CONVERSION_TYPE != 'EMU FIXED'
+			AND   DCT.USER_CONVERSION_TYPE IN ('Corporate','User')
+		<if test='keyword != null and keyword != ""'>
+        	AND UPPER(DCT.CONVERSION_TYPE) LIKE '%' || UPPER(#{keyword}) || '%'
+		</if>
+		ORDER BY UPPER(DCT.USER_CONVERSION_TYPE)
+	</select>
+
+    <select id="getSearchPriceTerm" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MEANING
+		,      DESCRIPTION
+		,      LOOKUP_CODE
+		FROM    FND_LOOKUP_VALUES@LN_PROD_ZSHPIF PAPF
+		WHERE (NVL('', TERRITORY_CODE) = TERRITORY_CODE OR TERRITORY_CODE IS NULL)
+			AND (LOOKUP_TYPE='FOB') AND (VIEW_APPLICATION_ID=201) AND (SECURITY_GROUP_ID=0)
+		<if test='keyword != null and keyword != ""'>
+        	AND (UPPER(MEANING) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%')
+		</if>
+		ORDER BY LOOKUP_CODE
+	</select>
+
+    <select id="getSearchLicenseNo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT LICENSE_NO, LICENSE_DATE, LICENSE_REPORTER
+		FROM ZMFG_PO_SM_EXPORT@LN_PROD_ZSHPIF
+		WHERE LICENSE_NO IS NOT NULL
+		<if test='keyword != null and keyword != ""'>
+        	AND (UPPER(LICENSE_NO) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(LICENSE_REPORTER) LIKE '%' || UPPER(#{keyword}) || '%')
+		</if>
+		ORDER BY LICENSE_NO
+	</select>
+
+	<select id="getChargeAccountItem" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT FFV.FLEX_VALUE
+		,      FFV.DESCRIPTION
+		FROM FND_ID_FLEX_SEGMENTS@LN_PROD_ZSHPIF FIFS
+		,    FND_FLEX_VALUES_VL@LN_PROD_ZSHPIF FFV
+		WHERE  FIFS.ID_FLEX_CODE = 'GL#'
+		AND FIFS.ID_FLEX_NUM = 101
+		<if test='keyword2 != null and keyword2 != ""'>
+			AND FIFS.APPLICATION_COLUMN_NAME = UPPER(#{keyword2})
+		</if>
+		<if test='keyword != null and keyword != ""'>
+        	AND (UPPER(FFV.FLEX_VALUE) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(FFV.DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%')
+		</if>
+		AND FFV.FLEX_VALUE_SET_ID = FIFS.FLEX_VALUE_SET_ID
+		AND FFV.ENABLED_FLAG = 'Y'
+		AND FFV.SUMMARY_FLAG = 'N'
+		ORDER BY FFV.FLEX_VALUE
+	</select>
+
+	<select id="getCodeCombinationId_bak" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT CODE_COMBINATION_ID
+		FROM GL_CODE_COMBINATIONS@LN_PROD_ZSHPIF
+		WHERE ENABLED_FLAG = 'Y'
+		  AND UPPER(SEGMENT1) = UPPER(#{segment1})
+		  AND UPPER(SEGMENT2) = UPPER(#{segment2})
+		  AND UPPER(SEGMENT3) = UPPER(#{segment3})
+		  AND UPPER(SEGMENT4) = UPPER(#{segment4})
+		  AND UPPER(SEGMENT5) = UPPER(#{segment5})
+		  AND UPPER(SEGMENT6) = UPPER(#{segment6})
+		  AND UPPER(SEGMENT7) = UPPER(#{segment7})
+		  AND UPPER(SEGMENT8) = UPPER(#{segment8})
+	</select>
+
+	<select id="getCodeCombinationId" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZSHPIF_UTIL_INTERFACE_PKG.GET_CCID_ONLY_CHARGEACCR@LN_PROD_ZSHPIF(UPPER(#{segment1}) || ',' || UPPER(#{segment2}) || ',' || UPPER(#{segment3}) || ',' || UPPER(#{segment4}) || ',' || UPPER(#{segment5}) || ',' || UPPER(#{segment6}) || ',' || UPPER(#{segment7}) || ',' || UPPER(#{segment8})) AS CODE_COMBINATION_ID FROM DUAL
+	</select>
+
+    <select id="getSearchCurrency" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT CURRENCY_CODE FROM FND_CURRENCIES@LN_PROD_ZSHPIF
+		WHERE 1=1
+		<if test='keyword != null and keyword != ""'>
+        	AND UPPER(CURRENCY_CODE) LIKE '%' || UPPER(#{keyword}) || '%'
+		</if>
+		ORDER BY UPPER(CURRENCY_CODE)
+	</select>
+
+    <select id="getSearchErpProjectEmp" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT PPF.FULL_NAME
+		      ,PPF.EMPLOYEE_NUMBER
+		      ,HLA.LOCATION_CODE
+		      ,PPF.PERSON_ID
+		FROM   PER_ALL_PEOPLE_F_INT  PPF
+		      ,PER_ALL_ASSIGNMENTS_F_INT PAF
+		      ,HR_LOCATIONS_ALL_INT  HLA
+		WHERE  PPF.PERSON_ID = PAF.PERSON_ID
+		AND    PPF.EFFECTIVE_END_DATE > TRUNC(SYSDATE)
+		AND    PAF.EFFECTIVE_END_DATE > TRUNC(SYSDATE)
+		AND    HLA.LOCATION_ID = PAF.LOCATION_ID
+        <if test='keyword != null and keyword != ""'>
+              AND (
+                    UPPER(PPF.FULL_NAME) LIKE '%' || UPPER(#{keyword}) || '%'
+                    OR UPPER(PPF.EMPLOYEE_NUMBER) LIKE '%' || UPPER(#{keyword}) || '%'
+                    OR UPPER(HLA.LOCATION_CODE) LIKE '%' || UPPER(#{keyword}) || '%'
+              )
+        </if>
+		ORDER BY PPF.FULL_NAME
+	</select>
+
+	<select id="getSearchManufacturer" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT PV.VENDOR_ID
+		,	   PV.SEGMENT1 AS VENDOR_CODE
+		,	   PV.VENDOR_NAME_ALT AS VENDOR_NAME
+		FROM PO_VENDORS@LN_PROD_ZSHPIF PV
+		WHERE 1=1
+		<if test='keyword != null and keyword != ""'>
+			AND (UPPER(PV.VENDOR_NAME_ALT) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(PV.SEGMENT1) LIKE '%' || UPPER(#{keyword}) || '%')
+		</if>
+	</select>
+
+	<select id="getNewExpHeaderID" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZMFG_EXP_REQUEST_HEADERS_S.NEXTVAL@LN_PROD_ZSHPIF NEXTVAL
+		FROM DUAL
+	</select>
+
+	<select id="getNewExpNo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ZMFG_EXP_REQUEST_HEADERS_NO_S.NEXTVAL@LN_PROD_ZSHPIF NEXTVAL
+		FROM DUAL
+	</select>
+
+	<select id="validationInvoiceNoDuplication" parameterType="java.util.Map" resultType="int">
+		SELECT COUNT(*)
+		FROM ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+		WHERE INVOICE_NO = #{INVOICE_NO}
+		AND STATUS NOT IN ('Cancelled')
+		<if test="EXPORT_NO != null and EXPORT_NO != ''">
+			AND NOT EXISTS(SELECT 1 FROM ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF WHERE EXPORT_NO = #{EXPORT_NO} AND (STATUS = 'Incomplete' OR STATUS = 'Incomplete,Rejected'))
+        </if>
+	</select>
+
+
+
+	<update id="saveExportClearance" parameterType="java.util.Map">
+		MERGE INTO ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+		USING DUAL
+		ON (export_no = #{EXPORT_NO})
+		WHEN MATCHED THEN
+			UPDATE SET
+				  non_project              = #{NON_PROJECT}
+				, apply_date               = CASE WHEN #{APPLY_DATE} = ' ' THEN NULL ELSE to_date(#{APPLY_DATE}, 'yyyy-mm-dd') END
+				, epc_project_id           = #{EPC_PROJECT_ID}
+				, project_id               = #{PROJECT_ID}
+				, task_id                  = #{TASK_ID}
+				, invoice_no               = #{INVOICE_NO}
+				, main_item                = #{MAIN_ITEM}
+				, currency_code            = #{CURRENCY_CODE}
+				, total_amount             = #{TOTAL_AMOUNT}
+				, code_combination_id      = #{CODE_COMBINATION_ID}
+				, quantity                 = #{QUANTITY}
+				, quantity_unit            = #{QUANTITY_UNIT}
+				, packing_count            = #{PACKING_COUNT}
+				, exchage_type             = #{EXCHAGE_TYPE}
+				, exchage_date             = CASE WHEN #{EXCHAGE_DATE} = ' ' THEN NULL ELSE to_date(#{EXCHAGE_DATE}, 'yyyy-mm-dd') END
+				, net_weight               = #{NET_WEIGHT}
+				, net_weight_unit          = #{NET_WEIGHT_UNIT}
+				, gross_weight             = #{GROSS_WEIGHT}
+				, gross_weight_unit        = #{GROSS_WEIGHT_UNIT}
+
+				, customs_type             = #{CUSTOMS_TYPE}
+				, item_stored_place        = #{ITEM_STORED_PLACE}
+				, port_of_loading          = ''
+				, port_of_loading_desc     = #{PORT_OF_LOADING_DESC}
+				, port_of_destination      = ''
+				, port_of_destination_desc = #{PORT_OF_DESTINATION_DESC}
+				, manufacturer_id          = #{MANUFACTURER_ID}
+				, manufacturer             = #{MANUFACTURER}
+				, exporter_id              = null
+				, exporter                 = #{EXPORTER}
+				, price_terms              = #{PRICE_TERMS}
+				, ship_name                = #{SHIP_NAME}
+				, request_ic_date          = CASE WHEN #{REQUEST_IC_DATE} = ' ' THEN NULL ELSE to_date(#{REQUEST_IC_DATE},'yyyy-mm-dd') END
+				, remarks                  = #{REMARKS}
+				, is_carried_in_yn         = #{IS_CARRIED_IN_YN}
+				, strategic_item_yn        = #{STRATEGIC_ITEM_YN}
+				, license_no               = #{LICENSE_NO}
+				, attribute2               = #{ATTRIBUTE2}
+				, attribute3               = #{ATTRIBUTE3}
+				, attribute4               = #{ATTRIBUTE4}
+				, attribute5               = 'Y'
+				, attribute7			   = #{FILE_GRP_CD}
+				, decision_maker_id        = #{DECISION_MAKER_ID}
+				, decision_reason          = #{DECISION_REASON}
+				, project_member_id        = #{PROJECT_MEMBER_ID}
+				, engineer_id              = #{ENGINEER_ID}
+
+				, attribute8 = #{IS_RE_EXPORT}
+				, attribute9 = #{IS_ORIGINAL_EXPORT}
+				, attribute10 = #{IS_FTA_ORIGIN}
+				, attribute11 = #{LOADING_BONDED_AREA}
+				, attribute12 = #{CERTIFICATE_DUEDATE}
+				, attribute13 = #{IS_STRATEGIC_MATERIAL}
+				, attribute14 = #{EXPORT_LICENSE_NUMBER}
+				, attribute15 = #{FTA_NAME}
+
+				, approved_date            = #{APPROVED_DATE}
+				, approver                 = #{APPROVER}
+				, cl_document_no           = #{CL_DOCUMENT_NO}
+				, ci_license_date          = CASE WHEN #{CI_LICENSE_DATE} = ' ' THEN NULL ELSE to_date(#{CI_LICENSE_DATE},'yyyy-mm-dd') END
+				, refund_status            = #{REFUND_STATUS}
+
+				, last_update_date         = SYSDATE
+				, last_updated_by          = NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+				, last_update_login        = NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+
+		WHEN NOT MATCHED THEN
+			INSERT
+				( export_header_id        , export_no               , status
+
+				, non_project             , apply_date              , epc_project_id          , project_id              , task_id
+				, invoice_no              , main_item               , currency_code           , total_amount            , code_combination_id
+				, quantity                , quantity_unit           , packing_count           , exchage_type            , exchage_date
+				, net_weight              , net_weight_unit         , gross_weight            , gross_weight_unit
+
+				, customs_type            , item_stored_place       , port_of_loading         , port_of_loading_desc    , port_of_destination
+				, port_of_destination_desc, manufacturer_id         , manufacturer            , exporter_id             , exporter
+				, price_terms             , ship_name               , request_ic_date         , remarks                 , is_carried_in_yn
+				, strategic_item_yn       , license_no              , attribute2              , attribute3              , attribute4
+				, decision_maker_id       , decision_reason         , project_member_id       , engineer_id
+				, attribute5			  , attribute7
+
+				, attribute8			  , attribute9				, attribute10			  , attribute11				, attribute12
+				, attribute13			  , attribute14				, attribute15
+
+				, last_update_date        , last_updated_by         , last_update_login
+				, creation_date           , created_by)
+			VALUES
+				(  #{EXPORT_HEADER_ID}	  , #{EXPORT_NO}            , 'Incomplete'
+
+			 	, #{NON_PROJECT}         , CASE WHEN #{APPLY_DATE} = ' ' THEN NULL ELSE to_date(#{APPLY_DATE},'yyyy-mm-dd') END  , #{EPC_PROJECT_ID}     , #{PROJECT_ID}    , #{TASK_ID}
+				, #{INVOICE_NO}          , #{MAIN_ITEM}            , #{CURRENCY_CODE}         , #{TOTAL_AMOUNT}         , #{CODE_COMBINATION_ID}
+				, #{QUANTITY}            , #{QUANTITY_UNIT}        , #{PACKING_COUNT}         , #{EXCHAGE_TYPE}         , CASE WHEN #{EXCHAGE_DATE} = ' ' THEN NULL ELSE to_date(#{EXCHAGE_DATE},'yyyy-mm-dd') END
+				, #{NET_WEIGHT}          , #{NET_WEIGHT_UNIT}      , #{GROSS_WEIGHT}          , #{GROSS_WEIGHT_UNIT}
+
+				, #{CUSTOMS_TYPE}       , #{ITEM_STORED_PLACE}     , ''                       , #{PORT_OF_LOADING_DESC}  , ''
+				, #{PORT_OF_DESTINATION_DESC} , #{MANUFACTURER_ID} , #{MANUFACTURER}          , null                     , #{EXPORTER}
+				, #{PRICE_TERMS}        , #{SHIP_NAME}             , CASE WHEN #{REQUEST_IC_DATE} = ' ' THEN NULL ELSE to_date(#{REQUEST_IC_DATE},'yyyy-mm-dd') END      , #{REMARKS}               , #{IS_CARRIED_IN_YN}
+				, #{STRATEGIC_ITEM_YN}  , #{LICENSE_NO}            , #{ATTRIBUTE2}	          , #{ATTRIBUTE3}	          , #{ATTRIBUTE4}
+				, #{DECISION_MAKER_ID}  , #{DECISION_REASON}       , #{PROJECT_MEMBER_ID}     , #{ENGINEER_ID}
+				, 'Y'				    , #{FILE_GRP_CD}
+
+				, #{IS_RE_EXPORT}		, #{IS_ORIGINAL_EXPORT}	   , #{IS_FTA_ORIGIN}		  , #{LOADING_BONDED_AREA}	  , #{CERTIFICATE_DUEDATE}
+				, #{IS_STRATEGIC_MATERIAL} , #{EXPORT_LICENSE_NUMBER}, #{FTA_NAME}
+
+				, SYSDATE               , NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+				, NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+				, SYSDATE               , NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1))
+    </update>
+
+    <update id="updateExportStatus" parameterType="java.util.Map">
+		/* ExportClearanceMapper.updateExportStatus : 수출통관의 상태 변경 */
+        UPDATE ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+        SET STATUS = #{STATUS}
+        WHERE EXPORT_NO = #{EXPORT_NO}
+	</update>
+
+	<delete id="deleteExportClearance" parameterType="java.util.Map">
+    	DELETE ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+        WHERE export_no = #{EXPORT_NO}
+	</delete>
+
+	<update id="saveExportClearanceFileGrpCd" parameterType="java.util.Map">
+		UPDATE ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+		  SET ATTRIBUTE7 = #{FILE_GRP_CD}
+		WHERE EXPORT_NO = #{EXPORT_NO}
+	</update>
+
+	<select id="getExportRequestStatus" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT CL.APPROVAL_STATUS, CL.SN, NVL(H.STATUS,'ZZZ') AS H_STATUS
+		 FROM ZETR.EXPORT_CLEARANCE_LICENCE@LN_PROD_ZSHPIF CL							 /* Clearance License 상태.., */
+			LEFT OUTER JOIN ZETR.CUS_CUSDEC830_H@LN_PROD_ZSHPIF H ON CL.SN = H.C_COM_ID	/* 수출입신고서 */
+		WHERE CL.EXPORT_HEADER_ID  = #{EXPORT_HEADER_ID}
+		  AND CL.EXPORT_HEADER_ID IS NOT NULL
+		  AND  H.AMEND_COUNT  = '00';
+	</select>
+
+	<delete id="deleteRelatedData" parameterType="java.util.Map">
+		<![CDATA[
+		{
+		CALL
+		DECLARE
+		BEGIN
+			UPDATE DRW_IMPORT_H1D1
+			WHERE DRW_IMPORT_HD1D1_UID = :ZETR_DRW_REMAIN_LIST_V.DRW_IMPORT_HD1D1_UID;
+
+			DELETE ZETR_DRW_REMAIN_LIST_V@LN_PROD_ZSHPIF WHERE EXPORT_HEADER_ID  = #{EXPORT_HEADER_ID};
+
+			DELETE ZETR.CUS_CUSDEC830_H@LN_PROD_ZSHPIF  WHERE C_COM_ID = #{LIC_SN};
+
+			DELETE ZETR.EXPORT_CLEARANCE_LICENCE@LN_PROD_ZSHPIF WHERE EXPORT_HEADER_ID  = #{EXPORT_HEADER_ID};
+		END
+		}
+		]]>
+  	</delete>
+
+	<!-- 사급PO 관련 -->
+	<select id="getPOStatus" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT 123456 PO_HEADER_ID
+		,      'Unknown' PO_STATUS
+		FROM DUAL
+		/*
+		SELECT PO_HEADER_ID
+		,      PO_STATUS
+		FROM ZMFG_EXP_SAGEUP_PO@LN_PROD_ZSHPIF
+		WHERE PO_HEADER_ID = {PO_HEADER_ID}
+		*/
+	</select>
+
+	<select id="getPrivatePOList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT TRANSACTION_ID
+			, EXPORT_HEADER_ID
+			, PO_HEADER_ID
+			,	 'Unknown' PO_STATUS
+		/* 	, CASE WHEN ZPO.PO_STATUS IS NULL THEN 'Unknown' ELSE ZPO.PO_STATUS END PO_STATUS */
+			, CREATION_DATE
+			, CREATED_BY
+			, LAST_UPDATE_DATE
+			, LAST_UPDATED_BY
+			, LAST_UPDATE_LOGIN
+		FROM ZMFG_EXP_SAGEUP_PO@LN_PROD_ZSHPIF  ZERHV
+		/*	LEFT OUTER JOIN AAA@LN_PROD_ZSHPIF ZPO ON ZERHV.PO_HEADER_ID = ZPO.PO_HEADER_ID */
+		WHERE ZERHV.EXPORT_HEADER_ID = #{EXPORT_HEADER_ID}
+	</select>
+
+	<delete id="deletePrivatePO" parameterType="java.util.Map">
+    	DELETE ZMFG_EXP_SAGEUP_PO@LN_PROD_ZSHPIF ZERHV
+        WHERE ZERHV.EXPORT_HEADER_ID = #{EXPORT_HEADER_ID}
+	</delete>
+
+	<update id="savePrivatePO" parameterType="java.util.Map">
+		INSERT INTO ZMFG_EXP_SAGEUP_PO@LN_PROD_ZSHPIF (
+			  TRANSACTION_ID
+			, EXPORT_HEADER_ID
+			, PO_HEADER_ID
+			, CREATION_DATE
+			, CREATED_BY
+			, LAST_UPDATE_DATE
+			, LAST_UPDATED_BY
+			, LAST_UPDATE_LOGIN
+		)  VALUES (
+			  ZMFG_EXP_SAGEUP_PO_S.NEXTVAL@LN_PROD_ZSHPIF
+			, #{EXPORT_HEADER_ID}
+			, #{PO_HEADER_ID}
+			, SYSDATE
+			, NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+			, SYSDATE
+			, NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+			, NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+		)
+    </update>
+	<!-- 사급PO 관련 END-->
+
+	<!-- 전자결재 관련 -->
+	<select id="getExportReportInfo" parameterType="java.util.Map" resultType="map">
+		/*ExportClearanceMapper.getExportReportInfo : Export Report 관련 정보 SELECT ONE*/
+		SELECT ZERHV.PROJECT_NO
+		,      ZERHV.PROJECT_NAME
+		,      ZERHV.INVOICE_NO
+		,      ZERHV.PORT_OF_LOADING_DESC
+		,      ZERHV.PORT_OF_DESTINATION_DESC
+		,      ZERHV.EXPORTER
+		,      ZERHV.MANUFACTURER
+		,      (
+            	SELECT PV.SEGMENT1
+            	FROM PO_VENDORS@LN_PROD_ZSHPIF PV
+            	WHERE PV.VENDOR_ID = ZERHV.MANUFACTURER_ID
+           	   ) AS MANUFACTURER_SEGMENT
+		,      ZERHV.PRICE_TERMS
+		,      ZERHV.SHIP_NAME
+		,      ZERHV.CUSTOMS_TYPE
+		,      ZERHV.TOTAL_AMOUNT AS TOTAL_AMOUNT
+		,      ZERHV.CURRENCY_CODE
+		,      ZERHV.EXCHAGE_TYPE
+		,      ZERHV.EXCHAGE_DATE
+		,      ZERHV.MAIN_ITEM
+		,      ZERHV.NET_WEIGHT AS NET_WEIGHT
+		,      ZERHV.NET_WEIGHT_UNIT
+		,      ZERHV.GROSS_WEIGHT AS GROSS_WEIGHT
+		,      ZERHV.GROSS_WEIGHT_UNIT
+		,      ZERHV.PACKING_COUNT
+		,      ZERHV.ITEM_STORED_PLACE
+		,      ZERHV.CREATED_BY_NAME
+		,      (
+		       SELECT HOU.NAME
+		       FROM PER_ALL_ASSIGNMENTS_F_INT PAAF
+		       ,    HR_ORGANIZATION_UNITS@LN_PROD_ZSHPIF HOU
+		       ,    FND_USER_INT              FU
+		       WHERE FU.USER_ID = ZERHV.CREATED_BY
+		       AND   FU.EMPLOYEE_ID = PAAF.PERSON_ID
+		       AND   PAAF.ASS_ATTRIBUTE1 = HOU.INTERNAL_ADDRESS_LINE
+		       AND   TO_DATE(TO_CHAR(SYSDATE,'YYYYMMDD'),'YYYYMMDD') BETWEEN PAAF.EFFECTIVE_START_DATE AND PAAF.EFFECTIVE_END_DATE
+		       AND ROWNUM = 1
+		       )  AS CREATOR_TEAM
+		,      ZMFG_EXP_GET_SAGEUP_PO@LN_PROD_ZSHPIF(ZERHV.EXPORT_HEADER_ID) AS SAGEUP_PO
+		,      ZERHV.REMARKS
+		,      ZERHV.EXPORT_NO
+		,      ZERHV.IS_CARRIED_IN_YN
+		,      DECODE(ZERHV.CUSTOMS_TYPE,'당사환급', ZMFG_EXP_GET_DANGSAHG_PO@LN_PROD_ZSHPIF(ZERHV.EXPORT_HEADER_ID), NULL) AS DANGSAHG_PO
+		--     아래부터 MRD쪽 대비 추가 쿼리(ZMFGPOEXPPR.mrd)
+		,      ZERHV.CREATED_BY_CODE AS USER_AD
+		,	   ZERHV.ATTRIBUTE5 AS IS_DESM_YN
+		,	   ZERHV.ATTRIBUTE6 AS MASTER_SEQUENCE_ID
+		,      ZERHV.ATTRIBUTE7 AS ATTACH_GRP_CD
+		,	   ZERHV.ATTRIBUTE8 AS IS_RE_EXPORT
+		,	   ZERHV.ATTRIBUTE9 AS IS_ORIGINAL_EXPORT
+		,	   ZERHV.ATTRIBUTE10 AS IS_FTA_ORIGIN
+		,	   ZERHV.ATTRIBUTE11 AS LOADING_BONDED_AREA
+		,	   ZERHV.ATTRIBUTE12 AS CERTIFICATE_DUEDATE
+		,	   ZERHV.ATTRIBUTE13 AS IS_STRATEGIC_MATERIAL
+		,	   ZERHV.ATTRIBUTE14 AS EXPORT_LICENSE_NUMBER
+		--,	   ZERHV.ATTRIBUTE15 AS FTA_NAME -- DESM CODE로 NAME 가져오기
+		,      (SELECT DTL_NAME_KO FROM DESM_CODE_DTL WHERE MST_CODE = 'EXP001' AND DTL_CODE = ZERHV.ATTRIBUTE15) AS FTA_NAME
+		,	   TO_CHAR(SYSDATE, 'YYYY-MM-DD') AS CURRENT_DATE
+        ,      TO_CHAR(SYSDATE + 3, 'YYYY-MM-DD') AS DUE_DATE
+        ,      TO_CHAR(SYSDATE, 'YYYY') AS CURRENT_YEAR
+        ,	   ZERHV.EXPORT_HEADER_ID
+        ,	   ( SELECT SUPERVISOR_ID FROM ESAUSER WHERE USR_ID = ZERHV.CREATED_BY_CODE )	AS SUPERVISOR_ID
+		FROM ZMFG_EXP_REQUEST_HEADERS_V@LN_PROD_ZSHPIF  ZERHV
+		WHERE ZERHV.EXPORT_HEADER_ID = #{EXPORT_HEADER_ID}
+	</select>
+
+	<select id="getMasterSequenceIdNextval" resultType="int">
+		/* ExportClearanceMapper.getMasterSequenceIdNextval : 전자결재 연동을 위한 ZOAS쪽 SEQ 생성 */
+		SELECT ZOAS_OT_DHNET_MASTERS_S.NEXTVAL@LN_PROD_ZSHPIF FROM DUAL
+	</select>
+
+	<insert id="insertZoasOtDhnetMaster" parameterType="java.util.Map">
+		INSERT INTO ZOAS_OT_DHNET_MASTERS@LN_PROD_ZSHPIF
+		(
+			MASTER_SEQUENCE_ID
+			,MODULE_NAME
+			,DETAIL_TABLE_NAME
+			,PROCESS_FLAG
+			,TRANSACTION_TYPE
+			,CREATION_DATE
+			,CREATED_BY
+			,DATE_FOR_APPROVAL
+			,ATTRIBUTE3
+			,ATTRIBUTE4
+			,ATTRIBUTE6
+			,ATTRIBUTE7
+		)
+		VALUES
+		(
+			 #{MASTER_SEQUENCE_ID}
+			 ,'EXP'
+			 ,'ZMFG_EXP_REQUEST_HEADERS'
+			 ,'1'
+			 ,'CREATE'
+			 ,SYSDATE
+			 ,#{CREATED_AD}
+			 ,SYSDATE + 3
+			 ,#{EXPORT_HEADER_ID}
+			 ,#{EXPORT_NO}
+			 ,'EXP'
+			 ,#{URL}
+		)
+	</insert>
+
+	<update id="updateExportHeader" parameterType="java.util.Map">
+		/* ExportClearanceMapper.updateExportHeader : Portal 전송 후 Export 상태 변경 */
+        UPDATE ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+        SET STATUS = #{STATUS}
+        ,   ATTRIBUTE6 = #{MASTER_SEQUENCE_ID}
+        WHERE EXPORT_HEADER_ID = #{EXPORT_HEADER_ID}
+	</update>
+
+	<select id="callPortalInterface" resultType="map" statementType="CALLABLE">
+		/* ExportClearanceMapper.callPortalInterface 포탈 전송을 위한 Package 호출 */
+		<![CDATA[
+		{
+			CALL ZOAS_PORTAL_INTERFACE_PKG.DOC_TRANSFER_DESM@LN_PROD_ZSHPIF(
+				#{ERRBUF, mode = OUT, jdbcType=VARCHAR},
+				#{RETCODE, mode = OUT, jdbcType=INTEGER},
+				#{MASTER_SEQUENCE_ID, mode = IN, jdbcType=INTEGER},
+				#{P_DRAFT_TYPE, mode = IN, jdbcType=VARCHAR}
+			)
+		}
+		]]>
+	</select>
+
+	<select id="getExpFileInfo" resultType="Map">
+		/* ExportClearanceMapper.getExpFileInfo : File Info 가져오기 */
+		SELECT ATT_ID
+        ,      GRP_CD
+        ,      ORGN_FILE_NM
+        ,      ATT_FILE_PATH
+        ,      TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+        ,      SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+        FROM ESAATTH
+        WHERE SYS_ID = 'EMRO'
+        AND ATT_ID = #{FILE_ID}
+        AND STS <![CDATA[<>]]> 'D'
+	</select>
+
+	<select id="getExpAttachList" parameterType="Map" resultType="Map">
+		SELECT ATT_ID
+        ,      GRP_CD
+        ,      ORGN_FILE_NM
+        ,      ATT_FILE_PATH
+        ,      TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+        ,      SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+        FROM ESAATTH
+        WHERE SYS_ID = 'EMRO'
+        AND GRP_CD = #{ATTACH_GRP_CD}
+        AND STS <![CDATA[<>]]> 'D'
+	</select>
+
+	<select id="callPortalInterface_backup" resultType="map" statementType="CALLABLE">
+		/* ExportClearanceMapper.callPortalInterface 포탈 전송을 위한 Package 호출 */
+		<![CDATA[
+		{
+			CALL ZOAS_PORTAL_INTERFACE_PKG.DOC_TRANSFER@LN_PROD_ZSHPIF(
+				#{ERRBUF, mode = OUT, jdbcType=VARCHAR},
+				#{RETCODE, mode = OUT, jdbcType=INTEGER},
+				#{EMPTY_VALUE, mode = IN, jdbcType=INTEGER},
+				#{P_DRAFT_TYPE, mode = IN, jdbcType=VARCHAR}
+			)
+		}
+		]]>
+	</select>
+	<!-- 전자결재 관련 end -->
+
+
+	<!-- ########################## backup ############################# -->
+	<update id="saveExportClearance_220120" parameterType="java.util.Map">
+		MERGE INTO ZMFG_EXP_REQUEST_HEADERS@LN_PROD_ZSHPIF
+		USING DUAL
+		ON (export_no = #{EXPORT_NO})
+		WHEN MATCHED THEN
+			UPDATE SET
+				  non_project              = #{NON_PROJECT}
+				, apply_date               = CASE WHEN #{APPLY_DATE} = ' ' THEN NULL ELSE to_date(#{APPLY_DATE}, 'yyyy-mm-dd') END
+				, epc_project_id           = #{EPC_PROJECT_ID}
+				, project_id               = #{PROJECT_ID}
+				, task_id                  = #{TASK_ID}
+				, invoice_no               = #{INVOICE_NO}
+				, main_item                = #{MAIN_ITEM}
+				, currency_code            = #{CURRENCY_CODE}
+				, total_amount             = #{TOTAL_AMOUNT}
+				, code_combination_id      = #{CODE_COMBINATION_ID}
+				, quantity                 = #{QUANTITY}
+				, quantity_unit            = #{QUANTITY_UNIT}
+				, packing_count            = #{PACKING_COUNT}
+				, exchage_type             = #{EXCHAGE_TYPE}
+				, exchage_date             = CASE WHEN #{EXCHAGE_DATE} = ' ' THEN NULL ELSE to_date(#{EXCHAGE_DATE}, 'yyyy-mm-dd') END
+				, net_weight               = #{NET_WEIGHT}
+				, net_weight_unit          = #{NET_WEIGHT_UNIT}
+				, gross_weight             = #{GROSS_WEIGHT}
+				, gross_weight_unit        = #{GROSS_WEIGHT_UNIT}
+
+				, customs_type             = #{CUSTOMS_TYPE}
+				, item_stored_place        = #{ITEM_STORED_PLACE}
+				, port_of_loading          = ''
+				, port_of_loading_desc     = #{PORT_OF_LOADING_DESC}
+				, port_of_destination      = ''
+				, port_of_destination_desc = #{PORT_OF_DESTINATION_DESC}
+				, manufacturer_id          = null
+				, manufacturer             = #{MANUFACTURER}
+				, exporter_id              = null
+				, exporter                 = #{EXPORTER}
+				, price_terms              = #{PRICE_TERMS}
+				, ship_name                = #{SHIP_NAME}
+				, request_ic_date          = CASE WHEN #{REQUEST_IC_DATE} = ' ' THEN NULL ELSE to_date(#{REQUEST_IC_DATE},'yyyy-mm-dd') END
+				, remarks                  = #{REMARKS}
+				, is_carried_in_yn         = #{IS_CARRIED_IN_YN}
+				, strategic_item_yn        = #{STRATEGIC_ITEM_YN}
+				, license_no               = #{LICENSE_NO}
+				, attribute2               = #{ATTRIBUTE2}
+				, attribute3               = #{ATTRIBUTE3}
+				, attribute4               = #{ATTRIBUTE4}
+				, attribute5               = 'Y'
+				, attribute7			   = #{FILE_GRP_CD}
+				, decision_maker_id        = #{DECISION_MAKER_ID}
+				, decision_reason          = #{DECISION_REASON}
+				, project_member_id        = #{PROJECT_MEMBER_ID}
+				, engineer_id              = #{ENGINEER_ID}
+
+				, approved_date            = #{APPROVED_DATE}
+				, approver                 = #{APPROVER}
+				, cl_document_no           = #{CL_DOCUMENT_NO}
+				, ci_license_date          = CASE WHEN #{CI_LICENSE_DATE} = ' ' THEN NULL ELSE to_date(#{CI_LICENSE_DATE},'yyyy-mm-dd') END
+				, refund_status            = #{REFUND_STATUS}
+
+				, last_update_date         = SYSDATE
+				, last_updated_by          = NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+				, last_update_login        = NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+
+		WHEN NOT MATCHED THEN
+			INSERT
+				( export_header_id        , export_no               , status
+
+				, non_project             , apply_date              , epc_project_id          , project_id              , task_id
+				, invoice_no              , main_item               , currency_code           , total_amount            , code_combination_id
+				, quantity                , quantity_unit           , packing_count           , exchage_type            , exchage_date
+				, net_weight              , net_weight_unit         , gross_weight            , gross_weight_unit
+
+				, customs_type            , item_stored_place       , port_of_loading         , port_of_loading_desc    , port_of_destination
+				, port_of_destination_desc, manufacturer_id         , manufacturer            , exporter_id             , exporter
+				, price_terms             , ship_name               , request_ic_date         , remarks                 , is_carried_in_yn
+				, strategic_item_yn       , license_no              , attribute2              , attribute3              , attribute4
+				, decision_maker_id       , decision_reason         , project_member_id       , engineer_id
+				, attribute5			  , attribute7
+
+
+				, last_update_date        , last_updated_by         , last_update_login
+				, creation_date           , created_by)
+			VALUES
+				(  #{EXPORT_HEADER_ID}	  , #{EXPORT_NO}            , 'Incomplete'
+
+			 	, #{NON_PROJECT}         , CASE WHEN #{APPLY_DATE} = ' ' THEN NULL ELSE to_date(#{APPLY_DATE},'yyyy-mm-dd') END  , #{EPC_PROJECT_ID}     , #{PROJECT_ID}    , #{TASK_ID}
+				, #{INVOICE_NO}          , #{MAIN_ITEM}            , #{CURRENCY_CODE}         , #{TOTAL_AMOUNT}         , #{CODE_COMBINATION_ID}
+				, #{QUANTITY}            , #{QUANTITY_UNIT}        , #{PACKING_COUNT}         , #{EXCHAGE_TYPE}         , CASE WHEN #{EXCHAGE_DATE} = ' ' THEN NULL ELSE to_date(#{EXCHAGE_DATE},'yyyy-mm-dd') END
+				, #{NET_WEIGHT}          , #{NET_WEIGHT_UNIT}      , #{GROSS_WEIGHT}          , #{GROSS_WEIGHT_UNIT}
+
+				, #{CUSTOMS_TYPE}       , #{ITEM_STORED_PLACE}     , ''                       , #{PORT_OF_LOADING_DESC}  , ''
+				, #{PORT_OF_DESTINATION_DESC} , null               , #{MANUFACTURER}          , null                     , #{EXPORTER}
+				, #{PRICE_TERMS}        , #{SHIP_NAME}             , CASE WHEN #{REQUEST_IC_DATE} = ' ' THEN NULL ELSE to_date(#{REQUEST_IC_DATE},'yyyy-mm-dd') END      , #{REMARKS}               , #{IS_CARRIED_IN_YN}
+				, #{STRATEGIC_ITEM_YN}  , #{LICENSE_NO}            , #{ATTRIBUTE2}	          , #{ATTRIBUTE3}	          , #{ATTRIBUTE4}
+				, #{DECISION_MAKER_ID}  , #{DECISION_REASON}       , #{PROJECT_MEMBER_ID}     , #{ENGINEER_ID}
+				, 'Y'				    , #{FILE_GRP_CD}
+
+				, SYSDATE               , NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+				, NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1)
+				, SYSDATE               , NVL((SELECT USER_ID FROM FND_USER_INT WHERE USER_NAME = #{USER_AD}), -1))
+    </update>
+	<!-- ########################## backup end ######################### -->
+</mapper>

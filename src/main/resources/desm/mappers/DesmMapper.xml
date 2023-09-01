@@ -1,0 +1,631 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.DesmMapper">
+
+	<update id="setSessionLang" parameterType="java.util.Map">
+		ALTER SESSION SET NLS_LANGUAGE ='AMERICAN'
+	</update>	
+
+	<select id="chkLogin" parameterType="java.util.Map" resultType="egovframework.desm.service.DesmVO">
+	<![CDATA[
+		SELECT T.USER_AD
+		      ,T.USER_NAME
+	          ,(SELECT LISTAGG(DR.ROLE_SEQ,',') WITHIN GROUP (ORDER BY DR.ROLE_SEQ ) AS ROLE_SEQ
+	              FROM DESM_USER_ROLE DUR,
+	                   DESM_ROLE DR
+	             WHERE DUR.ROLE_SEQ = DR.ROLE_SEQ
+	               AND DUR.USER_AD = T.USER_AD ) AS ROLE_SEQ
+		      ,T.PWS_EDIT_YN
+		      ,CASE WHEN T.SUBCON_USER_YN = 'Y' AND T.SUBCON_MENU_CNT > 0 THEN 'Y' ELSE 'N' END AS SUBCON_YN 
+		      ,T.DEPT_NAME
+          	  ,'Last Login : ' || T.LOG_DATE || '<br/>' || 'Last IP : ' || T.IP || '<br/>' || 'Current IP : ' || #{IP} AS LOG_DATE 
+	          ,(SELECT LISTAGG(DR.ROLE_NAME,',') WITHIN GROUP (ORDER BY DR.ROLE_SEQ ) AS ROLE_NAME
+	              FROM DESM_USER_ROLE DUR,
+	                   DESM_ROLE DR
+	             WHERE DUR.ROLE_SEQ = DR.ROLE_SEQ
+	               AND DUR.USER_AD = T.USER_AD ) AS ROLE_NAME
+		  FROM (SELECT DU.USER_AD
+		              ,DU.USER_NAME
+		              ,NVL(TO_CHAR(DUL.CREATION_DATE, 'YYYY-MM-DD HH24:MI:SS'), '0000-00-00 00:00:00') AS LOG_DATE
+		              ,ROW_NUMBER() OVER(ORDER BY DUL.CREATION_DATE DESC) AS RN
+		              ,DUL.IP
+		              ,CASE WHEN DSU.USER_AD IS NULL THEN 'Y' ELSE DSU.PWS_EDIT_YN END AS PWS_EDIT_YN
+	                  ,CASE WHEN DSU.USER_AD IS NOT NULL THEN 'Y' ELSE 'N' END AS SUBCON_USER_YN
+	                  ,(SELECT COUNT(*) AS CNT FROM DESM_USER_ROLE DUR WHERE DUR.USER_AD = DU.USER_AD AND DUR.ROLE_SEQ = 111) AS SUBCON_MENU_CNT
+		              ,DU.DEPT_NAME
+		          FROM DESM_USER DU,
+		          	   DESM_USER_LOG DUL,
+		               DESM_SUBCON_USER DSU
+		         WHERE DU.USER_AD = DUL.USER_AD(+)
+		           AND DU.USER_AD = DSU.USER_AD(+)
+		           AND DUL.IP(+) != 'android'
+                   AND DUL.IP(+) != 'ios'
+		           AND DU.DELEGATE_FLAG = 'N' 
+		           AND UPPER(DU.USER_AD) = UPPER(#{USER_ID})) T
+		 WHERE RN = 1
+	]]>	 
+	</select>
+	
+	<select id="getLeftMenu" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT M.*,
+		       CONNECT_BY_ISLEAF AS LEAF
+		  FROM (SELECT DISTINCT
+		               DM.MENU_SEQ,
+		               'MENU' || TO_CHAR(DM.MENU_SEQ) AS MENU_ID,  
+		               'MENU' || TO_CHAR(DM.MENU_UP_SEQ) AS MENU_UP_ID,
+		               CASE WHEN #{lang} = 'ko' THEN DM.MENU_NAME_KO
+		                    WHEN #{lang} = 'en' THEN DM.MENU_NAME_EN END AS MENU_NAME,
+		               DM.MENU_UP_SEQ,
+		               NVL(DM.MENU_PATH,'#') AS MENU_PATH,
+		               DM.MENU_ORDER,
+		               DM.TRANS_YN,
+		               DM.DEFAIL_PROJECT_YN
+		          FROM DESM_USER DU,
+		               DESM_USER_ROLE DUR,
+		               DESM_ROLE_MENU DRM,
+		               DESM_MENU DM
+		         WHERE DU.USER_AD = DUR.USER_AD
+		           AND DUR.ROLE_SEQ = DRM.ROLE_SEQ 
+		           AND DRM.MENU_SEQ = DM.MENU_SEQ
+	    		<if test='MOBILE_YN != null and MOBILE_YN !=""'>
+	      		   AND DM.MOBILE_YN = #{MOBILE_YN}
+	      		</if>		           
+		           AND DUR.USER_AD = #{USER_AD} 
+		           AND DM.DELEGATE_FLAG = 'N'
+		           AND DU.EXPIRE_FLAG = 'N') M
+		START WITH MENU_UP_SEQ = 0         
+		CONNECT BY PRIOR MENU_SEQ = MENU_UP_SEQ
+		ORDER SIBLINGS BY MENU_ORDER 		
+	</select>
+	
+	<select id="getCheckMenu" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MENU_PATH,
+		       MENU_UP_ID,
+		       MENU_NAME,
+		       TRANS_YN,
+		       CASE WHEN MENU_UP_SEQ = 0 THEN MENU_NAME ELSE MENU_UP_NAME END AS MENU_UP_NAME  
+		  FROM (SELECT DISTINCT
+		               DM.MENU_PATH,
+		               DM.TRANS_YN,
+		               DM.MENU_UP_SEQ,
+		               'MENU' || TO_CHAR(DM.MENU_UP_SEQ) AS MENU_UP_ID,
+		               CASE WHEN #{lang} = 'ko' THEN DM.MENU_NAME_KO
+		                    WHEN #{lang} = 'en' THEN DM.MENU_NAME_EN END AS MENU_NAME,    
+		               CASE WHEN #{lang} = 'ko' THEN DM2.MENU_NAME_KO
+		                    WHEN #{lang} = 'en' THEN DM2.MENU_NAME_EN END AS MENU_UP_NAME
+		          FROM DESM_USER_ROLE DUR,
+		               DESM_ROLE_MENU DRM,
+		               DESM_MENU DM,
+		               DESM_MENU DM2       
+		         WHERE DUR.ROLE_SEQ = DRM.ROLE_SEQ 
+		           AND DRM.MENU_SEQ = DM.MENU_SEQ
+		           AND DM.MENU_UP_SEQ = DM2.MENU_SEQ(+)
+		           AND DUR.USER_AD = #{USER_AD} 
+		           AND DM.MENU_SEQ = #{MENU_SEQ}
+		           AND DM.DELEGATE_FLAG = 'N'
+		           AND DM2.DELEGATE_FLAG(+) = 'N')	
+	</select>	
+	
+	<select id="getComCode" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DCD.DTL_CODE AS CODE,
+			   CASE WHEN #{lang} = 'ko' THEN DCD.DTL_NAME_KO
+		            WHEN #{lang} = 'en' THEN DCD.DTL_NAME_EN END AS NAME	
+		  FROM DESM_CODE_MST DCM,
+		       DESM_CODE_DTL DCD
+		 WHERE DCM.MST_CODE = DCD.MST_CODE
+		   AND DCM.DELEGATE_FLAG ='N'
+		   AND DCD.DELEGATE_FLAG = 'N'
+		   AND DCM.MST_CODE = #{CODE} 
+		ORDER BY DCD.DTL_ORDER 		
+	</select>	
+	
+	<select id="getComDay" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT TO_CHAR(SYSDATE, 'YYYY/MM/DD') AS CUR_DAY
+		      ,TO_CHAR(SYSDATE - 7, 'YYYY/MM/DD') AS PREV_7_DAY			
+		      ,TO_CHAR(ADD_MONTHS(SYSDATE, -1), 'YYYY/MM/DD') AS PREV_1_MON_DAY
+		      ,TO_CHAR(ADD_MONTHS(SYSDATE, -2), 'YYYY/MM/DD') AS PREV_2_MON_DAY
+		      ,TO_CHAR(ADD_MONTHS(SYSDATE, +1), 'YYYY/MM/DD') AS NEXT_1_MON_DAY
+		      ,TO_CHAR(SYSDATE, 'YYYY/MM') AS CUR_MON
+		      ,TO_CHAR(SYSDATE, 'YYYY_MM') AS CUR_MON_NAME    
+		      ,TO_NUMBER(TO_CHAR(SYSDATE, 'DD')) AS CUR_DD_INT    
+		  FROM DUAL 	
+	</select>		
+	
+	<select id="getComUser" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_AD,
+		       DU.USER_NAME,
+		       NVL(DU.DEPT_NAME, ZE.ZORG_NM) AS DEPT_NAMEM,
+		       TO_CHAR(SYSDATE, 'YYYY/MM/DD') AS CUR_DAY
+		  FROM DESM_USER DU,
+		       ZVTS_EMP ZE
+		 WHERE DU.USER_AD = ZE.AD_USER_ID (+) 
+		   AND ZE.ZSTATUS_TYPE(+) = '재직'  
+		   AND DU.USER_AD = #{USER_AD}   	
+	</select>		
+	
+	<insert id="insertUserLog" parameterType="java.util.Map">
+		INSERT INTO DESM_USER_LOG
+		(USER_AD
+		,IP
+		,CREATION_DATE) 
+		VALUES
+		(#{USER_ID}
+		,#{IP}
+		,SYSDATE) 
+	</insert>		
+	
+	<select id="getMenuAuthCheckList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT S.MENU_SEQ,
+		       S.AUTH_CODE,
+		       S.AUTH_NAME,
+		       MAX(CASE WHEN DRMA.ROLE_SEQ IS NOT NULL AND DU.EXPIRE_FLAG = 'N' THEN 'Y' ELSE 'N' END) AS USE_YN
+		  FROM (SELECT DRM.ROLE_SEQ,
+		               DRM.MENU_SEQ,
+		               DMA.AUTH_CODE,
+		               DMA.AUTH_NAME,
+		               DUR.USER_AD
+		          FROM DESM_USER_ROLE DUR,
+		               DESM_ROLE_MENU DRM,
+		               DESM_MENU_AUTH DMA  
+		         WHERE DUR.ROLE_SEQ = DRM.ROLE_SEQ
+		           AND DRM.MENU_SEQ = DMA.MENU_SEQ   
+		           AND DUR.USER_AD = #{USER_AD}  
+		           AND DRM.MENU_SEQ = #{MENU_SEQ}) S,
+		       DESM_USER DU,     
+		       DESM_ROLE_MENU_AUTH DRMA
+		 WHERE S.USER_AD = DU.USER_AD
+		   AND S.ROLE_SEQ = DRMA.ROLE_SEQ(+)         
+		   AND S.MENU_SEQ = DRMA.MENU_SEQ(+)         
+		   AND S.AUTH_CODE = DRMA.AUTH_CODE(+)            
+		GROUP BY S.MENU_SEQ,
+		       S.AUTH_CODE,
+		       S.AUTH_NAME		
+	</select>	
+	
+	<select id="getInitDefailProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT PPA.SEGMENT1,
+		       PPA.NAME
+		  FROM DESM_USER_DEFAULT_PROJECT DUDP,
+		       PA_PROJECTS_ALL_INT PPA,
+		       (SELECT COUNT(*) AS PROJECT_ALL_CNT
+		          FROM DESM_USER_PROJECT_ALL
+		         WHERE USER_AD = #{USER_AD} ) DUPA   		       
+		 WHERE DUDP.PROJECT_CODE = PPA.SEGMENT1
+		   AND DUDP.USER_AD = #{USER_AD} 
+		   AND (DUPA.PROJECT_ALL_CNT = 1 OR 
+		       (EXISTS (SELECT 1 FROM DESM_USER_PROJECT DUP
+		                 WHERE DUP.PROJECT_CODE = PPA.SEGMENT1 AND DUP.USER_AD = #{USER_AD})))  		   	
+	</select>	
+	
+	<select id="getInitDefaultCountry" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT COUNTRY,
+		               OPERATOR,
+		               CASE WHEN CNT = 0 AND COUNTRY = 'South Korea' THEN 1 
+		                    WHEN CNT > 0 AND USER_AD IS NOT NULL THEN 1 
+		                    ELSE 0 END AS DEFAULT_YN
+		          FROM (SELECT DCD.DTL_CODE AS COUNTRY,
+		                       DCD.DTL_NAME_KO AS OPERATOR,
+		                       DUDC.USER_AD,
+		                       DCD.DTL_ORDER,
+		                       (SELECT COUNT(*) FROM DESM_USER_DEFAULT_COUNTRY WHERE USER_AD = #{USER_AD}) AS CNT  
+		                  FROM DESM_CODE_MST DCM,
+		                       DESM_CODE_DTL DCD,
+		                       DESM_USER_DEFAULT_COUNTRY DUDC
+		                 WHERE DCM.MST_CODE = DCD.MST_CODE
+		                   AND DCD.DTL_CODE = DUDC.COUNTRY_CODE(+)
+		                   AND DCM.DELEGATE_FLAG = 'N' 
+		                   AND DCM.MST_CODE = 'R003'
+		                   AND DCD.DELEGATE_FLAG = 'N'
+		                   AND DUDC.USER_AD(+) = #{USER_AD}))
+		 WHERE DEFAULT_YN = 1    	   	
+	</select>
+	
+   	<resultMap type="map" id="resultMap-findMailInfoById">
+        <result property="TMP_CONT" column="TMP_CONT" jdbcType="CLOB" javaType="string" />
+    </resultMap>  		
+	<select id="getMailByMailId" parameterType="java.util.Map" resultMap="resultMap-findMailInfoById">
+		SELECT A.SYS_ID
+			, A.TMP_ID
+			, A.TMP_CLS
+			, A.TMP_BAS_ID
+			, A.TMP_NM
+			, A.TMP_CONT
+			, A.PARAM_CLASS_NM
+			, A.STS
+			, A.REG_ID
+			, A.REG_DT
+			, A.MOD_ID
+			, A.MOD_DT
+			, B.MAIL_SET_ID
+			, B.MAIL_SET_NM
+			, B.USE_YN
+			, B.SND_CLS
+		
+		FROM ESATMPM A
+			INNER JOIN ESACFML B
+				ON A.TMP_ID = B.TMP_ID 
+				AND  B.MAIL_SET_ID = #{MAIL_SET_ID}
+		
+		WHERE A.STS != 'D'
+	</select>	
+	
+		<insert id="insertEsamailData" parameterType="java.util.Map">
+		INSERT INTO ESAMAIL
+		<trim prefix="(" suffix=")" prefixOverrides=",">
+      			SYS_ID						
+      			,REG_ID
+      			,REG_DT		
+      			,MAIL_ID					/*메일 아이디 */
+      			,MAIL_SET_ID				/*메일 설정 아이디 */			
+      		<if test="mail_tit != null">	
+      			,MAIL_TIT					/*메일 제목*/
+      		</if>
+      		<if test="mail_cont != null">
+      			,MAIL_CONT					/*메일 내용*/
+      		</if>
+      		<if test="to_nm != null">
+      			,TO_NM						/*송신자 이름*/
+      		</if> 
+      		<if test="to_addr != null">
+      			,TO_ADDR					/*송신자 주소*/
+      		</if>
+    		<if test="from_nm != null">
+      			,FROM_NM					/*수신자 이름*/
+      		</if>
+      		<if test="from_addr != null">
+      			,FROM_ADDR					/*수신자 주소*/
+      		</if>
+      		<if test="snd_yn != null">
+      			,SND_YN						/*전송 여부*/
+      		</if>
+      		<if test="snd_dt != null">
+      			,SND_DT						/*전송 일시*/
+      		</if>
+      	</trim>
+      	<trim prefix="VALUES (" suffix=")" prefixOverrides=",">
+      			'DHIC'			
+      			, #{USER_AD}
+      			, SYSDATE
+      			, #{mail_id}					
+      			, #{mail_set_id}
+     		<if test="mail_tit != null">				
+      			, #{mail_tit}
+      		</if>
+      		<if test="mail_cont != null">
+      			, #{mail_cont}					
+      		</if>
+      		<if test="to_nm != null">
+      			, #{to_nm}						
+      		</if>
+      		<if test="to_addr != null">
+      			, #{to_addr}					
+      		</if>
+    		<if test="from_nm != null">
+      			, #{from_nm}					
+      		</if>
+      		<if test="from_addr != null">
+      			, #{from_addr}					
+      		</if>
+      		<if test="snd_yn != null">
+      			, #{snd_yn}						
+      		</if>
+      		<if test="snd_dt != null">
+      			, #{snd_dt}						
+      		</if>
+      	</trim>
+	</insert>
+	
+	<select id="getMailById" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.SYS_ID
+			, A.MAIL_ID
+			, A.MAIL_SET_ID
+			, A.MAIL_TIT
+			, A.FROM_ADDR
+			, A.FROM_NM
+			, A.TO_ADDR
+			, A.TO_NM
+			, A.SND_DT
+			, A.SND_YN
+			, A.REG_ID
+			, A.REG_DT
+			, B.SND_CLS	
+			
+		FROM ESAMAIL A
+	   INNER JOIN ESACFML B
+            ON A.MAIL_SET_ID = B.MAIL_SET_ID
+		
+		WHERE A.MAIL_ID = #{mail_id}
+	</select>		
+	
+	<update id="updateMailSendComplete" parameterType="java.util.Map">
+		UPDATE ESAMAIL
+			SET snd_yn = #{snd_yn}
+				, snd_dt = sysdate 
+		WHERE mail_id = #{MAIL_ID}	
+	</update>		
+	
+	<select id="getfcmToken" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT DFT.USER_AD,
+		               DFT.FCM_TOKEN,
+		               DFT.PLATFORM,
+		               ROW_NUMBER() OVER(ORDER BY DFT.LAST_UPDATE_DATE DESC) AS RN
+		          FROM DESM_FCM_TOKEN DFT
+		         WHERE DFT.USER_AD = #{TO_USER_AD})
+		 WHERE RN = 1 
+		   AND FCM_TOKEN IS NOT NULL 				
+	</select>	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	<select id="getStatusCardInfo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MYACCT_TRIP_ID AS JOBCODE, 
+			'출장 경비' AS INV_CAT, 
+			'국내 출장' AS INV_TYPE, 
+			TO_CHAR(A.REQUEST_DATE, 'YYYY-MM-DD') AS REQUEST_DATE, 
+			TRIP_NAME AS INV_DETAIL, STATUS,
+			NVL((SELECT DESCRIPTION FROM FND_LOOKUP_VALUES WHERE lookup_type = 'ZFIN_AP_MYACCT_STATUS' AND lookup_code = A.STATUS AND ROWNUM = 1), STATUS) AS STATUS_DISPLAY,
+			NVL(TO_CHAR((SELECT SUM(AMOUNT) FROM ZFIN_AP_MYACCT_TRIP_DETAIL B WHERE A.MYACCT_TRIP_ID = B.MYACCT_TRIP_ID), 'FM999,999,999'), '자가차량') AS AMOUNT 
+		FROM   zfin_ap_myacct_trip A
+		WHERE  1 = 1
+			<choose>
+				<when test='status == "OP_CONFIRMED"'>
+					AND  status IN ('OP_CONFIRMED', 'INVOICE_VALIDATED', 'ELEC_REQUESTED')
+				</when>
+				<otherwise>
+		    		AND status = #{status} 
+				</otherwise>
+			</choose>			
+			AND request_date BETWEEN TO_DATE(#{fromDate}, 'YYYY-MM-DD') AND TO_DATE(#{toDate}, 'YYYY-MM-DD')
+		  	AND UPPER(requestor_ad) = UPPER(#{userAD})
+		
+		UNION ALL          
+		SELECT MYACCT_INVOICE_ID AS JOBCODE, 
+			'일반 경비' AS INV_CAT, 
+			EXPENSE_TYPE AS INV_TYPE, 
+			TO_CHAR(B.REQUEST_DATE, 'YYYY-MM-DD') AS REQUEST_DATE, 
+			PURPOSE AS INV_DETAIL, 
+			STATUS,
+			NVL((SELECT DESCRIPTION FROM FND_LOOKUP_VALUES WHERE lookup_type = 'ZFIN_AP_MYACCT_STATUS' AND lookup_code = B.STATUS AND ROWNUM = 1), STATUS) AS STATUS_DISPLAY,
+			TO_CHAR(AMOUNT, 'FM999,999,999') AS  AMOUNT 
+		FROM   zfin_ap_myacct_invoices  B        
+		WHERE  1 = 1
+			<choose>
+				<when test='status == "OP_CONFIRMED"'>
+					AND  status IN ('OP_CONFIRMED', 'INVOICE_VALIDATED', 'ELEC_REQUESTED')
+				</when>
+				<otherwise>
+		    		AND status = #{status} 
+				</otherwise>
+			</choose>	
+			AND request_date BETWEEN TO_DATE(#{fromDate}, 'YYYY-MM-DD') AND TO_DATE(#{toDate}, 'YYYY-MM-DD')
+		  	AND UPPER(requestor_ad) = UPPER(#{userAD})
+		  	ORDER BY 4 DESC
+	</select>	
+	
+	<select id="getMyRequestInfo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MYACCT_TRIP_ID AS JOBCODE, 
+			'출장 경비' AS INV_CAT, 
+			'국내 출장' AS INV_TYPE, 
+			TO_CHAR(A.REQUEST_DATE, 'YYYY-MM-DD') AS REQUEST_DATE, 
+			TRIP_NAME AS INV_DETAIL, 
+			(SELECT SUM(amount) FROM zfin_ap_myacct_trip_detail WHERE myacct_trip_id = A.myacct_trip_id) AMOUNT,
+			STATUS,
+			NVL((SELECT DESCRIPTION FROM FND_LOOKUP_VALUES WHERE lookup_type = 'ZFIN_AP_MYACCT_STATUS' AND lookup_code = A.STATUS AND ROWNUM = 1), STATUS) AS STATUS_DISPLAY 
+		FROM   zfin_ap_myacct_trip A
+		WHERE  1 = 1
+			AND request_date BETWEEN TO_DATE(#{fromDate}, 'YYYY-MM-DD') AND TO_DATE(#{toDate}, 'YYYY-MM-DD')
+		  	AND UPPER(requestor_ad) = UPPER(#{userAD})
+		
+		UNION ALL          
+		SELECT MYACCT_INVOICE_ID AS JOBCODE, 
+			'일반 경비' AS INV_CAT, 
+			EXPENSE_TYPE AS INV_TYPE, 
+			TO_CHAR(B.REQUEST_DATE, 'YYYY-MM-DD') AS REQUEST_DATE, 
+			PURPOSE AS INV_DETAIL, 
+			AMOUNT,
+			STATUS,
+			NVL((SELECT DESCRIPTION FROM FND_LOOKUP_VALUES WHERE lookup_type = 'ZFIN_AP_MYACCT_STATUS' AND lookup_code = B.STATUS AND ROWNUM = 1), STATUS) AS STATUS_DISPLAY 
+		FROM   zfin_ap_myacct_invoices  B        
+		WHERE  1 = 1
+			AND request_date BETWEEN TO_DATE(#{fromDate}, 'YYYY-MM-DD') AND TO_DATE(#{toDate}, 'YYYY-MM-DD')
+		  	AND UPPER(requestor_ad) = UPPER(#{userAD})
+		  	
+		ORDER BY REQUEST_DATE DESC
+	</select>	
+	
+	<!-- NOTICE - List & Detail -->
+	<select id="getNotice" parameterType="java.util.Map" resultType="java.util.HashMap">	
+	    SELECT N.NOTICE_ID, 
+	      N.TITLE, 
+	      --CASE WHEN (U1.USER_NAME IS NULL) THEN N.CREATED_BY ELSE U1.USER_NAME END AS CREATED_BY,
+	      --CASE WHEN (U2.USER_NAME IS NULL) THEN N.CREATED_BY ELSE U2.USER_NAME END AS LAST_UPDATED_BY,
+	      N.CREATED_BY,
+	      N.LAST_UPDATED_BY,
+	      TO_CHAR(N.CREATION_DATE, 'YYYY-MM-DD') AS CREATION_DATE, 
+	      TO_CHAR(N.LAST_UPDATE_DATE, 'YYYY-MM-DD') AS LAST_UPDATE_DATE,
+	      FILE_GRP_CD,
+	        (SELECT COUNT(*)
+	           FROM ESAATTH
+	          WHERE SYS_ID = 'EMRO'
+	            AND GRP_CD = N.FILE_GRP_CD
+		          AND STS  !=  'D') AS ATT_CNT	      
+	    FROM DESM_NOTICE N,
+	         DESM_USER U1,
+	         DESM_USER U2 
+	    WHERE N.CREATED_BY = U1.USER_AD
+	      AND N.LAST_UPDATED_BY = U2.USER_AD    
+		<if test='jobCode == null or jobCode == ""'>
+	      AND (N.ATTRIBUTE2 IS NULL OR N.ATTRIBUTE2  <![CDATA[<>]]>  'Y')
+		</if>	
+		<if test='jobCode != ""'>
+			AND N.NOTICE_ID = #{jobCode}         
+		</if>	
+	    ORDER BY N.TITLE		
+	</select>		
+
+	<!-- NOTICE - CONTENTS 조회 -->
+	<resultMap type="HashMap" id="CONTENTS_CLOB">
+		<result property="CONTENTS" column="CONTENTS" jdbcType="CLOB" javaType="java.lang.String" />
+	</resultMap>
+	<select id="getNoticeContents" parameterType="java.util.Map" resultType="java.util.HashMap" resultMap="CONTENTS_CLOB">
+		SELECT CONTENTS 
+		FROM DESM_NOTICE
+		WHERE NOTICE_ID = #{jobCode}         
+	</select>	
+	
+	<!-- 전표 첨부파일 - 목록 조회 -->
+	<select id="selectInvoiceAttach" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT * FROM ZFIN_AP_MYACCT_FILE 
+		WHERE 1=1 AND FLAG_DEL = 'N'
+	        <if test="idx != null">
+				AND FILE_IDX = #{idx}
+			</if>
+	        <if test="jobCode != null">
+				AND JOB_CODE = #{jobCode} 
+			</if>
+	        <if test="code != null">
+				AND FILE_CODE = #{code}
+			</if>
+	        <if test="category != null">
+				AND FILE_CATEGORY = #{category}
+			</if>			
+		ORDER BY FILE_CODE
+	</select>	
+	
+	<!-- NOTICE - List & Detail -->
+	<select id="getRealTimeNotice" parameterType="java.util.Map" resultType="java.util.HashMap">	
+	    SELECT *
+		FROM (
+		  SELECT N.NOTICE_ID, N.TITLE, N.FILE_GRP_CD, N.ATTRIBUTE2
+		  FROM DESM_NOTICE N
+		  WHERE N.ATTRIBUTE2 = 'Y'
+		  ORDER BY N.NOTICE_ID DESC
+		)
+		WHERE ROWNUM <![CDATA[<=]]> 3	
+	</select>		
+	
+	<!-- 부서정보 조회 - 자동완성 -->
+    <select id="getOrgList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		<if test="keyword != null">
+			SELECT IHO.ORG_ID,
+					IHO.ORG_NM,
+					NVL(IHE.NAME, ' ')					AS LEADER_NM,
+					NVL(IHE.TITLE, ' ')						AS LEADER_JIKWI,
+					NVL(IHO.LEADER_AD_USER_ID, ' ')			AS LEADER_AD,
+					NVL((SELECT ORG_NM FROM INF_HVERP_ORG@erp_int_l3 WHERE ORG_ID = IHO.BG_ID AND ROWNUM = 1), ' ') AS BG_NAME
+			FROM INF_HVERP_ORG@erp_int_l3 IHO
+				LEFT OUTER JOIN inf_hverp_employee@erp_int_l3 IHE ON IHO.LEADER_AD_USER_ID = IHE.AD_USER_ID AND IHE.STATUS IN ('재직', '휴직')
+		    WHERE 1=1 
+	    		AND (UPPER(IHO.ORG_ID) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(IHO.ORG_NM) LIKE '%' || UPPER(#{keyword}) || '%' )
+		</if>
+	</select>
+	
+	<!-- 임직원정보 조회(전체사용자에서 검색) - 자동완성 -->
+    <select id="getAllUserList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		<if test="keyword != null">
+		  SELECT IHE.AD_USER_ID             AS USER_ID
+				,NVL(IHE.NAME,' ')        	AS USER_NAME 
+				,NVL(IHE.TITLE,' ')      AS POS_TYPE
+				,NVL(IHE.EMAIL,' ')         AS EMAIL_ADDRESS
+				,NVL(IHE.DEF,' ')   		AS DEPARTMENT_ID 
+				,NVL(IHO.ORG_NM,' ')        AS DEPARTMENT_NAME 
+	 			,NVL(IHO.LEADER_AD_USER_ID,' ')		AS LEADER_AD
+				,NVL((SELECT NAME FROM INF_HVERP_EMPLOYEE@erp_int_l3 WHERE AD_USER_ID = IHO.LEADER_AD_USER_ID),' ') AS LEADER_NAME
+			from INF_HVERP_EMPLOYEE@erp_int_l3 IHE
+				LEFT OUTER JOIN INF_HVERP_ORG@erp_int_l3 IHO ON IHO.ORG_ID = IHE.DEF
+	       WHERE 1=1  AND IHE.STATUS IN ('재직', '휴직')	
+	       		AND (UPPER(IHE.AD_USER_ID) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(IHE.NAME) LIKE '%' ||  UPPER(#{keyword}) || '%')
+	 	</if>
+	</select>	
+	
+	<!-- NOTICE update -->
+	<insert id="insertNotice" parameterType="java.util.Map">
+		MERGE INTO DESM_NOTICE
+			USING DUAL
+			ON (NOTICE_ID = #{jobCode})
+			WHEN MATCHED THEN
+				UPDATE SET
+					TITLE = #{title},
+					CONTENTS = #{contents},
+					FILE_GRP_CD = #{FILE_GRP_CD},
+					LAST_UPDATED_BY = #{USER_AD},
+					LAST_UPDATE_LOGIN = #{USER_AD},
+					LAST_UPDATE_DATE = SYSDATE
+			        <if test="isRealTime != null">
+						, ATTRIBUTE2 = #{isRealTime}
+					</if>
+			WHEN NOT MATCHED THEN
+				INSERT (
+					NOTICE_ID, 	TITLE, 				CONTENTS, 		
+					CREATED_BY, 		CREATION_DATE,		LAST_UPDATED_BY, 	LAST_UPDATE_DATE, LAST_UPDATE_LOGIN,
+					FILE_GRP_CD
+			        <if test="isRealTime != null">
+						, ATTRIBUTE2
+					</if>
+				) VALUES (
+					DESM_NOTICE_S.NEXTVAL,
+					#{title},
+					#{contents},
+
+					#{USER_AD},
+					SYSDATE,
+					#{USER_AD},
+					SYSDATE,
+					#{USER_AD},
+					#{FILE_GRP_CD}
+			        <if test="isRealTime != null">
+						,#{isRealTime}
+					</if>
+				)
+	</insert>
+	
+	<delete id="deleteNotice" parameterType="java.util.Map">
+		DELETE FROM DESM_NOTICE
+		WHERE NOTICE_ID = #{jobCode}
+	</delete>	
+	
+	<insert id="saveDesmServiceLog" parameterType="java.util.Map">
+		INSERT INTO DESM_SERVICE_LOG
+		(NAME
+		,USER_AD)
+		VALUES
+		(#{NAME}
+		,#{USER_AD})
+	</insert>	
+		
+	<select id="getIsSubon" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_AD
+        ,      'Y' AS SUBCON_YN
+        FROM DESM_USER DU
+        ,    DESM_ROLE DR
+        ,    DESM_USER_ROLE DUR
+        WHERE 1=1
+        AND DU.USER_AD = DUR.USER_AD
+        AND DR.ROLE_SEQ = DUR.ROLE_SEQ
+        AND DR.ROLE_NAME = 'SubconUser'
+        AND DU.USER_AD = #{USER_AD}
+	</select>
+	
+	<select id="getRedirectLang" parameterType="java.util.Map" resultType="string">
+		SELECT CASE WHEN NVL(DU.LANG, 'ko') = 'en' THEN 'en'
+                    WHEN NVL(DUDC.COUNTRY_CODE, 'South Korea') = 'South Korea' THEN 'ko'
+                    WHEN INSTR(NVL(DU.MAIL, 'A@A.A'), '@doosan.com') > 0 THEN 'ko'
+                    ELSE 'en'
+               END AS LANG
+        FROM DESM_USER DU
+        ,    DESM_USER_DEFAULT_COUNTRY DUDC
+        WHERE DU.USER_AD = DUDC.USER_AD(+)
+        AND DU.USER_AD = #{USER_ID}
+	</select>
+</mapper>

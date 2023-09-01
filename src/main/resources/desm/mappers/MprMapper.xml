@@ -1,0 +1,3844 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="MprMapper">
+
+	<update id="saveDesmMprSetupDate" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_SETUP_DATE A
+		USING DUAL
+		ON (A.PO_NO = #{PO_NO} AND A.MPR_NO = #{MPR_NO})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.START_MONTH = #{START_MONTH},
+		     A.END_MONTH = #{END_MONTH},
+		     A.STATUS = 'Incomplete',
+		     A.SUBMISSION_PERIOD = #{SUBMISSION_PERIOD},
+		     A.SUBMISSION_PERIOD_MONTH = #{SUBMISSION_PERIOD_MONTH},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PO_NO
+		     ,A.MPR_NO
+		     ,A.START_MONTH
+		     ,A.END_MONTH
+		     ,A.STATUS
+		     ,A.SUBMISSION_PERIOD
+		     ,A.SUBMISSION_PERIOD_MONTH
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{PO_NO}
+		     ,#{MPR_NO}
+		     ,#{START_MONTH}
+		     ,#{END_MONTH}
+		     ,'Incomplete'
+		     ,#{SUBMISSION_PERIOD}
+		     ,#{SUBMISSION_PERIOD_MONTH}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprSetupDate" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT CASE WHEN DMSD.START_MONTH IS NULL THEN TO_CHAR(DPHI.CREATION_DATE, 'YYYY/MM') ELSE DMSD.START_MONTH END AS START_MONTH,
+		       CASE WHEN DMSD.START_MONTH IS NULL THEN TO_CHAR(ADD_MONTHS(DPHI.CREATION_DATE, 36) , 'YYYY/MM') ELSE DMSD.END_MONTH END AS END_MONTH,
+		       DMSD.PRODUCT_NAME
+		  FROM DESM_PO_HEADER_INT DPHI,
+		       DESM_MPR_SETUP_DATE DMSD
+		 WHERE DPHI.PO_NO = DMSD.PO_NO(+)
+		   AND DPHI.PO_NO = #{PO_NO}
+		   AND DMSD.MPR_NO(+) = #{MPR_NO}
+	</select>
+
+	<select id="getDesmMprSetupColDataList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.START_MONTH,
+		       A.END_MONTH,
+		       TO_CHAR(ADD_MONTHS(TO_DATE(A.START_MONTH || '/01','YYYY/MM/DD'), B.LV), 'YYYY') AS YYYY,
+		       TO_CHAR(ADD_MONTHS(TO_DATE(A.START_MONTH || '/01','YYYY/MM/DD'), B.LV), 'YY') AS YY,
+		       TO_CHAR(ADD_MONTHS(TO_DATE(A.START_MONTH || '/01','YYYY/MM/DD'), B.LV), 'MM') AS MM,
+		       TO_CHAR(ADD_MONTHS(TO_DATE(A.START_MONTH || '/01','YYYY/MM/DD'), B.LV), 'YYYY') || '_' || TO_CHAR(ADD_MONTHS(TO_DATE(A.START_MONTH || '/01','YYYY/MM/DD'), B.LV), 'MM') AS COL_NAME
+		  FROM DESM_MPR_SETUP_DATE A,
+		       (SELECT LEVEL - 1 AS LV
+		          FROM DUAL
+		        CONNECT BY LEVEL BETWEEN 0 AND (SELECT NVL(MAX(MONTHS_BETWEEN(TO_DATE(A.END_MONTH || '/01','YYYY/MM/DD'), TO_DATE(A.START_MONTH || '/01', 'YYYY/MM/DD'))) + 1, 0) AS MONTH_CNT
+		                                          FROM DESM_MPR_SETUP_DATE A
+		                                         WHERE A.PO_NO = #{PO_NO}
+		                                           AND A.MPR_NO = #{MPR_NO})) B
+		 WHERE A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+	</select>
+
+	<select id="getDesmMprSetupDataList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  ,'MPR Submission period' AS TYPE_NAME
+		  ,0 AS TYPE_RN
+		  ,'NN' AS GUBUN_CODE
+		  ,'MPR Submission period' AS GUBUN_NAME
+		  ,0 AS GUBUN_RN
+		  ,'NN' AS V_TYPE_CODE
+		  ,'NN' AS V_GUBUN_CODE
+
+		<foreach collection="colList" item="item" separator="" open="" close="">
+			,NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		</foreach>
+
+		  ,'' AS REMARK
+		  ,0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+			SELECT SD.*,
+			       VD.*,
+			       DMSR.REMARK,
+			       TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+			  FROM (SELECT T.TYPE_CODE,
+			               T.TYPE_NAME,
+			               T.TYPE_RN,
+			               G.GUBUN_CODE,
+			               G.GUBUN_NAME,
+			               G.GUBUN_RN
+			          FROM (SELECT MST_CODE,
+			                       DTL_CODE AS TYPE_CODE,
+			                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                  FROM DESM_CODE_DTL
+			                 WHERE MST_CODE = 'M001'
+			                   AND DELEGATE_FLAG = 'N') T,
+			                ( SELECT MST_CODE,
+			                         DTL_CODE AS GUBUN_CODE,
+			                         CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                              WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+			                         ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+			                    FROM DESM_CODE_DTL
+			                   WHERE MST_CODE = 'M002'
+			                     AND DELEGATE_FLAG = 'N') G) SD,
+			         (
+			         	SELECT V_TYPE_CODE
+			                ,V_GUBUN_CODE
+
+						<foreach collection="colList" item="item" separator="" open="" close="">
+							,TO_CHAR(MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END)) AS "${item.COL_NAME}"
+						</foreach>
+
+			            FROM (SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+	                                 DMSD.GUBUN_CODE AS V_GUBUN_CODE,
+	                                 DMSD.YYYY,
+	                                 DMSD.MM,
+	                                 TRUNC(DMSD.VAL / 100, 2) AS VAL
+	                            FROM DESM_MPR_SETUP_DATA DMSD
+	                           WHERE PO_NO = #{PO_NO}
+	                             AND MPR_NO = #{MPR_NO})
+			          GROUP BY V_TYPE_CODE, V_GUBUN_CODE) VD,
+			          DESM_MPR_SETUP_REMARK DMSR
+			 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+			   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+		       AND DMSR.PO_NO(+) = #{PO_NO}
+		       AND DMSR.MPR_NO(+) = #{MPR_NO}
+			ORDER BY SD.TYPE_RN, SD.GUBUN_RN
+		)
+	</select>
+
+	<select id="getDesmMprSetupDataListNew" parameterType="java.util.Map" resultType="java.util.HashMap">
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  , 'MPR Submission period' AS TYPE_NAME
+		  , 0 AS TYPE_RN
+		  , '' AS TYPE_SUB_CODE
+		  , '' AS TYPE_SUB_NAME
+		  , 1 AS TYPE_SUB_RN
+		  , 'NN' AS GUBUN_CODE
+		  , 'MPR Submission period' AS GUBUN_NAME
+		  , 0 AS GUBUN_RN
+		  , '' AS GUBUN_SUB_CODE
+		  , '' AS GUBUN_SUB_NAME
+		  , 1 AS GUBUN_SUB_RN
+		  , 'NN' AS V_TYPE_CODE
+		  , 'NN' AS V_GUBUN_CODE
+	      , 'NN' AS V_TYPE_SUB_CODE
+	      , 'NN' AS V_GUBUN_SUB_CODE
+
+		  <foreach collection="colList" item="item" separator="" open="" close="">
+		  	, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		  </foreach>
+
+		  , '' AS REMARK
+		  , 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+		    SELECT
+		      SD.*,
+		      VD.*,
+		      DMSR.REMARK,
+		      TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+		    FROM (
+		          SELECT T.TYPE_CODE,
+		                T.TYPE_NAME,
+		                T.TYPE_RN,
+		                'NN' AS TYPE_SUB_CODE,
+		                '' AS TYPE_SUB_NAME,
+		                999 AS TYPE_SUB_RN,
+		                G.GUBUN_CODE,
+		                G.GUBUN_NAME,
+		                G.GUBUN_RN,
+		                'NN' AS GUBUN_SUB_CODE,
+		                '' AS GUBUN_SUB_NAME,
+		                999 AS GUBUN_SUB_RN
+		          FROM (
+		                 SELECT MST_CODE,
+		                        DTL_CODE AS TYPE_CODE,
+		                        CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                             WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                        ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                FROM DESM_CODE_DTL
+		                WHERE MST_CODE = 'M001'
+		                AND DELEGATE_FLAG = 'N'
+		              ) T,
+		              (
+		                SELECT MST_CODE,
+		                       DTL_CODE AS GUBUN_CODE,
+		                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+		                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+		                FROM DESM_CODE_DTL
+		                WHERE MST_CODE = 'M002'
+		                      AND DELEGATE_FLAG = 'N'
+		              ) G
+		         UNION
+		         SELECT
+		                 T.TYPE_CODE,
+		                 T.TYPE_NAME,
+		                 T.TYPE_RN,
+		                 G.TYPE_SUB_CODE,
+		                 G.TYPE_SUB_NAME,
+		                 G.TYPE_SUB_RN,
+		                 'NN' AS GUBUN_CODE,
+		                 '' AS GUBUN_NAME,
+		                 999 AS GUBUN_RN,
+		                 G.GUBUN_SUB_CODE,
+		                 G.GUBUN_SUB_NAME,
+		                 G.GUBUN_SUB_RN
+		         FROM (
+		               SELECT MST_CODE,
+		                    DTL_CODE AS TYPE_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                  FROM DESM_CODE_DTL
+		                  WHERE MST_CODE = 'M001'
+		                    AND DELEGATE_FLAG = 'N'
+		              ) T,
+		              (
+		               SELECT
+		                    A.TYPE_SUB_CODE,
+		                    A.TYPE_SUB_NAME,
+		                    A.TYPE_SUB_RN,
+		                    B.GUBUN_SUB_CODE,
+		                    B.GUBUN_SUB_NAME,
+		                    B.GUBUN_SUB_RN,
+		                    A.TYPE_CODE
+		                  FROM
+		                  (
+		                    SELECT MST_CODE,
+		                    DTL_CODE AS TYPE_SUB_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_SUB_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_SUB_RN,
+		                    ATTRIBUTE1 AS TYPE_CODE
+		                    FROM DESM_CODE_DTL
+		                    WHERE MST_CODE = 'M006'
+		                    AND DELEGATE_FLAG = 'N'
+		                  ) A,
+		                  (
+		                    SELECT MST_CODE,
+		                    DTL_CODE AS GUBUN_SUB_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_SUB_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_SUB_RN
+		                    FROM DESM_CODE_DTL
+		                    WHERE MST_CODE = 'M007'
+		                    AND DELEGATE_FLAG = 'N'
+		                  ) B
+		              ) G
+		         WHERE T.TYPE_CODE = G.TYPE_CODE
+		    ) SD,
+		    (
+		      SELECT V_TYPE_CODE
+		             ,V_GUBUN_CODE
+		             ,V_TYPE_SUB_CODE
+		             ,V_GUBUN_SUB_CODE
+
+					<foreach collection="colList" item="item" separator="" open="" close="">
+						,TO_CHAR(MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END)) AS "${item.COL_NAME}"
+					</foreach>
+
+		      FROM (
+		           SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+		                  NVL(TRIM(DMSD.GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+		                  NVL(DMSD.TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+		                  NVL(DMSD.GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+		                  DMSD.YYYY,
+		                  DMSD.MM,
+		                  CASE WHEN NVL(DMSD.GUBUN_CODE, ' ') = ' ' OR DMSD.GUBUN_CODE = 'NN' THEN DMSD.VAL_SUB
+		                       ELSE TO_CHAR(TRUNC(DMSD.VAL / 100, 2)) END AS VAL
+		           FROM DESM_MPR_SETUP_DATA DMSD
+                   WHERE PO_NO = #{PO_NO}
+                     AND MPR_NO = #{MPR_NO})
+		           GROUP BY V_TYPE_CODE, V_GUBUN_CODE, V_TYPE_SUB_CODE, V_GUBUN_SUB_CODE
+		    ) VD,
+	        (
+	          SELECT TYPE_CODE, GUBUN_CODE, TYPE_SUB_CODE, GUBUN_SUB_CODE, REMARK, WEIGHT
+	          FROM DESM_MPR_SETUP_REMARK
+	          WHERE PO_NO = #{PO_NO}
+	               AND MPR_NO = #{MPR_NO}
+	        ) DMSR
+		    WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+		      AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		      AND SD.TYPE_SUB_CODE = VD.V_TYPE_SUB_CODE(+)
+		      AND SD.GUBUN_SUB_CODE = VD.V_GUBUN_SUB_CODE(+)
+		      AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		      AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+	          AND SD.TYPE_SUB_CODE = DMSR.TYPE_SUB_CODE(+)
+	          AND SD.GUBUN_SUB_CODE = DMSR.GUBUN_SUB_CODE(+)
+		    ORDER BY SD.TYPE_RN, SD.GUBUN_RN, SD.TYPE_SUB_RN, SD.GUBUN_SUB_RN
+		)
+	</select>
+
+	<select id="getDesmMprFirstSetupDataList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprFirstSetupDataListNew : MPR 생성 그리드 수정 */
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  , 'MPR Submission period' AS TYPE_NAME
+		  , 0 AS TYPE_RN
+		  , 'NN' AS GUBUN_CODE
+		  , 'MPR Submission period' AS GUBUN_NAME
+		  , 0 AS GUBUN_RN
+		  , 'NN' AS V_TYPE_CODE
+		  , 'NN' AS V_GUBUN_CODE
+
+		  <foreach collection="colList" item="item" separator="" open="" close="">
+		  	, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		  </foreach>
+
+		  , '' AS REMARK
+		  , 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+			SELECT SD.*,
+			       VD.*,
+			       DMSR.REMARK,
+			       TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+			  FROM (SELECT T.TYPE_CODE,
+			               T.TYPE_NAME,
+			               T.TYPE_RN,
+			               G.GUBUN_CODE,
+			               G.GUBUN_NAME,
+			               G.GUBUN_RN
+			          FROM (SELECT MST_CODE,
+			                       DTL_CODE AS TYPE_CODE,
+			                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                  FROM DESM_CODE_DTL
+			                 WHERE MST_CODE = 'M001'
+			                   AND DELEGATE_FLAG = 'N') T,
+			                ( SELECT MST_CODE,
+			                         DTL_CODE AS GUBUN_CODE,
+			                         CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                              WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+			                         ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+			                    FROM DESM_CODE_DTL
+			                   WHERE MST_CODE = 'M002'
+			                     AND DELEGATE_FLAG = 'N') G) SD,
+			         (
+			         	SELECT V_TYPE_CODE
+			                ,V_GUBUN_CODE
+
+						<foreach collection="colList" item="item" separator="" open="" close="">
+							,TO_CHAR(MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END)) AS "${item.COL_NAME}"
+						</foreach>
+
+			            FROM (SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+	                                 DMSD.GUBUN_CODE AS V_GUBUN_CODE,
+	                                 DMSD.YYYY,
+	                                 DMSD.MM,
+	                                 TRUNC(DMSD.VAL / 100, 2) AS VAL
+	                            FROM DESM_MPR_SETUP_DATA DMSD
+	                           WHERE PO_NO = #{PO_NO}
+	                             AND MPR_NO = #{MPR_NO})
+			          GROUP BY V_TYPE_CODE, V_GUBUN_CODE) VD,
+			          DESM_MPR_SETUP_REMARK DMSR
+			 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+			   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+		       AND DMSR.PO_NO(+) = #{PO_NO}
+		       AND DMSR.MPR_NO(+) = #{MPR_NO}
+			ORDER BY SD.TYPE_RN, SD.GUBUN_RN
+		)
+	</select>
+
+	<select id="getDesmMprFirstSetupDataList_origin" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		FROM (
+			SELECT SD.*,
+			       VD.*,
+			       DMSR.REMARK,
+			       TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+			  FROM (SELECT T.TYPE_CODE,
+			               T.TYPE_NAME,
+			               T.TYPE_RN,
+			               G.GUBUN_CODE,
+			               G.GUBUN_NAME,
+			               G.GUBUN_RN
+			          FROM (SELECT MST_CODE,
+			                       DTL_CODE AS TYPE_CODE,
+			                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                  FROM DESM_CODE_DTL
+			                 WHERE MST_CODE = 'M001'
+			                   AND DELEGATE_FLAG = 'N') T,
+			                ( SELECT MST_CODE,
+			                         DTL_CODE AS GUBUN_CODE,
+			                         CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                              WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+			                         ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+			                    FROM DESM_CODE_DTL
+			                   WHERE MST_CODE = 'M002'
+			                     AND DELEGATE_FLAG = 'N') G) SD,
+			         (
+			         	SELECT V_TYPE_CODE
+			                ,V_GUBUN_CODE
+
+						<foreach collection="colList" item="item" separator="" open="" close="">
+							,TO_CHAR(MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END)) AS "${item.COL_NAME}"
+						</foreach>
+
+			            FROM (SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+	                                 DMSD.GUBUN_CODE AS V_GUBUN_CODE,
+	                                 DMSD.YYYY,
+	                                 DMSD.MM,
+	                                 TRUNC(DMSD.VAL / 100, 2) AS VAL
+	                            FROM DESM_MPR_SETUP_DATA DMSD
+	                           WHERE PO_NO = #{PO_NO}
+	                             AND MPR_NO = #{MPR_NO})
+			          GROUP BY V_TYPE_CODE, V_GUBUN_CODE) VD,
+			          DESM_MPR_SETUP_REMARK DMSR
+			 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+			   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+		       AND DMSR.PO_NO(+) = #{PO_NO}
+		       AND DMSR.MPR_NO(+) = #{MPR_NO}
+			ORDER BY SD.TYPE_RN, SD.GUBUN_RN
+		)
+	</select>
+
+	<select id="getDesmMprFirstSetupDataListNew_230712" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprFirstSetupDataListNew : MPR 생성 그리드 수정 */
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  , 'MPR Submission period' AS TYPE_NAME
+		  , 0 AS TYPE_RN
+		  , '' AS TYPE_SUB_CODE
+		  , '' AS TYPE_SUB_NAME
+		  , 1 AS TYPE_SUB_RN
+		  , 'NN' AS GUBUN_CODE
+		  , 'MPR Submission period' AS GUBUN_NAME
+		  , 0 AS GUBUN_RN
+		  , '' AS GUBUN_SUB_CODE
+		  , '' AS GUBUN_SUB_NAME
+		  , 1 AS GUBUN_SUB_RN
+		  , 'NN' AS V_TYPE_CODE
+		  , 'NN' AS V_GUBUN_CODE
+	      , 'NN' AS V_TYPE_SUB_CODE
+	      , 'NN' AS V_GUBUN_SUB_CODE
+
+		  <foreach collection="colList" item="item" separator="" open="" close="">
+		  	, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		  </foreach>
+
+		  , '' AS REMARK
+		  , 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+		    SELECT
+		      SD.*,
+		      VD.*,
+		      DMSR.REMARK,
+		      TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+		    FROM (
+		          SELECT T.TYPE_CODE,
+		                T.TYPE_NAME,
+		                T.TYPE_RN,
+		                'NN' AS TYPE_SUB_CODE,
+		                '' AS TYPE_SUB_NAME,
+		                999 AS TYPE_SUB_RN,
+		                G.GUBUN_CODE,
+		                G.GUBUN_NAME,
+		                G.GUBUN_RN,
+		                'NN' AS GUBUN_SUB_CODE,
+		                '' AS GUBUN_SUB_NAME,
+		                999 AS GUBUN_SUB_RN
+		          FROM (
+		                 SELECT MST_CODE,
+		                        DTL_CODE AS TYPE_CODE,
+		                        CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                             WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                        ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                FROM DESM_CODE_DTL
+		                WHERE MST_CODE = 'M001'
+		                AND DELEGATE_FLAG = 'N'
+		              ) T,
+		              (
+		                SELECT MST_CODE,
+		                       DTL_CODE AS GUBUN_CODE,
+		                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+		                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+		                FROM DESM_CODE_DTL
+		                WHERE MST_CODE = 'M002'
+		                      AND DELEGATE_FLAG = 'N'
+		              ) G
+		         UNION
+		         SELECT
+		                 T.TYPE_CODE,
+		                 T.TYPE_NAME,
+		                 T.TYPE_RN,
+		                 G.TYPE_SUB_CODE,
+		                 G.TYPE_SUB_NAME,
+		                 G.TYPE_SUB_RN,
+		                 'NN' AS GUBUN_CODE,
+		                 '' AS GUBUN_NAME,
+		                 999 AS GUBUN_RN,
+		                 G.GUBUN_SUB_CODE,
+		                 G.GUBUN_SUB_NAME,
+		                 G.GUBUN_SUB_RN
+		         FROM (
+		               SELECT MST_CODE,
+		                    DTL_CODE AS TYPE_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                  FROM DESM_CODE_DTL
+		                  WHERE MST_CODE = 'M001'
+		                    AND DELEGATE_FLAG = 'N'
+		              ) T,
+		              (
+		               SELECT
+		                    A.TYPE_SUB_CODE,
+		                    A.TYPE_SUB_NAME,
+		                    A.TYPE_SUB_RN,
+		                    B.GUBUN_SUB_CODE,
+		                    B.GUBUN_SUB_NAME,
+		                    B.GUBUN_SUB_RN,
+		                    A.TYPE_CODE
+		                  FROM
+		                  (
+		                    SELECT MST_CODE,
+		                    DTL_CODE AS TYPE_SUB_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_SUB_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_SUB_RN,
+		                    ATTRIBUTE1 AS TYPE_CODE
+		                    FROM DESM_CODE_DTL
+		                    WHERE MST_CODE = 'M006'
+		                    AND DELEGATE_FLAG = 'N'
+		                  ) A,
+		                  (
+		                    SELECT MST_CODE,
+		                    DTL_CODE AS GUBUN_SUB_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_SUB_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_SUB_RN
+		                    FROM DESM_CODE_DTL
+		                    WHERE MST_CODE = 'M007'
+		                    AND DELEGATE_FLAG = 'N'
+		                  ) B
+		              ) G
+		         WHERE T.TYPE_CODE = G.TYPE_CODE
+		    ) SD,
+		    (
+		      SELECT 
+		          AA.V_TYPE_CODE
+		          , AA.V_GUBUN_CODE
+		          , AA.V_TYPE_SUB_CODE
+		          , AA.V_GUBUN_SUB_CODE
+
+					<foreach collection="colList" item="item" separator="" open="" close="">
+				        , TO_CHAR(MAX(CASE WHEN AA.YYYY = #{item.YYYY} AND AA.MM = #{item.MM} THEN DECODE(AA.V_GUBUN_CODE, 'NN', BB.VAL, AA.VAL) END)) AS "${item.COL_NAME}"
+					</foreach>
+
+		      FROM (
+		          SELECT TYPE_CODE AS V_TYPE_CODE,
+		          NVL(TRIM(GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+		          NVL(TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+		          NVL(GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+		          YYYY,
+		          MM,
+		          TO_CHAR(TRUNC(VAL / 100, 2)) AS VAL
+		          FROM DESM_MPR_DETAIL_PROGRESS
+		          WHERE MPR_SEQ = #{MPR_SEQ}
+		            AND GUBUN_CODE != 'P'
+		        ) AA,
+		        (
+		          SELECT
+		          V_TYPE_CODE
+		          , V_GUBUN_CODE
+		          , V_TYPE_SUB_CODE
+		          , V_GUBUN_SUB_CODE
+		          , YYYY
+		          , MM
+		          , COUNT(VAL) AS VAL
+		          FROM (
+		            SELECT 
+		               'B' AS V_TYPE_CODE
+		               , 'C' AS V_TYPE_SUB_CODE
+		               , 'NN' AS V_GUBUN_CODE
+		               , DECODE(INFO, 'PO_PLAN', 'P', 'PO_ACTUAL', 'R') AS V_GUBUN_SUB_CODE
+		               , TO_CHAR(VALUE, 'YYYY') AS YYYY
+		               , TO_CHAR(VALUE, 'MM') AS MM
+		               , TO_CHAR(VALUE) AS VAL
+		            FROM (
+		              SELECT PROCURE_SEQ, INFO, VALUE
+		              FROM (
+		                SELECT PROCURE_SEQ, PO_PLAN, PO_ACTUAL
+		                FROM DESM_MPR_PROCURE
+		                WHERE MPR_SEQ = #{MPR_SEQ}
+		              )
+		              UNPIVOT ( VALUE FOR INFO IN (PO_PLAN, PO_ACTUAL))
+		            )
+		            UNION ALL
+		            SELECT 
+		               'E' AS V_TYPE_CODE
+		               , DECODE(INFO, 'SCHEDULE_PLAN', 'A', 'SCHEDULE_ACTUAL', 'A', 'APPROVAL_PLAN', 'B', 'APPROVAL_ACTUAL', 'B') AS V_TYPE_SUB_CODE
+		               , 'NN' AS V_GUBUN_CODE
+		               , DECODE(INFO, 'SCHEDULE_PLAN', 'P', 'SCHEDULE_ACTUAL', 'R', 'APPROVAL_PLAN', 'P', 'APPROVAL_ACTUAL', 'R') AS V_GUBUN_SUB_CODE
+		               , TO_CHAR(VALUE, 'YYYY') AS YYYY
+		               , TO_CHAR(VALUE, 'MM') AS MM
+		               , TO_CHAR(VALUE) AS VAL
+		            FROM (
+		              SELECT DESIGN_SEQ, INFO, VALUE
+		              FROM (
+		                SELECT DESIGN_SEQ, SCHEDULE_PLAN, SCHEDULE_ACTUAL, APPROVAL_PLAN, APPROVAL_ACTUAL
+		                FROM DESM_MPR_DESIGN
+		                WHERE MPR_SEQ = #{MPR_SEQ}
+		              )
+		              UNPIVOT ( VALUE FOR INFO IN (SCHEDULE_PLAN, SCHEDULE_ACTUAL, APPROVAL_PLAN, APPROVAL_ACTUAL))
+		            )
+		            UNION ALL
+		            SELECT 
+		               'P' AS V_TYPE_CODE
+		               , DECODE(TYPE, 'MFG/ASSEMBLY', 'D', 'FAT', 'E', 'CARGO READY', 'F') AS V_TYPE_SUB_CODE
+		               , 'NN' AS V_GUBUN_CODE
+		               , DECODE(INFO, 'SCHEDULE_PLAN', 'P', 'SCHEDULE_ACTUAL', 'R') AS V_GUBUN_SUB_CODE
+		               , TO_CHAR(VALUE, 'YYYY') AS YYYY
+		               , TO_CHAR(VALUE, 'MM') AS MM
+		               , TO_CHAR(VALUE) AS VAL
+		            FROM (
+		              SELECT MFG_SEQ, TYPE, INFO, VALUE
+		              FROM (
+		                SELECT MFG_SEQ, TYPE, SCHEDULE_PLAN, SCHEDULE_ACTUAL
+		                FROM DESM_MPR_MFG
+		                WHERE MPR_SEQ = #{MPR_SEQ}
+		              )
+		              UNPIVOT ( VALUE FOR INFO IN (SCHEDULE_PLAN, SCHEDULE_ACTUAL))
+		            )
+		          )
+		          GROUP BY V_TYPE_CODE, V_GUBUN_CODE, V_TYPE_SUB_CODE, V_GUBUN_SUB_CODE, YYYY, MM
+		        ) BB
+		        WHERE AA.V_TYPE_CODE = BB.V_TYPE_CODE(+)
+		              AND AA.V_TYPE_SUB_CODE = BB.V_TYPE_SUB_CODE(+)
+		              AND AA.V_GUBUN_CODE = BB.V_GUBUN_CODE(+)
+		              AND AA.V_GUBUN_SUB_CODE = BB.V_GUBUN_SUB_CODE(+)
+		              AND AA.YYYY = BB.YYYY(+)
+		              AND AA.MM = BB.MM(+)
+		        GROUP BY AA.V_TYPE_CODE, AA.V_GUBUN_CODE, AA.V_TYPE_SUB_CODE, AA.V_GUBUN_SUB_CODE
+		      ) VD,
+	          DESM_MPR_DETAIL_PROGRESS_REMARK DMDPR,
+	          DESM_MPR_SETUP_REMARK DMSR
+			 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+			   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		       AND SD.TYPE_SUB_CODE = VD.V_TYPE_SUB_CODE(+)
+		       AND SD.GUBUN_SUB_CODE = VD.V_GUBUN_SUB_CODE(+)
+		       AND SD.TYPE_CODE = DMDPR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMDPR.GUBUN_CODE(+)
+               AND SD.TYPE_SUB_CODE = DMDPR.TYPE_SUB_CODE(+)
+               AND SD.GUBUN_SUB_CODE = DMDPR.GUBUN_SUB_CODE(+)
+		       AND DMDPR.MPR_SEQ(+) = #{MPR_SEQ}
+		       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+               AND SD.TYPE_SUB_CODE = DMSR.TYPE_SUB_CODE(+)
+               AND SD.GUBUN_SUB_CODE = DMSR.GUBUN_SUB_CODE(+)
+		       AND DMSR.PO_NO(+) = #{PO_NO}
+		       AND DMSR.MPR_NO(+) = #{MPR_NO}
+		    ORDER BY SD.TYPE_RN, SD.GUBUN_RN, SD.TYPE_SUB_RN, SD.GUBUN_SUB_RN
+		)
+	</select>
+
+	<select id="getDesmMprFirstSetupDataListNew" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprFirstSetupDataListNew : MPR 생성 그리드 수정 */
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  , 'MPR Submission period' AS TYPE_NAME
+		  , 0 AS TYPE_RN
+		  , '' AS TYPE_SUB_CODE
+		  , '' AS TYPE_SUB_NAME
+		  , 1 AS TYPE_SUB_RN
+		  , 'NN' AS GUBUN_CODE
+		  , 'MPR Submission period' AS GUBUN_NAME
+		  , 0 AS GUBUN_RN
+		  , '' AS GUBUN_SUB_CODE
+		  , '' AS GUBUN_SUB_NAME
+		  , 1 AS GUBUN_SUB_RN
+		  , 'NN' AS V_TYPE_CODE
+		  , 'NN' AS V_GUBUN_CODE
+	      , 'NN' AS V_TYPE_SUB_CODE
+	      , 'NN' AS V_GUBUN_SUB_CODE
+
+		  <foreach collection="colList" item="item" separator="" open="" close="">
+		  	, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		  </foreach>
+
+		  , '' AS REMARK
+		  , 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+		    SELECT
+		      SD.*,
+		      VD.*,
+		      DMSR.REMARK,
+		      TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+		    FROM (
+		          SELECT T.TYPE_CODE,
+		                T.TYPE_NAME,
+		                T.TYPE_RN,
+		                'NN' AS TYPE_SUB_CODE,
+		                '' AS TYPE_SUB_NAME,
+		                999 AS TYPE_SUB_RN,
+		                G.GUBUN_CODE,
+		                G.GUBUN_NAME,
+		                G.GUBUN_RN,
+		                'NN' AS GUBUN_SUB_CODE,
+		                '' AS GUBUN_SUB_NAME,
+		                999 AS GUBUN_SUB_RN
+		          FROM (
+		                 SELECT MST_CODE,
+		                        DTL_CODE AS TYPE_CODE,
+		                        CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                             WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                        ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                FROM DESM_CODE_DTL
+		                WHERE MST_CODE = 'M001'
+		                AND DELEGATE_FLAG = 'N'
+		              ) T,
+		              (
+		                SELECT MST_CODE,
+		                       DTL_CODE AS GUBUN_CODE,
+		                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+		                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+		                FROM DESM_CODE_DTL
+		                WHERE MST_CODE = 'M002'
+		                      AND DELEGATE_FLAG = 'N'
+		              ) G
+		         UNION
+		         SELECT
+		                 T.TYPE_CODE,
+		                 T.TYPE_NAME,
+		                 T.TYPE_RN,
+		                 G.TYPE_SUB_CODE,
+		                 G.TYPE_SUB_NAME,
+		                 G.TYPE_SUB_RN,
+		                 'NN' AS GUBUN_CODE,
+		                 '' AS GUBUN_NAME,
+		                 999 AS GUBUN_RN,
+		                 G.GUBUN_SUB_CODE,
+		                 G.GUBUN_SUB_NAME,
+		                 G.GUBUN_SUB_RN
+		         FROM (
+		               SELECT MST_CODE,
+		                    DTL_CODE AS TYPE_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                  FROM DESM_CODE_DTL
+		                  WHERE MST_CODE = 'M001'
+		                    AND DELEGATE_FLAG = 'N'
+		              ) T,
+		              (
+		               SELECT
+		                    A.TYPE_SUB_CODE,
+		                    A.TYPE_SUB_NAME,
+		                    A.TYPE_SUB_RN,
+		                    B.GUBUN_SUB_CODE,
+		                    B.GUBUN_SUB_NAME,
+		                    B.GUBUN_SUB_RN,
+		                    A.TYPE_CODE
+		                  FROM
+		                  (
+		                    SELECT MST_CODE,
+		                    DTL_CODE AS TYPE_SUB_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_SUB_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_SUB_RN,
+		                    ATTRIBUTE1 AS TYPE_CODE
+		                    FROM DESM_CODE_DTL
+		                    WHERE MST_CODE = 'M006'
+		                    AND DELEGATE_FLAG = 'N'
+		                  ) A,
+		                  (
+		                    SELECT MST_CODE,
+		                    DTL_CODE AS GUBUN_SUB_CODE,
+		                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_SUB_NAME,
+		                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_SUB_RN
+		                    FROM DESM_CODE_DTL
+		                    WHERE MST_CODE = 'M007'
+		                    AND DELEGATE_FLAG = 'N'
+		                  ) B
+		              ) G
+		         WHERE T.TYPE_CODE = G.TYPE_CODE
+		    ) SD,
+		    (
+		      SELECT V_TYPE_CODE
+		             ,V_GUBUN_CODE
+		             ,V_TYPE_SUB_CODE
+		             ,V_GUBUN_SUB_CODE
+
+					<foreach collection="colList" item="item" separator="" open="" close="">
+						,TO_CHAR(MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END)) AS "${item.COL_NAME}"
+					</foreach>
+
+		      FROM (
+		           SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+		                  NVL(TRIM(DMSD.GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+		                  NVL(DMSD.TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+		                  NVL(DMSD.GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+		                  DMSD.YYYY,
+		                  DMSD.MM,
+		                  CASE WHEN NVL(DMSD.GUBUN_CODE, ' ') = ' ' OR DMSD.GUBUN_CODE = 'NN' THEN DMSD.VAL_SUB
+		                       ELSE TO_CHAR(TRUNC(DMSD.VAL / 100, 2)) END AS VAL
+		           FROM DESM_MPR_SETUP_DATA DMSD
+                   WHERE PO_NO = #{PO_NO}
+                     AND MPR_NO = #{MPR_NO})
+		           GROUP BY V_TYPE_CODE, V_GUBUN_CODE, V_TYPE_SUB_CODE, V_GUBUN_SUB_CODE
+		    ) VD,
+	        (
+	          SELECT TYPE_CODE, GUBUN_CODE, TYPE_SUB_CODE, GUBUN_SUB_CODE, REMARK, WEIGHT
+	          FROM DESM_MPR_SETUP_REMARK
+	          WHERE PO_NO = #{PO_NO}
+	               AND MPR_NO = #{MPR_NO}
+	        ) DMSR
+		    WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+		      AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		      AND SD.TYPE_SUB_CODE = VD.V_TYPE_SUB_CODE(+)
+		      AND SD.GUBUN_SUB_CODE = VD.V_GUBUN_SUB_CODE(+)
+		      AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		      AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+	          AND SD.TYPE_SUB_CODE = DMSR.TYPE_SUB_CODE(+)
+	          AND SD.GUBUN_SUB_CODE = DMSR.GUBUN_SUB_CODE(+)
+		    ORDER BY SD.TYPE_RN, SD.GUBUN_RN, SD.TYPE_SUB_RN, SD.GUBUN_SUB_RN
+		)
+	</select>
+
+	<select id="getDesmMprSetupDataList_230323" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT SD.*,
+		       VD.*,
+		       DMSR.REMARK,
+		       TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+		  FROM (SELECT T.TYPE_CODE,
+		               T.TYPE_NAME,
+		               T.TYPE_RN,
+		               G.GUBUN_CODE,
+		               G.GUBUN_NAME,
+		               G.GUBUN_RN
+		          FROM (SELECT MST_CODE,
+		                       DTL_CODE AS TYPE_CODE,
+		                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		                  FROM DESM_CODE_DTL
+		                 WHERE MST_CODE = 'M001'
+		                   AND DELEGATE_FLAG = 'N') T,
+		                ( SELECT MST_CODE,
+		                         DTL_CODE AS GUBUN_CODE,
+		                         CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                              WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+		                         ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+		                    FROM DESM_CODE_DTL
+		                   WHERE MST_CODE = 'M002'
+		                     AND DELEGATE_FLAG = 'N') G) SD,
+		         (SELECT V_TYPE_CODE
+		                ,V_GUBUN_CODE
+
+					<foreach collection="colList" item="item" separator="" open="" close="">
+						,MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END) AS "${item.COL_NAME}"
+					</foreach>
+
+		            FROM (SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+                                 DMSD.GUBUN_CODE AS V_GUBUN_CODE,
+                                 DMSD.YYYY,
+                                 DMSD.MM,
+                                 TRUNC(DMSD.VAL / 100, 2) AS VAL
+                            FROM DESM_MPR_SETUP_DATA DMSD
+                           WHERE PO_NO = #{PO_NO}
+                             AND MPR_NO = #{MPR_NO})
+		          GROUP BY V_TYPE_CODE, V_GUBUN_CODE) VD,
+		          DESM_MPR_SETUP_REMARK DMSR
+		 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+		   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+	       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+	       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+	       AND DMSR.PO_NO(+) = #{PO_NO}
+	       AND DMSR.MPR_NO(+) = #{MPR_NO}
+		ORDER BY SD.TYPE_RN, SD.GUBUN_RN
+	</select>
+
+	<update id="saveDesmMprSetupData" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_SETUP_DATA A
+		USING DUAL
+		ON (A.PO_NO = #{PO_NO} AND A.TYPE_CODE = #{TYPE_CODE} AND A.GUBUN_CODE = #{GUBUN_CODE} AND A.YYYY = #{YYYY} AND A.MM = #{MM} AND A.MPR_NO = #{MPR_NO})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.VAL = TO_NUMBER(#{VAL}) * 100,
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PO_NO
+		     ,A.MPR_NO
+		     ,A.TYPE_CODE
+		     ,A.GUBUN_CODE
+		     ,A.YYYY
+		     ,A.MM
+		     ,A.VAL
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{PO_NO}
+		     ,#{MPR_NO}
+		     ,#{TYPE_CODE}
+		     ,#{GUBUN_CODE}
+		     ,#{YYYY}
+		     ,#{MM}
+		     ,TO_NUMBER(#{VAL}) * 100
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<update id="saveDesmMprSetupDataNew" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_SETUP_DATA A
+		USING DUAL
+		ON (A.PO_NO = #{PO_NO} AND A.TYPE_CODE = #{TYPE_CODE}
+		     <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+			 	AND A.GUBUN_CODE = #{GUBUN_CODE}
+		     </if>
+		     <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+			 	AND A.TYPE_SUB_CODE = #{TYPE_SUB_CODE}
+			 	AND A.GUBUN_SUB_CODE = #{GUBUN_SUB_CODE}
+		     </if>
+			AND A.YYYY = #{YYYY} AND A.MM = #{MM} AND A.MPR_NO = #{MPR_NO})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+		     	A.VAL = TO_NUMBER(#{VAL}) * 100,
+		     </if>
+		     <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+		     	A.VAL_SUB = #{VAL_SUB},
+		     </if>
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PO_NO
+		     ,A.MPR_NO
+		     ,A.TYPE_CODE
+		     ,A.GUBUN_CODE
+		     ,A.YYYY
+		     ,A.MM
+		     ,A.VAL
+		     ,A.TYPE_SUB_CODE
+		     ,A.GUBUN_SUB_CODE
+		     ,A.VAL_SUB
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{PO_NO}
+		     ,#{MPR_NO}
+		     ,#{TYPE_CODE}
+		     ,#{GUBUN_CODE}
+		     ,#{YYYY}
+		     ,#{MM}
+		     ,TO_NUMBER(#{VAL}) * 100
+		     ,#{TYPE_SUB_CODE}
+		     ,#{GUBUN_SUB_CODE}
+		     ,#{VAL_SUB}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<update id="saveDesmMprSetupRemark" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_SETUP_REMARK A
+		USING DUAL
+		ON (A.PO_NO = #{PO_NO} AND A.TYPE_CODE = #{TYPE_CODE} AND A.GUBUN_CODE = #{GUBUN_CODE} AND A.MPR_NO = #{MPR_NO})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.REMARK = #{REMARK},
+		     A.WEIGHT = TO_NUMBER(#{WEIGHT}) * 100,
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PO_NO
+		     ,A.MPR_NO
+		     ,A.TYPE_CODE
+		     ,A.GUBUN_CODE
+		     ,A.TYPE_SUB_CODE
+		     ,A.GUBUN_SUB_CODE
+		     ,A.REMARK
+		     ,A.WEIGHT
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{PO_NO}
+		     ,#{MPR_NO}
+		     ,#{TYPE_CODE}
+		     ,#{GUBUN_CODE}
+		     ,NVL(#{TYPE_SUB_CODE}, 'NN')
+		     ,NVL(#{GUBUN_SUB_CODE}, 'NN')
+		     ,#{REMARK}
+		     ,TO_NUMBER(#{WEIGHT}) * 100
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprSeq" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT SEQ_DESM_MPR_HEADER.NEXTVAL AS SEQ
+		  FROM DUAL
+	</select>
+
+	<update id="saveDesmMprHeader" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_HEADER A
+		USING DUAL
+		ON (A.MPR_SEQ = #{MPR_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		   	   	 PO_NO = #{PO_NO},
+		   	     PRODUCT_NAME = #{PRODUCT_NAME},
+		   	     MPR_DATE = #{MPR_DATE},
+		   	     STATUS = #{STATUS},
+		   	     ATTACH_GRP_CD = #{ATTACH_GRP_CD},
+		   	     PHOTO_GRP_CD = #{PHOTO_GRP_CD},
+		   	     DESIGN_GRP_CD = #{DESIGN_GRP_CD},
+		   	     QUALITY_GRP_CD = #{QUALITY_GRP_CD},
+		   	     RESULT_YN = #{RESULT_YN},
+		   	     RESULT_REMARK = #{RESULT_REMARK},
+		   	     REQUEST_REMARK = #{REQUEST_REMARK},
+		   	     DESIGN_REMARK = #{DESIGN_REMARK},
+		   	     DESIGN_NOTE = #{DESIGN_NOTE},
+		   	     QUALITY_REMARK = #{QUALITY_REMARK},
+		   	     QUALITY_NOTE = #{QUALITY_NOTE},
+		   	     LAST_UPDATED_BY = #{USER_AD},
+		   	     LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+			(MPR_SEQ
+			,MPR_NO
+			,PO_NO
+			,PRODUCT_NAME
+			,PO_PROMISED_DATE
+			,MPR_DATE
+			,STATUS
+			,ATTACH_GRP_CD
+			,PHOTO_GRP_CD
+			,DESIGN_GRP_CD
+			,QUALITY_GRP_CD
+			,RESULT_YN
+			,RESULT_REMARK
+			,REQUEST_REMARK
+			,DESIGN_REMARK
+			,DESIGN_NOTE
+			,QUALITY_REMARK
+			,QUALITY_NOTE
+			,M
+			,CREATED_BY
+			,CREATION_DATE
+			,LAST_UPDATED_BY
+			,LAST_UPDATE_DATE)
+		     VALUES
+			(#{MPR_SEQ}
+			,#{MPR_NO}
+			,#{PO_NO}
+			,#{PRODUCT_NAME}
+			,TO_DATE(#{PO_PROMISED_DATE}, 'YYYY/MM/DD')
+			,#{MPR_DATE}
+			,#{STATUS}
+			,#{ATTACH_GRP_CD}
+			,#{PHOTO_GRP_CD}
+			,#{DESIGN_GRP_CD}
+			,#{QUALITY_GRP_CD}
+			,#{RESULT_YN}
+			,#{RESULT_REMARK}
+			,#{REQUEST_REMARK}
+			,#{DESIGN_REMARK}
+			,#{DESIGN_NOTE}
+			,#{QUALITY_REMARK}
+			,#{QUALITY_NOTE}
+			,#{M}
+			,#{USER_AD}
+			,SYSDATE
+			,#{USER_AD}
+			,SYSDATE)
+	</update>
+
+	<select id="getDesmMprCheckList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.MPR_SEQ, A.MPR_DATE, NVL(A.M, 1) AS M
+		  FROM DESM_MPR_HEADER A
+		 WHERE A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+		   AND A.MPR_DATE = #{MPR_DATE}
+		   AND A.M = #{M}
+		ORDER BY A.MPR_DATE DESC, NVL(A.M, 1) DESC
+	</select>
+
+	<select id="getDesmMprList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT DMH.MPR_SEQ,
+				       DMH.MPR_DATE,
+				       DMH.STATUS,
+				       NVL(DMH.M, 1) AS M,
+				       DPHI.PROJECT_CODE AS PROJECT_NO,
+				       DMH.PO_NO,
+				       DMH.MPR_NO,
+				       DMH.ATTACH_GRP_CD,
+				       DMH.PHOTO_GRP_CD,
+				       DMH.DESIGN_GRP_CD,
+				       TO_CHAR(DMH.PO_PROMISED_DATE, 'YYYY/MM/DD') AS PO_PROMISED_DATE,
+				       DMH.PRODUCT_NAME,
+               		   DMH.RESULT_YN,
+				       DMH.REJECT_COMMENTS,
+				       DPHI.PROJECT_NAME,
+				       DPHI.PO_DESCRIPTION,
+				       DPHI.SUPPLIER_NUMBER,
+				       DPHI.SUPPLIER_NAME,
+				       DMH.CREATION_DATE,
+				       (SELECT DMSM.USER_AD FROM DESM_MPR_SETUP_MAIL DMSM WHERE DMSM.PO_NO = DMH.PO_NO AND DMSM.MPR_NO = DMH.MPR_NO AND EXPEDITER_YN = 'Y') AS MANAGER,
+		               TO_CHAR(NVL(SP.B_PLAN_VAR, 0)) || '%' AS B_PLAN_VAR,
+		               TO_CHAR(NVL(SP.E_PLAN_VAR, 0)) || '%' AS E_PLAN_VAR,
+		               TO_CHAR(NVL(SP.P_PLAN_VAR, 0)) || '%' AS P_PLAN_VAR,
+		               TO_CHAR(NVL(SP.B_ACTUAL_VAR, 0)) || '%' AS B_ACTUAL_VAR,
+		               TO_CHAR(NVL(SP.E_ACTUAL_VAR, 0)) || '%' AS E_ACTUAL_VAR,
+		               TO_CHAR(NVL(SP.P_ACTUAL_VAR, 0)) || '%' AS P_ACTUAL_VAR,
+		               TO_CHAR(NVL(SP.B_WEIGHT, 0)) || '%' AS B_WEIGHT,
+		               TO_CHAR(NVL(SP.E_WEIGHT, 0)) || '%' AS E_WEIGHT,
+		               TO_CHAR(NVL(SP.P_WEIGHT, 0)) || '%' AS P_WEIGHT,
+		               TO_CHAR(NVL(SP.CAL_PLAN_VAL, 0)) || '%' AS CAL_PLAN_VAL,
+		               TO_CHAR(NVL(SP.CAL_ACTUAL_VAR, 0)) || '%' AS CAL_ACTUAL_VAR,
+					   NVL(SP.B_PLAN_VAR, 0) AS B_PLAN_INT,
+		               NVL(SP.E_PLAN_VAR, 0) AS E_PLAN_INT,
+		               NVL(SP.P_PLAN_VAR, 0) AS P_PLAN_INT,
+		               NVL(SP.B_ACTUAL_VAR, 0) AS B_ACTUAL_INT,
+		               NVL(SP.E_ACTUAL_VAR, 0) AS E_ACTUAL_INT,
+		               NVL(SP.P_ACTUAL_VAR, 0) AS P_ACTUAL_INT,
+		               NVL(SP.B_WEIGHT, 0) AS B_WEIGHT_INT,
+		               NVL(SP.E_WEIGHT, 0) AS E_WEIGHT_INT,
+		               NVL(SP.P_WEIGHT, 0) AS P_WEIGHT_INT,
+		               NVL(SP.CAL_PLAN_VAL, 0) AS CAL_PLAN_INT,
+		               NVL(SP.CAL_ACTUAL_VAR, 0) AS CAL_ACTUAL_INT
+				  FROM DESM_MPR_HEADER DMH,
+				       DESM_PO_HEADER_INT DPHI,
+		               (SELECT MPR_SEQ,
+		                       MAX(CASE WHEN TYPE_CODE = 'B' THEN PLAN_VAR END) AS B_PLAN_VAR,
+		                       MAX(CASE WHEN TYPE_CODE = 'E' THEN PLAN_VAR END) AS E_PLAN_VAR,
+		                       MAX(CASE WHEN TYPE_CODE = 'P' THEN PLAN_VAR END) AS P_PLAN_VAR,
+		                       MAX(CASE WHEN TYPE_CODE = 'B' THEN ACTUAL_VAR END) AS B_ACTUAL_VAR,
+		                       MAX(CASE WHEN TYPE_CODE = 'E' THEN ACTUAL_VAR END) AS E_ACTUAL_VAR,
+		                       MAX(CASE WHEN TYPE_CODE = 'P' THEN ACTUAL_VAR END) AS P_ACTUAL_VAR,
+		                       MAX(CASE WHEN TYPE_CODE = 'B' THEN WEIGHT END) AS B_WEIGHT,
+		                       MAX(CASE WHEN TYPE_CODE = 'E' THEN WEIGHT END) AS E_WEIGHT,
+		                       MAX(CASE WHEN TYPE_CODE = 'P' THEN WEIGHT END) AS P_WEIGHT,
+		                       TRUNC(MAX(CAL_PLAN_VAL) / 100) AS CAL_PLAN_VAL,
+		                       TRUNC(MAX(CAL_ACTUAL_VAR) / 100) AS CAL_ACTUAL_VAR
+		                  FROM (SELECT MPR_SEQ,
+		                               TYPE_CODE,
+		                               PLAN_VAR,
+		                               ACTUAL_VAR,
+		                               WEIGHT,
+		                               SUM(PLAN_VAR * WEIGHT) OVER(PARTITION BY MPR_SEQ ORDER BY MPR_SEQ, TYPE_CODE) AS CAL_PLAN_VAL,
+		                               SUM(ACTUAL_VAR * WEIGHT) OVER(PARTITION BY MPR_SEQ ORDER BY MPR_SEQ, TYPE_CODE) AS CAL_ACTUAL_VAR
+		                          FROM (SELECT MPR_SEQ,
+		                                       TYPE_CODE,
+		                                       NVL(MAX(CASE WHEN GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR,
+		                                       NVL(MAX(CASE WHEN GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR,
+		                                       NVL(MAX(CASE WHEN GUBUN_CODE = 'P' THEN WEIGHT END), 0) AS WEIGHT
+		                                  FROM (SELECT DMH.MPR_SEQ,
+		                                               DMH.MPR_DATE,
+		                                               DMDP.YYYY,
+		                                               DMDP.MM,
+		                                               DMDP.VAL,
+		                                               DMDP.TYPE_CODE,
+		                                               DMDP.GUBUN_CODE,
+		                                               0 AS WEIGHT
+		                                          FROM DESM_MPR_HEADER DMH,
+		                                               DESM_MPR_DETAIL_PROGRESS DMDP
+		                                         WHERE DMH.MPR_SEQ = DMDP.MPR_SEQ
+		                                           AND TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'YYYY') = DMDP.YYYY
+		                                           AND TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'MM') = DMDP.MM
+		                                        UNION ALL
+		                                        SELECT DMH.MPR_SEQ,
+		                                               DMH.MPR_DATE,
+		                                               DMSD.YYYY,
+		                                               DMSD.MM,
+		                                               DMSD.VAL,
+		                                               DMSD.TYPE_CODE,
+		                                               DMSD.GUBUN_CODE,
+		                                               DMSR.WEIGHT
+		                                          FROM DESM_MPR_HEADER DMH,
+		                                               DESM_MPR_SETUP_DATA DMSD,
+		                                               DESM_MPR_SETUP_DATE DMSDE,
+		                                               DESM_MPR_SETUP_REMARK DMSR
+		                                         WHERE DMH.PO_NO = DMSD.PO_NO
+		                                           AND DMH.MPR_NO = DMSD.MPR_NO
+		                                           AND DMSD.PO_NO = DMSDE.PO_NO
+		                                           AND DMSD.MPR_NO = DMSDE.MPR_NO
+		                                           AND DMSD.PO_NO = DMSR.PO_NO
+		                                           AND DMSD.MPR_NO = DMSR.MPR_NO
+		                                           AND DMSD.TYPE_CODE = DMSR.TYPE_CODE
+		                                           AND DMSR.GUBUN_CODE = DMSR.GUBUN_CODE
+		                                           AND TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'YYYY') = DMSD.YYYY
+		                                           AND TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'MM') = DMSD.MM
+		                                           AND DMSDE.STATUS = 'Confirmed')
+		                                GROUP BY MPR_SEQ,
+		                                         TYPE_CODE))
+		                GROUP BY MPR_SEQ) SP
+				 WHERE DMH.PO_NO = DPHI.PO_NO(+)
+				   AND DMH.MPR_SEQ = SP.MPR_SEQ(+)
+				   <if test='PROJECT_NO != null and PROJECT_NO !=""'>
+				   AND DPHI.PROJECT_CODE = #{PROJECT_NO}
+				   </if>
+				   <if test='PO_NO != null and PO_NO !=""'>
+				   AND DMH.PO_NO = #{PO_NO}
+				   </if>
+				   <if test='SUPPLIER_NAME != null and SUPPLIER_NAME !=""'>
+				   AND UPPER(DPHI.SUPPLIER_NAME) LIKE '%' || UPPER(#{SUPPLIER_NAME}) || '%'
+				   </if>
+				   <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+				   AND DPHI.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+				   </if>
+				   <if test='STATUS != null and STATUS !=""'>
+				   AND DMH.STATUS = #{STATUS}
+				   </if>
+				   <if test='START_MPR_DATE != null and START_MPR_DATE !=""'>
+				   AND DMH.MPR_DATE >= #{START_MPR_DATE}
+				   </if>
+				   <if test='END_MPR_DATE != null and END_MPR_DATE !=""'>
+				   AND DMH.MPR_DATE <![CDATA[ <= ]]> #{END_MPR_DATE}
+				   </if>
+				   <if test='D_MANAGER != null and D_MANAGER !=""'>
+				   AND EXISTS (SELECT 1
+			                      FROM DESM_MPR_SETUP_MAIL DMSM,
+			                           DESM_USER DU,
+			                           ZVTS_EMP ZE
+			                     WHERE DMSM.USER_AD = DU.USER_AD
+			                       AND DMSM.USER_AD = ZE.AD_USER_ID(+)
+								   AND  DMSM.TYPE_CODE = 'D'
+								   AND DMSM.EXPEDITER_YN = 'N'
+								   AND (UPPER(DMSM.USER_AD) LIKE '%' || UPPER(#{D_MANAGER}) || '%'
+	                                    OR UPPER(NVL(ZE.ZEMP_NM, DU.USER_NAME)) LIKE '%' || UPPER(#{D_MANAGER}) || '%')
+								   AND DMSM.PO_NO = DMH.PO_NO
+								   AND DMSM.MPR_NO = DMH.MPR_NO)
+				   </if>
+				   <if test='TEAM != null and TEAM !=""'>
+		           AND EXISTS (SELECT 1
+		                         FROM DESM_MPR_SETUP_MAIL DMSM,
+		                               ZVTS_EMP ZE
+		                        WHERE DMSM.USER_AD = ZE.AD_USER_ID
+		                   AND DMSM.TYPE_CODE = 'D'
+		                   AND ZE.ZORG_ID = #{TEAM}
+		                   AND DMSM.PO_NO = DMH.PO_NO
+		                   AND DMSM.MPR_NO = DMH.MPR_NO)
+				   </if>
+				   <if test='MPR_NO != null and MPR_NO !=""'>
+				   AND DMH.MPR_NO LIKE '%' || UPPER(#{MPR_NO}) || '%'
+				   </if>
+				   <if test='DELIVERY != null and DELIVERY !=""'>
+			       AND NVL(DMH.RESULT_YN, 'N') = #{DELIVERY}
+			       </if>
+		       ) DT
+		  WHERE 1 = 1
+		   <if test='MANAGER != null and MANAGER !=""'>
+	       AND EXISTS (SELECT 1
+	                      FROM DESM_MPR_SETUP_MAIL DMSM,
+	                           DESM_USER DU,
+	                           ZVTS_EMP ZE
+	                     WHERE DMSM.USER_AD = DU.USER_AD
+	                       AND DMSM.USER_AD = ZE.AD_USER_ID(+)
+	                       AND DMSM.PO_NO = DT.PO_NO
+	                       AND DMSM.MPR_NO = DT.MPR_NO
+	                       AND DMSM.EXPEDITER_YN = 'Y'
+	                       AND (UPPER(DMSM.USER_AD) LIKE '%' || UPPER(#{MANAGER}) || '%'
+	                            OR UPPER(NVL(ZE.ZEMP_NM, DU.USER_NAME)) LIKE '%' || UPPER(#{MANAGER}) || '%'))
+		   </if>
+		 ORDER BY CREATION_DATE	DESC
+	</select>
+
+	<select id="getDesmMprData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMH.MPR_SEQ,
+			   DMH.MPR_NO,
+		       DMH.MPR_DATE,
+		       DMH.STATUS,
+		       DMH.PO_NO,
+		       DMH.PRODUCT_NAME,
+		       TO_CHAR(DMH.PO_PROMISED_DATE, 'YYYY/MM/DD') AS PO_PROMISED_DATE,
+		       DMH.ATTACH_GRP_CD,
+		       DMH.PHOTO_GRP_CD,
+		       DMH.DESIGN_GRP_CD,
+		       DMH.QUALITY_GRP_CD,
+     		   DMH.REJECT_COMMENTS,
+		       NVL(DMH.RESULT_YN, 'Y') AS RESULT_YN,
+		       DMH.RESULT_REMARK,
+		       DMH.REQUEST_REMARK,
+		       DMH.DESIGN_REMARK,
+		       DMH.DESIGN_NOTE,
+		       DMH.QUALITY_REMARK,
+		       DMH.QUALITY_NOTE,
+		       NVL(DMH.M, 1) AS M,
+			   NVL(DPHI.PROJECT_CODE, DMP.PROJECT_CODE) AS PROJECT_NO,
+			   NVL(DPHI.PO_DESCRIPTION, DMP.PO_DESCRIPTION) AS PO_DESCRIPTION,
+			   NVL(DPHI.PROJECT_NAME, DMP.PROJECT_NAME) AS PROJECT_NAME,
+			   NVL(DPHI.SUPPLIER_NUMBER, DMP.SUPPLIER_NUMBER) AS SUPPLIER_NUMBER,
+			   NVL(DPHI.SUPPLIER_NAME, DMP.SUPPLIER_NAME) AS SUPPLIER_NAME,
+			   NVL(DMSD.START_MONTH, '') AS START_MONTH,
+			   NVL(DMSD.END_MONTH, '') AS END_MONTH
+		  FROM DESM_MPR_HEADER DMH,
+		       DESM_PO_HEADER_INT DPHI,
+		       DESM_MANUAL_PO DMP,
+		       DESM_MPR_SETUP_DATE DMSD
+		 WHERE DMH.PO_NO = DPHI.PO_NO(+)
+ 			AND DMH.PO_NO = DMP.PO_NO(+)
+		   	AND DMH.PO_NO = DMSD.PO_NO
+		   	AND DMH.MPR_NO = DMSD.MPR_NO
+		   	AND DMH.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<select id="getDesmMprDetailProgressCurrentChekcList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprDetailProgressCurrentChekcList : MPR 기 생성 여부 */
+		SELECT MAX(MPR_SEQ) AS MPR_SEQ , CASE WHEN MAX(MPR_SEQ) IS NULL THEN 'N' ELSE 'Y' END AS CHECK_YN
+		  FROM DESM_MPR_DETAIL_PROGRESS
+		 WHERE MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<select id="getDesmMprDetailProgressLastChekcList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MAX(DMH.MPR_SEQ) AS MPR_SEQ , CASE WHEN MAX(DMH.MPR_SEQ) IS NULL THEN 'N' ELSE 'Y' END AS CHECK_YN
+		  FROM DESM_MPR_HEADER DMH,
+		       DESM_MPR_DETAIL_PROGRESS DMDP
+		 WHERE DMH.MPR_SEQ = DMDP.MPR_SEQ
+		   AND DMH.PO_NO = #{PO_NO}
+		   AND DMH.MPR_NO = #{MPR_NO}
+		   --AND DMH.STATUS = 'Confirmed'
+	</select>
+	
+	<select id="getDesmMprDetailProgressCurrentList_230714" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprDetailProgressCurrentList : MPR 기 생성 데이터 */
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		), WITH_DESM_CODE_DTLE AS ( 
+		    SELECT MST_CODE,
+		      DTL_CODE,
+		      CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		      WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS CODE_NAME,
+		      DTL_ORDER
+		    FROM DESM_CODE_DTL
+		    WHERE DELEGATE_FLAG = 'N'
+		)
+		SELECT
+			  'NN' AS TYPE_CODE
+			, 'NN' AS TYPE_SUB_CODE
+			, 'NN' AS GUBUN_CODE
+			, 'NN' AS GUBUN_SUB_CODE
+			, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = '2023' || '/' || '02'), 'Yes') AS "2023_02"          
+			, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = '2023' || '/' || '03'), 'Yes') AS "2023_03"          
+			, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = '2023' || '/' || '04'), 'Yes') AS "2023_04"      
+			, 0 AS TYPE_RN
+			, 1 AS TYPE_SUB_RN
+			, 0 AS GUBUN_RN
+			, 1 AS GUBUN_SUB_RN    
+			, 'MPR Submission period' AS TYPE_NAME
+			, '' AS TYPE_SUB_NAME
+			, 'MPR Submission period' AS GUBUN_NAME
+			, '' AS GUBUN_SUB_NAME
+			, '' AS REMARK
+			, 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT 
+		      AA.*
+		    , (SELECT CODE_NAME FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M001' AND DTL_CODE = AA.TYPE_CODE) AS TYPE_NAME
+		    , (SELECT CODE_NAME FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M006' AND DTL_CODE = AA.TYPE_SUB_CODE) AS TYPE_SUB_NAME
+		    , (SELECT CODE_NAME FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M002' AND DTL_CODE = AA.GUBUN_CODE) AS GUBUN_NAME
+		    , (SELECT CODE_NAME FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M007' AND DTL_CODE = AA.GUBUN_SUB_CODE) AS GUBUN_SUB_NAME
+		    , DMDPR.REMARK
+		    , TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+		FROM (
+		  SELECT 
+		      MST.TYPE_CODE
+		    , MST.TYPE_SUB_CODE
+		    , MST.GUBUN_CODE
+		    , MST.GUBUN_SUB_CODE
+		    , TO_CHAR(MAX(CASE WHEN MST.YYYY = '2023' AND MST.MM = '02' THEN DECODE(MST.GUBUN_CODE, 'NN', SUB.VAL, MST.VAL) END)) AS "2023_02"                
+		    , TO_CHAR(MAX(CASE WHEN MST.YYYY = '2023' AND MST.MM = '03' THEN DECODE(MST.GUBUN_CODE, 'NN', SUB.VAL, MST.VAL) END)) AS "2023_03"                
+		    , TO_CHAR(MAX(CASE WHEN MST.YYYY = '2023' AND MST.MM = '04' THEN DECODE(MST.GUBUN_CODE, 'NN', SUB.VAL, MST.VAL) END)) AS "2023_04"
+		    , MST.TYPE_RN
+		    , MST.TYPE_SUB_RN
+		    , MST.GUBUN_RN
+		    , MST.GUBUN_SUB_RN
+		  FROM 
+		  (
+		    SELECT 
+		      TYPE_CODE
+		      , GUBUN_CODE
+		      , TYPE_SUB_CODE
+		      , GUBUN_SUB_CODE
+		      , (SELECT NVL(DTL_ORDER, 999) FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M001' AND DTL_CODE = TYPE_CODE) AS TYPE_RN
+		      , (SELECT NVL(DTL_ORDER, 999) FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M006' AND DTL_CODE = TYPE_SUB_CODE) AS TYPE_SUB_RN
+		      , (SELECT NVL(DTL_ORDER, 999) FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M002' AND DTL_CODE = GUBUN_CODE) AS GUBUN_RN
+		      , (SELECT NVL(DTL_ORDER, 999) FROM WITH_DESM_CODE_DTLE WHERE MST_CODE = 'M007' AND DTL_CODE = GUBUN_SUB_CODE) AS GUBUN_SUB_RN
+		      , YYYY
+		      , MM
+		      , VAL
+		    FROM
+		    (
+		      SELECT 
+		        DMSP.TYPE_CODE AS TYPE_CODE
+		        , DMSP.GUBUN_CODE AS GUBUN_CODE
+		        , NVL(TYPE_SUB_CODE, 'NN') AS TYPE_SUB_CODE
+		        , NVL(GUBUN_SUB_CODE, 'NN') AS GUBUN_SUB_CODE
+		        , DMSP.YYYY
+		        , DMSP.MM
+		        , TO_CHAR(TRUNC(VAL / 100, 2)) AS VAL
+		      FROM DESM_MPR_DETAIL_PROGRESS DMSP
+		      WHERE DMSP.MPR_SEQ = #{MPR_SEQ}
+		        AND DMSP.GUBUN_CODE != 'P'
+		      UNION ALL
+		      SELECT TYPE_CODE AS V_TYPE_CODE,
+		        NVL(TRIM(GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+		        NVL(TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+		        NVL(GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+		        YYYY,
+		        MM,
+		        TO_CHAR(TRUNC(VAL / 100, 2)) AS VAL
+		      FROM DESM_MPR_SETUP_DATA
+		      WHERE PO_NO = #{PO_NO}
+		        AND MPR_NO = #{MPR_NO}
+		        AND GUBUN_CODE = 'P'
+		    )
+		  ) MST,
+		  (
+		    SELECT
+		      TYPE_CODE
+		      , GUBUN_CODE
+		      , TYPE_SUB_CODE
+		      , GUBUN_SUB_CODE
+		      , YYYY
+		      , MM
+		      , COUNT(VAL) AS VAL
+		    FROM (
+		      SELECT 
+		        'B' AS TYPE_CODE
+		        , 'C' AS TYPE_SUB_CODE
+		        , 'NN' AS GUBUN_CODE
+		        , DECODE(INFO, 'PO_PLAN', 'P', 'PO_ACTUAL', 'R') AS GUBUN_SUB_CODE
+		        , TO_CHAR(VALUE, 'YYYY') AS YYYY
+		        , TO_CHAR(VALUE, 'MM') AS MM
+		        , TO_CHAR(VALUE) AS VAL
+		      FROM (
+		        SELECT PROCURE_SEQ, INFO, VALUE
+		        FROM (
+		          SELECT PROCURE_SEQ, PO_PLAN, PO_ACTUAL
+		          FROM DESM_MPR_PROCURE
+		          WHERE MPR_SEQ = #{MPR_SEQ}
+		        )
+		        UNPIVOT ( VALUE FOR INFO IN (PO_PLAN, PO_ACTUAL))
+		      )
+		      UNION ALL
+		      SELECT 
+		        'E' AS TYPE_CODE
+		        , DECODE(INFO, 'SCHEDULE_PLAN', 'A', 'SCHEDULE_ACTUAL', 'A', 'APPROVAL_PLAN', 'B', 'APPROVAL_ACTUAL', 'B') AS TYPE_SUB_CODE
+		        , 'NN' AS GUBUN_CODE
+		        , DECODE(INFO, 'SCHEDULE_PLAN', 'P', 'SCHEDULE_ACTUAL', 'R', 'APPROVAL_PLAN', 'P', 'APPROVAL_ACTUAL', 'R') AS GUBUN_SUB_CODE
+		        , TO_CHAR(VALUE, 'YYYY') AS YYYY
+		        , TO_CHAR(VALUE, 'MM') AS MM
+		        , TO_CHAR(VALUE) AS VAL
+		      FROM (
+		        SELECT DESIGN_SEQ, INFO, VALUE
+		        FROM (
+		          SELECT DESIGN_SEQ, SCHEDULE_PLAN, SCHEDULE_ACTUAL, APPROVAL_PLAN, APPROVAL_ACTUAL
+		          FROM DESM_MPR_DESIGN
+		          WHERE MPR_SEQ = #{MPR_SEQ}
+		        )
+		        UNPIVOT ( VALUE FOR INFO IN (SCHEDULE_PLAN, SCHEDULE_ACTUAL, APPROVAL_PLAN, APPROVAL_ACTUAL))
+		      )
+		      UNION ALL
+		      SELECT 
+		        'P' AS TYPE_CODE
+		        , DECODE(TYPE, 'MFG/ASSEMBLY', 'D', 'FAT', 'E', 'CARGO READY', 'F') AS TYPE_SUB_CODE
+		        , 'NN' AS GUBUN_CODE
+		        , DECODE(INFO, 'SCHEDULE_PLAN', 'P', 'SCHEDULE_ACTUAL', 'R') AS GUBUN_SUB_CODE
+		        , TO_CHAR(VALUE, 'YYYY') AS YYYY
+		        , TO_CHAR(VALUE, 'MM') AS MM
+		        , TO_CHAR(VALUE) AS VAL
+		      FROM (
+		        SELECT MFG_SEQ, TYPE, INFO, VALUE
+		        FROM (
+		          SELECT MFG_SEQ, TYPE, SCHEDULE_PLAN, SCHEDULE_ACTUAL
+		          FROM DESM_MPR_MFG
+		          WHERE MPR_SEQ = #{MPR_SEQ}
+		        )
+		        UNPIVOT ( VALUE FOR INFO IN (SCHEDULE_PLAN, SCHEDULE_ACTUAL))
+		      )
+		    )
+		    GROUP BY TYPE_CODE, GUBUN_CODE, TYPE_SUB_CODE, GUBUN_SUB_CODE, YYYY, MM
+		  ) SUB
+		  WHERE MST.TYPE_CODE = SUB.TYPE_CODE(+)
+		        AND MST.TYPE_SUB_CODE = SUB.TYPE_SUB_CODE(+)
+		        AND MST.GUBUN_CODE = SUB.GUBUN_CODE(+)
+		        AND MST.GUBUN_SUB_CODE = SUB.GUBUN_SUB_CODE(+)
+		        AND MST.YYYY = SUB.YYYY(+)
+		        AND MST.MM = SUB.MM(+)
+		  GROUP BY MST.TYPE_CODE, MST.GUBUN_CODE, MST.TYPE_SUB_CODE, MST.GUBUN_SUB_CODE
+		    , MST.TYPE_RN
+		    , MST.TYPE_SUB_RN
+		    , MST.GUBUN_RN
+		    , MST. GUBUN_SUB_RN
+		) AA,
+		  DESM_MPR_DETAIL_PROGRESS_REMARK DMDPR,
+		  DESM_MPR_SETUP_REMARK DMSR
+		WHERE AA.TYPE_CODE = DMDPR.TYPE_CODE(+)
+		      AND AA.GUBUN_CODE = DMDPR.GUBUN_CODE(+)
+		      AND AA.TYPE_SUB_CODE = DMDPR.TYPE_SUB_CODE(+)
+		      AND AA.GUBUN_SUB_CODE = DMDPR.GUBUN_SUB_CODE(+)
+		      AND DMDPR.MPR_SEQ(+) = #{MPR_SEQ}
+		      AND AA.TYPE_CODE = DMSR.TYPE_CODE(+)
+		      AND AA.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+		      AND AA.TYPE_SUB_CODE = DMSR.TYPE_SUB_CODE(+)
+		      AND AA.GUBUN_SUB_CODE = DMSR.GUBUN_SUB_CODE(+)
+		      AND DMSR.PO_NO(+) = #{PO_NO}
+		      AND DMSR.MPR_NO(+) = #{MPR_NO}
+		ORDER BY TYPE_RN, GUBUN_RN, TYPE_SUB_RN, GUBUN_SUB_RN
+	</select>
+	
+
+	<select id="getDesmMprDetailProgressCurrentList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprDetailProgressCurrentList : MPR 기 생성 데이터 */
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  , 'MPR Submission period' AS TYPE_NAME
+		  , 0 AS TYPE_RN
+		  , '' AS TYPE_SUB_CODE
+		  , '' AS TYPE_SUB_NAME
+		  , 1 AS TYPE_SUB_RN
+		  , 'NN' AS GUBUN_CODE
+		  , 'MPR Submission period' AS GUBUN_NAME
+		  , 0 AS GUBUN_RN
+		  , '' AS GUBUN_SUB_CODE
+		  , '' AS GUBUN_SUB_NAME
+		  , 1 AS GUBUN_SUB_RN
+		  , 'NN' AS V_TYPE_CODE
+		  , 'NN' AS V_GUBUN_CODE
+	      , 'NN' AS V_TYPE_SUB_CODE
+	      , 'NN' AS V_GUBUN_SUB_CODE
+
+		  <foreach collection="colList" item="item" separator="" open="" close="">
+		  	, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		  </foreach>
+
+		  , '' AS REMARK
+		  , 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+			SELECT SD.*,
+			       VD.*,
+			       DMDPR.REMARK,
+			       TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+			  FROM (
+			          SELECT T.TYPE_CODE,
+			                T.TYPE_NAME,
+			                T.TYPE_RN,
+			                'NN' AS TYPE_SUB_CODE,
+			                '' AS TYPE_SUB_NAME,
+			                999 AS TYPE_SUB_RN,
+			                G.GUBUN_CODE,
+			                G.GUBUN_NAME,
+			                G.GUBUN_RN,
+			                'NN' AS GUBUN_SUB_CODE,
+			                '' AS GUBUN_SUB_NAME,
+			                999 AS GUBUN_SUB_RN
+			          FROM (
+			                 SELECT MST_CODE,
+			                        DTL_CODE AS TYPE_CODE,
+			                        CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                             WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                        ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                FROM DESM_CODE_DTL
+			                WHERE MST_CODE = 'M001'
+			                AND DELEGATE_FLAG = 'N'
+			              ) T,
+			              (
+			                SELECT MST_CODE,
+			                       DTL_CODE AS GUBUN_CODE,
+			                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+			                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+			                FROM DESM_CODE_DTL
+			                WHERE MST_CODE = 'M002'
+			                      AND DELEGATE_FLAG = 'N'
+			              ) G
+			         UNION
+			         SELECT
+			                 T.TYPE_CODE,
+			                 T.TYPE_NAME,
+			                 T.TYPE_RN,
+			                 G.TYPE_SUB_CODE,
+			                 G.TYPE_SUB_NAME,
+			                 G.TYPE_SUB_RN,
+			                 'NN' AS GUBUN_CODE,
+			                 '' AS GUBUN_NAME,
+			                 999 AS GUBUN_RN,
+			                 G.GUBUN_SUB_CODE,
+			                 G.GUBUN_SUB_NAME,
+			                 G.GUBUN_SUB_RN
+			         FROM (
+			               SELECT MST_CODE,
+			                    DTL_CODE AS TYPE_CODE,
+			                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                  FROM DESM_CODE_DTL
+			                  WHERE MST_CODE = 'M001'
+			                    AND DELEGATE_FLAG = 'N'
+			              ) T,
+			              (
+			               SELECT
+			                    A.TYPE_SUB_CODE,
+			                    A.TYPE_SUB_NAME,
+			                    A.TYPE_SUB_RN,
+			                    B.GUBUN_SUB_CODE,
+			                    B.GUBUN_SUB_NAME,
+			                    B.GUBUN_SUB_RN,
+			                    A.TYPE_CODE
+			                  FROM
+			                  (
+			                    SELECT MST_CODE,
+			                    DTL_CODE AS TYPE_SUB_CODE,
+			                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_SUB_NAME,
+			                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_SUB_RN,
+			                    ATTRIBUTE1 AS TYPE_CODE
+			                    FROM DESM_CODE_DTL
+			                    WHERE MST_CODE = 'M006'
+			                    AND DELEGATE_FLAG = 'N'
+			                  ) A,
+			                  (
+			                    SELECT MST_CODE,
+			                    DTL_CODE AS GUBUN_SUB_CODE,
+			                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_SUB_NAME,
+			                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_SUB_RN
+			                    FROM DESM_CODE_DTL
+			                    WHERE MST_CODE = 'M007'
+			                    AND DELEGATE_FLAG = 'N'
+			                  ) B
+			              ) G
+			         	WHERE T.TYPE_CODE = G.TYPE_CODE
+			         ) SD,
+			         (
+			         	SELECT 
+				          AA.V_TYPE_CODE
+				          , AA.V_GUBUN_CODE
+				          , AA.V_TYPE_SUB_CODE
+				          , AA.V_GUBUN_SUB_CODE
+						  <foreach collection="colList" item="item" separator="" open="" close="">
+				          	, TO_CHAR(MAX(CASE WHEN AA.YYYY = #{item.YYYY} AND AA.MM = #{item.MM} THEN DECODE(AA.V_GUBUN_CODE, 'NN', BB.VAL, AA.VAL) END)) AS "${item.COL_NAME}"
+						  </foreach>
+				        FROM (
+				          SELECT DMSP.TYPE_CODE AS V_TYPE_CODE,
+                               	DMSP.GUBUN_CODE AS V_GUBUN_CODE,
+                                NVL(TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+                                NVL(GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+                               	DMSP.YYYY,
+                               	DMSP.MM,
+                    			TO_CHAR(TRUNC(VAL / 100, 2)) AS VAL
+                          FROM DESM_MPR_DETAIL_PROGRESS DMSP
+                          WHERE DMSP.MPR_SEQ = #{MPR_SEQ}
+                          	AND DMSP.GUBUN_CODE != 'P'
+                          UNION ALL
+				          SELECT TYPE_CODE AS V_TYPE_CODE,
+					          NVL(TRIM(GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+					          NVL(TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+					          NVL(GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+					          YYYY,
+					          MM,
+					          TO_CHAR(TRUNC(VAL / 100, 2)) AS VAL
+				          FROM DESM_MPR_SETUP_DATA
+				          WHERE PO_NO = #{PO_NO}
+		            		AND MPR_NO = #{MPR_NO}
+				            AND GUBUN_CODE = 'P'
+				        ) AA,
+				        (
+				          SELECT
+				          V_TYPE_CODE
+				          , V_GUBUN_CODE
+				          , V_TYPE_SUB_CODE
+				          , V_GUBUN_SUB_CODE
+				          , YYYY
+				          , MM
+				          , COUNT(VAL) AS VAL
+				          FROM (
+				            SELECT 
+				               'B' AS V_TYPE_CODE
+				               , 'C' AS V_TYPE_SUB_CODE
+				               , 'NN' AS V_GUBUN_CODE
+				               , DECODE(INFO, 'PO_PLAN', 'P', 'PO_ACTUAL', 'R') AS V_GUBUN_SUB_CODE
+				               , TO_CHAR(VALUE, 'YYYY') AS YYYY
+				               , TO_CHAR(VALUE, 'MM') AS MM
+				               , TO_CHAR(VALUE) AS VAL
+				            FROM (
+				              SELECT PROCURE_SEQ, INFO, VALUE
+				              FROM (
+				                SELECT PROCURE_SEQ, PO_PLAN, PO_ACTUAL
+				                FROM DESM_MPR_PROCURE
+				                WHERE MPR_SEQ = #{MPR_SEQ}
+				              )
+				              UNPIVOT ( VALUE FOR INFO IN (PO_PLAN, PO_ACTUAL))
+				            )
+				            UNION ALL
+				            SELECT 
+				               'E' AS V_TYPE_CODE
+				               , DECODE(INFO, 'SCHEDULE_PLAN', 'A', 'SCHEDULE_ACTUAL', 'A', 'APPROVAL_PLAN', 'B', 'APPROVAL_ACTUAL', 'B') AS V_TYPE_SUB_CODE
+				               , 'NN' AS V_GUBUN_CODE
+				               , DECODE(INFO, 'SCHEDULE_PLAN', 'P', 'SCHEDULE_ACTUAL', 'R', 'APPROVAL_PLAN', 'P', 'APPROVAL_ACTUAL', 'R') AS V_GUBUN_SUB_CODE
+				               , TO_CHAR(VALUE, 'YYYY') AS YYYY
+				               , TO_CHAR(VALUE, 'MM') AS MM
+				               , TO_CHAR(VALUE) AS VAL
+				            FROM (
+				              SELECT DESIGN_SEQ, INFO, VALUE
+				              FROM (
+				                SELECT DESIGN_SEQ, SCHEDULE_PLAN, SCHEDULE_ACTUAL, APPROVAL_PLAN, APPROVAL_ACTUAL
+				                FROM DESM_MPR_DESIGN
+				                WHERE MPR_SEQ = #{MPR_SEQ}
+				              )
+				              UNPIVOT ( VALUE FOR INFO IN (SCHEDULE_PLAN, SCHEDULE_ACTUAL, APPROVAL_PLAN, APPROVAL_ACTUAL))
+				            )
+				            UNION ALL
+				            SELECT 
+				               'P' AS V_TYPE_CODE
+				               , DECODE(TYPE, 'MFG/ASSEMBLY', 'D', 'FAT', 'E', 'CARGO READY', 'F') AS V_TYPE_SUB_CODE
+				               , 'NN' AS V_GUBUN_CODE
+				               , DECODE(INFO, 'SCHEDULE_PLAN', 'P', 'SCHEDULE_ACTUAL', 'R') AS V_GUBUN_SUB_CODE
+				               , TO_CHAR(VALUE, 'YYYY') AS YYYY
+				               , TO_CHAR(VALUE, 'MM') AS MM
+				               , TO_CHAR(VALUE) AS VAL
+				            FROM (
+				              SELECT MFG_SEQ, TYPE, INFO, VALUE
+				              FROM (
+				                SELECT MFG_SEQ, TYPE, SCHEDULE_PLAN, SCHEDULE_ACTUAL
+				                FROM DESM_MPR_MFG
+				                WHERE MPR_SEQ = #{MPR_SEQ}
+				              )
+				              UNPIVOT ( VALUE FOR INFO IN (SCHEDULE_PLAN, SCHEDULE_ACTUAL))
+				            )
+				          )
+				          GROUP BY V_TYPE_CODE, V_GUBUN_CODE, V_TYPE_SUB_CODE, V_GUBUN_SUB_CODE, YYYY, MM
+				        ) BB
+				        WHERE AA.V_TYPE_CODE = BB.V_TYPE_CODE(+)
+				              AND AA.V_TYPE_SUB_CODE = BB.V_TYPE_SUB_CODE(+)
+				              AND AA.V_GUBUN_CODE = BB.V_GUBUN_CODE(+)
+				              AND AA.V_GUBUN_SUB_CODE = BB.V_GUBUN_SUB_CODE(+)
+				              AND AA.YYYY = BB.YYYY(+)
+				              AND AA.MM = BB.MM(+)
+				        GROUP BY AA.V_TYPE_CODE, AA.V_GUBUN_CODE, AA.V_TYPE_SUB_CODE, AA.V_GUBUN_SUB_CODE) VD,
+			          DESM_MPR_DETAIL_PROGRESS_REMARK DMDPR,
+			          DESM_MPR_SETUP_REMARK DMSR
+			 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+			   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		       AND SD.TYPE_SUB_CODE = VD.V_TYPE_SUB_CODE(+)
+		       AND SD.GUBUN_SUB_CODE = VD.V_GUBUN_SUB_CODE(+)
+		       AND SD.TYPE_CODE = DMDPR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMDPR.GUBUN_CODE(+)
+               AND SD.TYPE_SUB_CODE = DMDPR.TYPE_SUB_CODE(+)
+               AND SD.GUBUN_SUB_CODE = DMDPR.GUBUN_SUB_CODE(+)
+		       AND DMDPR.MPR_SEQ(+) = #{MPR_SEQ}
+		       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+               AND SD.TYPE_SUB_CODE = DMSR.TYPE_SUB_CODE(+)
+               AND SD.GUBUN_SUB_CODE = DMSR.GUBUN_SUB_CODE(+)
+		       AND DMSR.PO_NO(+) = #{PO_NO}
+		       AND DMSR.MPR_NO(+) = #{MPR_NO}
+       		ORDER BY SD.TYPE_RN, SD.GUBUN_RN, SD.TYPE_SUB_RN, SD.GUBUN_SUB_RN
+		)
+	</select>
+
+	<select id="getDesmMprDetailProgressCurrentList_230621" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprDetailProgressCurrentList : MPR 기 생성 데이터 */
+		WITH WITH_SUBMISSION_PERIOD AS (
+		     SELECT REGEXP_SUBSTR(a.SUBMISSION_PERIOD, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD
+		            , REGEXP_SUBSTR(a.SUBMISSION_PERIOD_MONTH, '[^,]+', 1, LEVEL) AS SUBMISSION_PERIOD_MONTH
+		     FROM (
+		          SELECT SUBMISSION_PERIOD, SUBMISSION_PERIOD_MONTH
+		          FROM DESM_MPR_SETUP_DATE
+		          WHERE PO_NO = #{PO_NO}
+		            AND MPR_NO = #{MPR_NO}) a
+		     CONNECT BY LEVEL <![CDATA[ <= ]]> LENGTH(REGEXP_REPLACE(a.SUBMISSION_PERIOD, '[^,]+','')) + 1
+		)
+		SELECT
+		  'NN' AS TYPE_CODE
+		  , 'MPR Submission period' AS TYPE_NAME
+		  , 0 AS TYPE_RN
+		  , '' AS TYPE_SUB_CODE
+		  , '' AS TYPE_SUB_NAME
+		  , 1 AS TYPE_SUB_RN
+		  , 'NN' AS GUBUN_CODE
+		  , 'MPR Submission period' AS GUBUN_NAME
+		  , 0 AS GUBUN_RN
+		  , '' AS GUBUN_SUB_CODE
+		  , '' AS GUBUN_SUB_NAME
+		  , 1 AS GUBUN_SUB_RN
+		  , 'NN' AS V_TYPE_CODE
+		  , 'NN' AS V_GUBUN_CODE
+	      , 'NN' AS V_TYPE_SUB_CODE
+	      , 'NN' AS V_GUBUN_SUB_CODE
+
+		  <foreach collection="colList" item="item" separator="" open="" close="">
+		  	, NVL((SELECT T.SUBMISSION_PERIOD FROM WITH_SUBMISSION_PERIOD T WHERE T.SUBMISSION_PERIOD_MONTH = #{item.YYYY} || '/' || #{item.MM}), 'Yes') AS "${item.COL_NAME}"
+		  </foreach>
+
+		  , '' AS REMARK
+		  , 0 AS WEIGHT
+		FROM dual
+		UNION ALL
+		SELECT *
+		FROM (
+			SELECT SD.*,
+			       VD.*,
+			       DMDPR.REMARK,
+			       TRUNC(DMSR.WEIGHT / 100, 2) AS WEIGHT
+			  FROM (
+			          SELECT T.TYPE_CODE,
+			                T.TYPE_NAME,
+			                T.TYPE_RN,
+			                'NN' AS TYPE_SUB_CODE,
+			                '' AS TYPE_SUB_NAME,
+			                999 AS TYPE_SUB_RN,
+			                G.GUBUN_CODE,
+			                G.GUBUN_NAME,
+			                G.GUBUN_RN,
+			                'NN' AS GUBUN_SUB_CODE,
+			                '' AS GUBUN_SUB_NAME,
+			                999 AS GUBUN_SUB_RN
+			          FROM (
+			                 SELECT MST_CODE,
+			                        DTL_CODE AS TYPE_CODE,
+			                        CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                             WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                        ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                FROM DESM_CODE_DTL
+			                WHERE MST_CODE = 'M001'
+			                AND DELEGATE_FLAG = 'N'
+			              ) T,
+			              (
+			                SELECT MST_CODE,
+			                       DTL_CODE AS GUBUN_CODE,
+			                       CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                            WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_NAME,
+			                       ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_RN
+			                FROM DESM_CODE_DTL
+			                WHERE MST_CODE = 'M002'
+			                      AND DELEGATE_FLAG = 'N'
+			              ) G
+			         UNION
+			         SELECT
+			                 T.TYPE_CODE,
+			                 T.TYPE_NAME,
+			                 T.TYPE_RN,
+			                 G.TYPE_SUB_CODE,
+			                 G.TYPE_SUB_NAME,
+			                 G.TYPE_SUB_RN,
+			                 'NN' AS GUBUN_CODE,
+			                 '' AS GUBUN_NAME,
+			                 999 AS GUBUN_RN,
+			                 G.GUBUN_SUB_CODE,
+			                 G.GUBUN_SUB_NAME,
+			                 G.GUBUN_SUB_RN
+			         FROM (
+			               SELECT MST_CODE,
+			                    DTL_CODE AS TYPE_CODE,
+			                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+			                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+			                  FROM DESM_CODE_DTL
+			                  WHERE MST_CODE = 'M001'
+			                    AND DELEGATE_FLAG = 'N'
+			              ) T,
+			              (
+			               SELECT
+			                    A.TYPE_SUB_CODE,
+			                    A.TYPE_SUB_NAME,
+			                    A.TYPE_SUB_RN,
+			                    B.GUBUN_SUB_CODE,
+			                    B.GUBUN_SUB_NAME,
+			                    B.GUBUN_SUB_RN,
+			                    A.TYPE_CODE
+			                  FROM
+			                  (
+			                    SELECT MST_CODE,
+			                    DTL_CODE AS TYPE_SUB_CODE,
+			                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_SUB_NAME,
+			                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_SUB_RN,
+			                    ATTRIBUTE1 AS TYPE_CODE
+			                    FROM DESM_CODE_DTL
+			                    WHERE MST_CODE = 'M006'
+			                    AND DELEGATE_FLAG = 'N'
+			                  ) A,
+			                  (
+			                    SELECT MST_CODE,
+			                    DTL_CODE AS GUBUN_SUB_CODE,
+			                    CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+			                         WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS GUBUN_SUB_NAME,
+			                    ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS GUBUN_SUB_RN
+			                    FROM DESM_CODE_DTL
+			                    WHERE MST_CODE = 'M007'
+			                    AND DELEGATE_FLAG = 'N'
+			                  ) B
+			              ) G
+			         	WHERE T.TYPE_CODE = G.TYPE_CODE
+			         ) SD,
+			         (SELECT V_TYPE_CODE
+			                ,V_GUBUN_CODE
+				             ,V_TYPE_SUB_CODE
+				             ,V_GUBUN_SUB_CODE
+
+						<foreach collection="colList" item="item" separator="" open="" close="">
+							,MAX(CASE WHEN YYYY = #{item.YYYY} AND MM = #{item.MM} THEN VAL END) AS "${item.COL_NAME}"
+						</foreach>
+
+			            FROM (SELECT DMSP.TYPE_CODE AS V_TYPE_CODE,
+					                  NVL(TRIM(DMSP.GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+					                  NVL(DMSP.TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+					                  NVL(DMSP.GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+			                           DMSP.YYYY,
+			                           DMSP.MM,
+					                  CASE WHEN NVL(DMSP.GUBUN_CODE, ' ') = ' ' OR DMSP.GUBUN_CODE = 'NN' THEN DMSP.VAL_SUB
+					                       ELSE TO_CHAR(TRUNC(DMSP.VAL / 100, 2)) END AS VAL
+			                      FROM DESM_MPR_DETAIL_PROGRESS DMSP
+			                     WHERE DMSP.MPR_SEQ = #{MPR_SEQ}
+			                       AND DMSP.GUBUN_CODE != 'P'
+			                    UNION ALL
+			                    SELECT DMSD.TYPE_CODE AS V_TYPE_CODE,
+					                  NVL(TRIM(DMSD.GUBUN_CODE), 'NN') AS V_GUBUN_CODE,
+					                  NVL(DMSD.TYPE_SUB_CODE, 'NN') AS V_TYPE_SUB_CODE,
+					                  NVL(DMSD.GUBUN_SUB_CODE, 'NN') AS V_GUBUN_SUB_CODE,
+					                  DMSD.YYYY,
+					                  DMSD.MM,
+					                  CASE WHEN NVL(DMSD.GUBUN_CODE, ' ') = ' ' OR DMSD.GUBUN_CODE = 'NN' THEN DMSD.VAL_SUB
+					                       ELSE TO_CHAR(TRUNC(DMSD.VAL / 100, 2)) END AS VAL
+			                      FROM DESM_MPR_SETUP_DATA DMSD
+			                     WHERE PO_NO = #{PO_NO}
+			                       AND MPR_NO = #{MPR_NO}
+			                       AND DMSD.GUBUN_CODE = 'P'
+			                )
+			          		GROUP BY V_TYPE_CODE, V_GUBUN_CODE, V_TYPE_SUB_CODE, V_GUBUN_SUB_CODE) VD,
+			          DESM_MPR_DETAIL_PROGRESS_REMARK DMDPR,
+			          DESM_MPR_SETUP_REMARK DMSR
+			 WHERE SD.TYPE_CODE = VD.V_TYPE_CODE(+)
+			   AND SD.GUBUN_CODE = VD.V_GUBUN_CODE(+)
+		       AND SD.TYPE_SUB_CODE = VD.V_TYPE_SUB_CODE(+)
+		       AND SD.GUBUN_SUB_CODE = VD.V_GUBUN_SUB_CODE(+)
+		       AND SD.TYPE_CODE = DMDPR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMDPR.GUBUN_CODE(+)
+               AND SD.TYPE_SUB_CODE = DMDPR.TYPE_SUB_CODE(+)
+               AND SD.GUBUN_SUB_CODE = DMDPR.GUBUN_SUB_CODE(+)
+		       AND DMDPR.MPR_SEQ(+) = #{MPR_SEQ}
+		       AND SD.TYPE_CODE = DMSR.TYPE_CODE(+)
+		       AND SD.GUBUN_CODE = DMSR.GUBUN_CODE(+)
+               AND SD.TYPE_SUB_CODE = DMSR.TYPE_SUB_CODE(+)
+               AND SD.GUBUN_SUB_CODE = DMSR.GUBUN_SUB_CODE(+)
+		       AND DMSR.PO_NO(+) = #{PO_NO}
+		       AND DMSR.MPR_NO(+) = #{MPR_NO}
+       		ORDER BY SD.TYPE_RN, SD.GUBUN_RN, SD.TYPE_SUB_RN, SD.GUBUN_SUB_RN
+		)
+	</select>
+
+	<update id="updateDesmMprDetailnProgress" parameterType="java.util.Map">
+		/* MprMapper.saveDesmMprDetailnProgressNew : MPR 수정 */
+		UPDATE DESM_MPR_DETAIL_PROGRESS A
+		   SET
+		     <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+		     	A.VAL = #{VAL},
+		     </if>
+		     <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+		     	A.VAL_SUB = TO_DATE (#{VAL_SUB},'YYYY/MM/DD'),
+		     </if>
+		       A.LAST_UPDATED_BY = #{USER_AD},
+		       A.LAST_UPDATE_DATE = SYSDATE
+         WHERE A.MPR_SEQ = #{MPR_SEQ}
+           AND A.PO_NO = #{PO_NO}
+           AND A.TYPE_CODE = #{TYPE_CODE}
+	       <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+		 		AND A.GUBUN_CODE = #{GUBUN_CODE}
+	       </if>
+	       <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+			 	AND A.TYPE_SUB_CODE = #{TYPE_SUB_CODE}
+			 	AND A.GUBUN_SUB_CODE = #{GUBUN_SUB_CODE}
+	       </if>
+           AND A.YYYY = #{YYYY}
+           AND A.MM = #{MM}
+	</update>
+
+	<update id="saveDesmMprDetailnProgress" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_DETAIL_PROGRESS A
+		USING DUAL
+		ON (A.MPR_SEQ = #{MPR_SEQ} AND A.PO_NO = #{PO_NO} AND A.TYPE_CODE = #{TYPE_CODE}
+		     <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+		     	 AND A.GUBUN_CODE = #{GUBUN_CODE}
+		     </if>
+		     <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+		     	 AND A.TYPE_SUB_CODE = #{TYPE_SUB_CODE}
+		     	 AND A.GUBUN_SUB_CODE = #{GUBUN_SUB_CODE}
+		     </if>
+			AND A.YYYY = #{YYYY} AND A.MM = #{MM})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+		     	A.VAL = #{VAL},
+		     </if>
+		     <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+		     	A.VAL_SUB = NVL(#{VAL_SUB}, ''),
+		     </if>
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.MPR_SEQ
+		     ,A.PO_NO
+		     ,A.TYPE_CODE
+		     ,A.GUBUN_CODE
+		     ,A.YYYY
+		     ,A.MM
+		     ,A.VAL
+		     ,A.TYPE_SUB_CODE
+		     ,A.GUBUN_SUB_CODE
+		     ,A.VAL_SUB
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{MPR_SEQ}
+		     ,#{PO_NO}
+		     ,#{TYPE_CODE}
+		     ,#{GUBUN_CODE}
+		     ,#{YYYY}
+		     ,#{MM}
+		     ,#{VAL}
+		     ,#{TYPE_SUB_CODE}
+		     ,#{GUBUN_SUB_CODE}
+		     ,NVL(#{VAL_SUB},'')
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<update id="updateDesmMprDetailnProgressRemark" parameterType="java.util.Map">
+	    UPDATE DESM_MPR_DETAIL_PROGRESS_REMARK A
+	       SET A.REMARK = #{REMARK},
+		       A.LAST_UPDATED_BY = #{USER_AD},
+		       A.LAST_UPDATE_DATE = SYSDATE
+	     WHERE A.MPR_SEQ = #{MPR_SEQ}
+	       AND A.PO_NO = #{PO_NO}
+	       AND A.TYPE_CODE = #{TYPE_CODE}
+	       AND A.GUBUN_CODE = #{GUBUN_CODE}
+	</update>
+
+	<update id="saveDesmMprDetailnProgressRemark" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_DETAIL_PROGRESS_REMARK A
+		USING DUAL
+		ON (A.MPR_SEQ = #{MPR_SEQ} AND A.PO_NO = #{PO_NO} AND A.TYPE_CODE = #{TYPE_CODE}
+		     <if test='GUBUN_CODE != null and GUBUN_CODE !="" and GUBUN_CODE !="NN"'>
+			 	AND A.GUBUN_CODE = #{GUBUN_CODE}
+		     </if>
+		     <if test='TYPE_SUB_CODE != null and TYPE_SUB_CODE !="" and TYPE_SUB_CODE !="NN"'>
+			 	AND A.TYPE_SUB_CODE = #{TYPE_SUB_CODE}
+			 	AND A.GUBUN_SUB_CODE = #{GUBUN_SUB_CODE}
+		     </if>
+		 	)
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.REMARK = #{REMARK},
+		     A.WEIGHT = TO_NUMBER(#{WEIGHT}) * 100,
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.MPR_SEQ
+		     ,A.PO_NO
+		     ,A.TYPE_CODE
+		     ,A.GUBUN_CODE
+		     ,A.TYPE_SUB_CODE
+		     ,A.GUBUN_SUB_CODE
+		     ,A.REMARK
+		     ,A.WEIGHT
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{MPR_SEQ}
+		     ,#{PO_NO}
+		     ,#{TYPE_CODE}
+		     ,#{GUBUN_CODE}
+		     ,NVL(#{TYPE_SUB_CODE}, 'NN')
+		     ,NVL(#{GUBUN_SUB_CODE}, 'NN')
+		     ,#{REMARK}
+		     ,TO_NUMBER(#{WEIGHT}) * 100
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprSetupList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MprMapper.getDesmMprSetupList : MPR Seup 목록 */
+		SELECT PO_NO,
+			   PROJECT_NO,
+		       PO_DESCRIPTION,
+		       PROJECT_NAME,
+		       SUPPLIER_NUMBER,
+		       SUPPLIER_NAME,
+		       ROW_NUMBER() OVER(ORDER BY MPR_NO DESC) AS RN,
+		       PRODUCT_NAME,
+		       MPR_NO,
+		       STATUS,
+		       REJECT_COMMENTS,
+		       MANAGER,
+		       MPR_SUBMISSION,
+			   CREATED_BY,
+			   CREATION_DATE,
+			   LAST_UPDATED_BY,
+			   LAST_UPDATE_DATE
+		  FROM (SELECT DMSD.PO_NO,
+					   CASE WHEN DPI.PROJECT_CODE IS NULL THEN DMP.PROJECT_CODE ELSE DPI.PROJECT_CODE END AS PROJECT_NO,
+		               CASE WHEN DPI.PO_DESCRIPTION IS NULL THEN DMP.PO_DESCRIPTION ELSE DPI.PO_DESCRIPTION END AS PO_DESCRIPTION,
+		               CASE WHEN DPI.PROJECT_NAME IS NULL THEN DMP.PROJECT_NAME ELSE DPI.PROJECT_NAME END AS PROJECT_NAME,
+		               CASE WHEN DPI.SUPPLIER_NUMBER IS NULL THEN DMP.SUPPLIER_NUMBER ELSE DPI.SUPPLIER_NUMBER END AS SUPPLIER_NUMBER,
+		               CASE WHEN DPI.SUPPLIER_NAME IS NULL THEN DMP.SUPPLIER_NAME ELSE DPI.SUPPLIER_NAME END AS SUPPLIER_NAME,
+				       DMSD.PRODUCT_NAME,
+				       DMSD.MPR_NO,
+				       DMSD.STATUS,
+				       DMSD.REJECT_COMMENTS,
+				       NVL(DMSD.MPR_SUBMISSION, 1) AS MPR_SUBMISSION,
+				       (SELECT DMSM.USER_AD FROM DESM_MPR_SETUP_MAIL DMSM WHERE DMSM.PO_NO = DMSD.PO_NO AND DMSM.MPR_NO = DMSD.MPR_NO AND EXPEDITER_YN = 'Y') AS MANAGER,
+				       DMSD.CREATED_BY,
+				       TO_CHAR(DMSD.CREATION_DATE, 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE,
+				       DMSD.LAST_UPDATED_BY,
+				       TO_CHAR(DMSD.LAST_UPDATE_DATE, 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE
+				  FROM DESM_MPR_SETUP_DATE DMSD,
+				       DESM_PO_HEADER_INT DPI,
+         			   DESM_MANUAL_PO DMP
+				 WHERE DMSD.PO_NO = DPI.PO_NO(+)
+     				   AND DMSD.PO_NO = DMP.PO_NO(+)
+				   <if test='PROJECT_NO != null and PROJECT_NO !=""'>
+				   		AND DPI.PROJECT_CODE = #{PROJECT_NO}
+				   </if>
+				   <if test='PO_NO != null and PO_NO !=""'>
+				   		AND DMSD.PO_NO = #{PO_NO}
+				   </if>
+				   <if test='SUPPLIER != null and SUPPLIER !=""'>
+				   		AND UPPER(DPI.SUPPLIER_NAME) LIKE '%' || UPPER(#{SUPPLIER}) || '%'
+				   </if>
+				   <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+				   		AND DPI.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+				   </if>
+				   <if test='START_UPDATE_DATE != null and START_UPDATE_DATE !=""'>
+				   		AND DMSD.LAST_UPDATE_DATE >= TO_DATE(#{START_UPDATE_DATE}, 'YYYY/MM/DD')
+				   </if>
+				   <if test='END_UPDATE_DATE != null and END_UPDATE_DATE !=""'>
+				   		AND DMSD.LAST_UPDATE_DATE <![CDATA[ < ]]> TO_DATE(#{END_UPDATE_DATE}, 'YYYY/MM/DD') + 1
+				   </if>
+				 )
+		 WHERE 1 = 1
+		   <if test='MANAGER != null and MANAGER !=""'>
+		   AND UPPER(MANAGER) LIKE '%' || UPPER(#{MANAGER}) || '%'
+		   </if>
+	</select>
+
+	<update id="saveDesmMprStatus" parameterType="java.util.Map">
+		UPDATE DESM_MPR_HEADER A
+		   SET A.STATUS = #{STATUS},
+		       A.REJECT_COMMENTS = #{REJECT_COMMENTS},
+		       A.LAST_UPDATED_BY = #{USER_AD},
+		       A.LAST_UPDATE_DATE = SYSDATE
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+	</update>
+
+	<select id="getSupplier_230322" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT PV.VENDOR_ID
+		,      PV.VENDOR_NAME
+		,      PV.VENDOR_NAME_ALT
+		,      PV.SEGMENT1
+		FROM PO_VENDORS@LN_PROD_ZSHPIF PV
+		WHERE 1=1
+	   <if test='keyword != null and keyword !=""'>
+	   	  AND (UPPER(PV.VENDOR_NAME) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(PV.SEGMENT1) LIKE '%' || UPPER(#{keyword}) || '%')
+	   </if>
+	</select>
+
+	<select id="getSupplier" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT VENDOR_ID
+		,      NVL(VENDOR_NAME, USER_AD) AS VENDOR_NAME
+		,      VENDOR_NAME_ALT
+		,      NVL(SEGMENT1, SUPPLIER_NO) AS SEGMENT1
+		FROM (
+		  SELECT PV.VENDOR_ID
+		  ,      PV.VENDOR_NAME
+		  ,		 PV.VENDOR_NAME_ALT
+		  ,      PV.SEGMENT1
+		  ,      '' AS USER_AD
+		  ,      '' AS SUPPLIER_NO
+		  FROM PO_VENDORS@LN_PROD_ZSHPIF PV
+		  WHERE 1=1
+		   <if test='keyword != null and keyword !=""'>
+		   	  AND (UPPER(PV.SEGMENT1) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(PV.VENDOR_NAME) LIKE '%' || UPPER(#{keyword}) || '%')
+		   </if>
+		  UNION
+		  SELECT PV.VENDOR_ID
+		  ,      PV.VENDOR_NAME
+		  ,		 PV.VENDOR_NAME_ALT
+		  ,      PV.SEGMENT1
+		  ,      DS.USER_AD
+		  ,      DS.SUPPLIER_NO
+		  FROM PO_VENDORS@LN_PROD_ZSHPIF PV, DESM_SUPPLIER DS
+		  WHERE PV.SEGMENT1(+) = DS.USER_AD
+		   <if test='keyword != null and keyword !=""'>
+		   	  AND (UPPER(DS.USER_AD) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(DS.SUPPLIER_NO) LIKE '%' || UPPER(#{keyword}) || '%')
+		   </if>
+		   AND PV.SEGMENT1 IS NULL
+		)
+	</select>
+
+	<select id="getMprSupplier" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT VENDOR_ID
+		,      NVL(VENDOR_NAME, USER_AD) AS VENDOR_NAME
+		,      VENDOR_NAME_ALT
+		,      NVL(SEGMENT1, SUPPLIER_NO) AS SEGMENT1
+		FROM (
+		  SELECT PV.VENDOR_ID
+		  ,      PV.VENDOR_NAME
+		  ,		 PV.VENDOR_NAME_ALT
+		  ,      PV.SEGMENT1
+		  ,      '' AS USER_AD
+		  ,      '' AS SUPPLIER_NO
+		  FROM PO_VENDORS@LN_PROD_ZSHPIF PV
+		  WHERE 1=1
+		   <if test='keyword != null and keyword !=""'>
+		   	  AND (UPPER(PV.SEGMENT1) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(PV.VENDOR_NAME) LIKE '%' || UPPER(#{keyword}) || '%')
+		   </if>
+		  UNION
+		  SELECT PV.VENDOR_ID
+		  ,      PV.VENDOR_NAME
+		  ,		 PV.VENDOR_NAME_ALT
+		  ,      PV.SEGMENT1
+		  ,      DS.USER_AD
+		  ,      DS.SUPPLIER_NO
+		  FROM PO_VENDORS@LN_PROD_ZSHPIF PV, DESM_SUPPLIER DS
+		  WHERE PV.SEGMENT1(+) = DS.USER_AD
+		   <if test='keyword != null and keyword !=""'>
+		   	  AND (UPPER(DS.USER_AD) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(DS.SUPPLIER_NO) LIKE '%' || UPPER(#{keyword}) || '%')
+		   </if>
+		   AND PV.SEGMENT1 IS NULL
+		)
+	</select>
+
+	<select id="getDesmManualPoCount" parameterType="java.util.Map" resultType="Integer">
+		SELECT SUM(CNT) AS CNT
+		FROM (
+		     SELECT COUNT(*) AS CNT
+		     FROM DESM_PO_HEADER_INT
+		     WHERE PO_NO = #{PO_NO} AND PROJECT_CODE = #{PROJECT_NO}
+		     UNION
+		     SELECT COUNT(*) AS CNT
+		     FROM DESM_MANUAL_PO
+		     WHERE PO_NO = #{PO_NO} AND PROJECT_CODE = #{PROJECT_NO}
+		)
+	</select>
+
+	<insert id="saveDesmManualPoCreationData" parameterType="java.util.Map">
+		MERGE INTO DESM_MANUAL_PO A
+		USING DUAL
+		ON (A.PO_NO = #{PO_NO} AND A.PROJECT_CODE = #{PROJECT_NO})
+		WHEN MATCHED THEN
+		     UPDATE
+		        SET A.AUTHORIZATION_STATUS = #{AUTHORIZATION_STATUS}
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PO_NO
+		     ,A.PO_DESCRIPTION
+		     ,A.AUTHORIZATION_STATUS
+		     ,A.PROJECT_CODE
+		     ,A.PROJECT_NAME
+		     ,A.SUPPLIER_NUMBER
+		     ,A.SUPPLIER_NAME
+		     ,A.CREATION_BY
+		     ,A.CREATION_DATE)
+		     VALUES
+		     (#{PO_NO}
+		     ,#{PO_DESCRIPTION}
+		     ,#{AUTHORIZATION_STATUS}
+		     ,#{PROJECT_NO}
+		     ,#{PROJECT_NAME}
+		     ,#{SUPPLIER_NO}
+		     ,#{SUPPLIER_NAME}
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</insert>
+
+	<select id="getDesmSupplierSetupPoList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DPHI.PO_NO
+		,      DPHI.PO_DESCRIPTION
+		,      TO_CHAR(DPHI.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE
+		,      DPHI.REVISION_NUM
+		,      DPHI.BUYER_ID AS BUYER
+		,      DPHI.SUPPLIER_NUMBER
+		,      DPHI.SUPPLIER_NAME
+		,      DPHI.VENDOR_COUNTRY_CODE
+		,      DPHI.PROJECT_CODE
+		,      DPHI.PROJECT_NAME
+		FROM DESM_PO_HEADER_INT DPHI
+		WHERE 1=1
+		AND DPHI.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+		ORDER BY DPHI.APPROVED_DATE DESC
+	</select>
+
+	<insert id="insertDesmSupplierSetupData" parameterType="java.util.Map">
+		MERGE INTO DESM_SUPPLIER A
+		USING DUAL
+		ON (A.USER_AD = #{P_USER_AD})
+		WHEN MATCHED THEN
+		     UPDATE
+		        SET A.LAST_UPDATED_BY = #{USER_AD},
+			   	   <if test='IDCS_C != null and IDCS_C =="Y"'>
+			   	   A.IDCS_CREATION_DATE = SYSDATE,
+			   	   </if>
+			   	   <if test='IDCS_U != null and IDCS_U =="Y"'>
+			   	   A.IDCS_LAST_UPDATE_DATE = SYSDATE,
+			   	   </if>
+		            A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.USER_AD
+		     ,A.SUPPLIER_NO
+	   	     <if test='IDCS_C != null and IDCS_C =="Y"'>
+	   	     ,A.IDCS_CREATION_DATE
+	   	     </if>
+	   	     <if test='IDCS_U != null and IDCS_U =="Y"'>
+	   	     ,A.IDCS_LAST_UPDATE_DATE
+	   	     </if>
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{P_USER_AD}
+		     ,#{SUPPLIER_NO}
+	   	     <if test='IDCS_C != null and IDCS_C =="Y"'>
+	   	     ,SYSDATE
+	   	     </if>
+	   	     <if test='IDCS_U != null and IDCS_U =="Y"'>
+	   	     ,SYSDATE
+	   	     </if>
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</insert>
+
+	<select id="getDesmSupplierSetupList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_NAME,
+		       DU.USER_AD,
+		       DU.MAIL,
+		       DS.LAST_UPDATED_BY,
+		       DS.CHECKED,
+		       DS.ATTACH_GRP_CD,
+		       DS.SUPPLIER_NO,
+		       DU.USER_AD || ' / ' || DS.SUPPLIER_NO AS SUPPLIER_NO_ID,
+		       NVL(DU.FEDERATED_YN, 'N') AS FEDERATED_YN,
+		       DU.IDCS_YN AS IDCS_ID,
+		       DS.MEMO,
+		       TO_CHAR(DS.IDCS_LAST_UPDATE_DATE, 'YY/MM/DD') AS IDCS_LAST_UPDATE_DATE,
+           	   TO_CHAR(DS.IDCS_CREATION_DATE, 'YY/MM/DD') AS IDCS_CREATION_DATE,
+		       CASE WHEN DU.IDCS_YN = 'N' OR DU.IDCS_YN IS NULL THEN 'Draft'
+		        	WHEN (DU.IDCS_YN = 'Y' OR DU.IDCS_YN IS NOT NULL) AND (SELECT COUNT(*) FROM DESM_USER_LOG DUL WHERE DUL.USER_AD = DS.USER_AD) > 0 THEN 'Confirmed'
+		        	WHEN DU.IDCS_YN = 'Y' OR DU.IDCS_YN IS NOT NULL THEN 'Sending' END AS STATUS
+		  FROM DESM_SUPPLIER DS,
+		       DESM_USER DU
+		 WHERE DS.USER_AD = DU.USER_AD
+		   AND DU.DELEGATE_FLAG = 'N'
+	    <if test='USER_NAME != null and USER_NAME !=""'>
+	       AND UPPER(DU.USER_NAME) LIKE '%' || UPPER(#{USER_NAME}) || '%'
+	    </if>
+	    <if test='USER_AD != null and USER_AD !=""'>
+	       AND UPPER(DS.SUPPLIER_NO) LIKE '%' || UPPER(#{USER_AD}) || '%'
+	    </if>
+		ORDER BY DS.LAST_UPDATE_DATE DESC
+	</select>
+
+	<delete id="deleteDesmSupplierSetupData" parameterType="java.util.Map">
+		BEGIN
+		DELETE FROM DESM_SUPPLIER
+		WHERE USER_AD = #{P_USER_AD};
+
+		DELETE DESM_USER
+		 WHERE USER_AD = #{P_USER_AD};
+		END;
+
+	</delete>
+
+	<select id="getDesmMprSetupSupplierList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_NAME AS SUPPLIER_NAME,
+		       DU.USER_AD AS SUPPLIER_NO,
+		       DU.MAIL,
+		       DS.LAST_UPDATED_BY
+		  FROM DESM_SUPPLIER DS,
+		       DESM_USER DU
+		 WHERE DS.USER_AD = DU.USER_AD
+		   AND DU.DELEGATE_FLAG = 'N'
+	    <if test='SUPPLIER_NAME != null and SUPPLIER_NAME !=""'>
+	       AND UPPER(DU.USER_NAME) LIKE '%' || UPPER(#{SUPPLIER_NAME}) || '%'
+	    </if>
+	    <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+	       AND UPPER(DU.USER_AD) LIKE '%' || UPPER(#{SUPPLIER_NO}) || '%'
+	    </if>
+		ORDER BY DS.LAST_UPDATE_DATE DESC
+	</select>
+
+	<select id="getDesmMprSetupUserList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_NAME,
+		       DU.USER_AD,
+		       NVL(ZE.ZEMAIL, DU.MAIL) AS  MAIL
+		  FROM DESM_USER DU,
+		  	   ZVTS_EMP ZE,
+		       DESM_SUPPLIER DS
+		 WHERE DU.USER_AD = ZE.AD_USER_ID(+)
+		   AND ZE.ZSTATUS_TYPE(+) = '재직'
+		   AND DU.USER_AD = DS.USER_AD(+)
+		   AND DU.DELEGATE_FLAG = 'N'
+		   AND DS.USER_AD IS NULL
+	    <if test='USER_NAME != null and USER_NAME !=""'>
+	       AND (UPPER(DU.USER_NAME) LIKE '%' || UPPER(#{USER_NAME}) || '%' OR UPPER(DU.USER_AD) LIKE '%' || UPPER(#{USER_NAME}) || '%')
+	    </if>
+	    <if test='USER_AD != null and USER_AD !=""'>
+	       AND UPPER(DU.USER_AD) LIKE '%' || UPPER(#{USER_AD}) || '%'
+	    </if>
+		ORDER BY DU.USER_AD
+	</select>
+
+	<update id="saveDesmMprSetupMail" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_SETUP_MAIL A
+		USING DUAL
+		ON (A.MAIL_SEQ = #{MAIL_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE
+		        SET A.MAIL = #{MAIL},
+		        	A.MEMO = #{MEMO},
+		        	A.MPR_NO = #{MPR_NO},
+				    <if test='P_USER_AD != null and P_USER_AD !=""'>
+				    A.USER_AD = #{P_USER_AD},
+				    </if>
+				    <if test='EXPEDITER_YN != null and EXPEDITER_YN !=""'>
+				    A.EXPEDITER_YN = #{EXPEDITER_YN},
+				    </if>
+		            A.LAST_UPDATED_BY = #{USER_AD},
+		            A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.MAIL_SEQ
+		     ,A.PO_NO
+		     ,A.TYPE_CODE
+		     ,A.MAIL
+		     ,A.MEMO
+		     ,A.MPR_NO
+		     <if test='P_USER_AD != null and P_USER_AD !=""'>
+		     ,A.USER_AD
+		     </if>
+		     <if test='EXPEDITER_YN != null and EXPEDITER_YN !=""'>
+		     ,A.EXPEDITER_YN
+		     </if>
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_SETUP_MAIL.NEXTVAL
+		     ,#{PO_NO}
+		     ,#{TYPE_CODE}
+		     ,#{MAIL}
+		     ,#{MEMO}
+		     ,#{MPR_NO}
+		     <if test='P_USER_AD != null and P_USER_AD !=""'>
+		     ,#{P_USER_AD}
+		     </if>
+		     <if test='EXPEDITER_YN != null and EXPEDITER_YN !=""'>
+		     ,#{EXPEDITER_YN}
+		     </if>
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprSetupMail" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMSM.MAIL,
+			   DMSM.MEMO,
+			   DMSM.MAIL_SEQ,
+			   DMSM.USER_AD,
+			   DMSM.EXPEDITER_YN
+		  FROM DESM_MPR_SETUP_MAIL DMSM
+		 WHERE DMSM.PO_NO = #{PO_NO}
+		   AND DMSM.MPR_NO = #{MPR_NO}
+		   <if test='TYPE_CODE != null and TYPE_CODE !=""'>
+		   AND DMSM.TYPE_CODE = #{TYPE_CODE}
+		   </if>
+		ORDER BY DMSM.LAST_UPDATED_BY DESC
+	</select>
+
+	<delete id="deleteDesmMprSetupMail" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_SETUP_MAIL
+		WHERE MAIL_SEQ = #{MAIL_SEQ}
+	</delete>
+
+	<select id="getSupplierAuth" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MAX(DS.SUPPLIER_NO) AS USER_AD,
+		       MAX(DU.USER_NAME) AS USER_NAME,
+		       CASE WHEN MAX(DS.USER_AD) IS NOT NULL THEN 'Y' ELSE 'N' END AS SUPPLIER_YN
+		  FROM DESM_SUPPLIER DS,
+		       DESM_USER DU
+		 WHERE DS.USER_AD = DU.USER_AD
+		   AND DS.USER_AD = #{USER_AD}
+	</select>
+
+	<update id="saveDesmMprProgressNote" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_PROGRESS_NOTE A
+		USING DUAL
+		ON (A.NOTE_SEQ = #{NOTE_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.TYPE = #{TYPE},
+		     A.CONTENTS = #{CONTENTS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.NOTE_SEQ
+		     ,A.MPR_SEQ
+		     ,A.PO_NO
+		     ,A.TYPE
+		     ,A.CONTENTS
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_PROGRESS_NOTE.NEXTVAL
+		     ,#{MPR_SEQ}
+		     ,#{PO_NO}
+		     ,#{TYPE}
+		     ,#{CONTENTS}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprProgressNote" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.NOTE_SEQ,
+		       A.TYPE,
+		       A.CONTENTS
+		  FROM DESM_MPR_PROGRESS_NOTE A
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+		ORDER BY A.NOTE_SEQ
+	</select>
+
+	<delete id="deleteDesmMprProgressNote" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_PROGRESS_NOTE
+		WHERE NOTE_SEQ = #{NOTE_SEQ}
+	</delete>
+
+	<update id="saveDesmMprMainRemarks" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_REMARKS A
+		USING DUAL
+		ON (A.REMARKS_SEQ = #{REMARKS_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.TYPE = #{TYPE},
+		     A.CONTENTS = #{CONTENTS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.REMARKS_SEQ
+		     ,A.MPR_SEQ
+		     ,A.PO_NO
+		     ,A.TYPE
+		     ,A.CONTENTS
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_REMARKS.NEXTVAL
+		     ,#{MPR_SEQ}
+		     ,#{PO_NO}
+		     ,#{TYPE}
+		     ,#{CONTENTS}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprRemarks" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.REMARKS_SEQ,
+		       A.TYPE,
+		       A.CONTENTS
+		  FROM DESM_MPR_REMARKS A
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+		ORDER BY A.REMARKS_SEQ
+	</select>
+
+	<delete id="deleteDesmMprRemarks" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_REMARKS
+		WHERE REMARKS_SEQ = #{REMARKS_SEQ}
+	</delete>
+
+	<update id="saveDesmMprProcure" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_PROCURE A
+		USING DUAL
+		ON (A.PROCURE_SEQ = #{PROCURE_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.ITEM = #{ITEM},
+		     A.VENDOR_NAME = #{VENDOR_NAME},
+		     A.VENDOR_COUNTRY = #{VENDOR_COUNTRY},
+		     A.PO_PLAN = TO_DATE(#{PO_PLAN}, 'YYYY/MM/DD'),
+		     A.PO_EXPECTED = TO_DATE(#{PO_EXPECTED}, 'YYYY/MM/DD'),
+		     A.PO_ACTUAL = TO_DATE(#{PO_ACTUAL}, 'YYYY/MM/DD'),
+		     A.DELIVERY_PLAN = TO_DATE(#{DELIVERY_PLAN}, 'YYYY/MM/DD'),
+		     A.DELIVERY_EXPECTED = TO_DATE(#{DELIVERY_EXPECTED}, 'YYYY/MM/DD'),
+		     A.DELIVERY_ACTUAL = TO_DATE(#{DELIVERY_ACTUAL}, 'YYYY/MM/DD'),
+		     A.REMARKS = #{REMARKS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PROCURE_SEQ
+		     ,A.MPR_SEQ
+		     ,A.ITEM
+		     ,A.VENDOR_NAME
+		     ,A.VENDOR_COUNTRY
+		     ,A.PO_PLAN
+		     ,A.PO_EXPECTED
+		     ,A.PO_ACTUAL
+		     ,A.DELIVERY_PLAN
+		     ,A.DELIVERY_EXPECTED
+		     ,A.DELIVERY_ACTUAL
+		     ,A.REMARKS
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_PROCURE.NEXTVAL
+		     ,#{MPR_SEQ}
+		     ,#{ITEM}
+		     ,#{VENDOR_NAME}
+		     ,#{VENDOR_COUNTRY}
+		     ,#{PO_PLAN}
+		     ,#{PO_EXPECTED}
+		     ,#{PO_ACTUAL}
+		     ,#{DELIVERY_PLAN}
+		     ,#{DELIVERY_EXPECTED}
+		     ,#{DELIVERY_ACTUAL}
+		     ,#{REMARKS}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprProcure" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMP.PROCURE_SEQ,
+		       DMP.ITEM,
+		       DMP.VENDOR_NAME,
+		       DMP.VENDOR_COUNTRY,
+		       TO_CHAR(DMP.PO_PLAN, 'YYYY/MM/DD') AS PO_PLAN,
+		       TO_CHAR(DMP.PO_EXPECTED, 'YYYY/MM/DD') AS PO_EXPECTED,
+		       TO_CHAR(DMP.PO_ACTUAL, 'YYYY/MM/DD') AS PO_ACTUAL,
+		       TO_CHAR(DMP.DELIVERY_PLAN, 'YYYY/MM/DD') AS DELIVERY_PLAN,
+		       TO_CHAR(DMP.DELIVERY_EXPECTED, 'YYYY/MM/DD') AS DELIVERY_EXPECTED,
+		       TO_CHAR(DMP.DELIVERY_ACTUAL, 'YYYY/MM/DD') AS DELIVERY_ACTUAL,
+		       DMP.REMARKS,
+		       ROW_NUMBER() OVER(ORDER BY DMP.PROCURE_SEQ) AS NO
+		  FROM DESM_MPR_PROCURE DMP
+		 WHERE DMP.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<delete id="deleteDesmProcure" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_PROCURE
+		WHERE PROCURE_SEQ = #{PROCURE_SEQ}
+	</delete>
+
+	<update id="saveDesmMprImgTxt" parameterType="java.util.Map">
+		UPDATE ESAATTH
+		   SET REM = #{TXT},
+		   	   SEQ = #{SEQ}
+		 WHERE SYS_ID = 'EMRO'
+		   AND ATT_ID = #{ID}
+	</update>
+
+	<update id="saveDesmMprSetupProductName" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_SETUP_DATE A
+		USING DUAL
+		ON (A.PO_NO = #{PO_NO} AND A.MPR_NO = #{MPR_NO})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.PRODUCT_NAME = #{PRODUCT_NAME},
+		     A.STATUS = #{STATUS},
+		     A.MPR_SUBMISSION = #{MPR_SUBMISSION},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.PO_NO
+		     ,A.MPR_NO
+		     ,A.PRODUCT_NAME
+		     ,A.STATUS
+		     ,A.MPR_SUBMISSION
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{PO_NO}
+		     ,#{MPR_NO}
+		     ,#{PRODUCT_NAME}
+		     ,#{STATUS}
+		     ,#{MPR_SUBMISSION}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<update id="saveDesmMprSetupSubmisstionPeriod" parameterType="java.util.Map">
+	     UPDATE
+	     	DESM_MPR_SETUP_DATE A
+	     SET
+		     A.SUBMISSION_PERIOD = #{SUBMISSION_PERIOD}
+		     , A.SUBMISSION_PERIOD_MONTH = #{SUBMISSION_PERIOD_MONTH}
+		 WHERE A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+	</update>
+
+	<select id="getDesmMprSetupCheckDateList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMSD.PO_NO,
+		       DMSD.START_MONTH,
+		       DMSD.END_MONTH
+		  FROM DESM_MPR_SETUP_DATE DMSD
+		 WHERE DMSD.PO_NO = #{PO_NO}
+		   AND DMSD.MPR_NO = #{MPR_NO}
+		 <if test='STATUS != null and STATUS !=""'>
+		   AND DMSD.STATUS = #{STATUS}
+		 </if>
+	</select>
+
+	<select id="getDesmMprPayments" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DPI.LINE_NUM
+		,      DPI.ITEM
+		,      DPI.ITEM_DESCRIPTION
+		,      RTRIM(TO_CHAR(DPI.QUANTITY, 'FM999,999,999,999,999,999,999,999,999,999,999.999999'), TO_CHAR(0, 'D')) AS QUANTITY
+		,      DPI.UOM
+		--,      RTRIM(TO_CHAR(DPI.UNIT_PRICE, 'FM999,999,999,999,999,999,999,999,999,999,999.999999'), TO_CHAR(0, 'D')) AS UNIT_PRICE
+		,      '*' AS UNIT_PRICE
+		,      DPI.CURRENCY_CODE
+		--,      RTRIM(TO_CHAR(DPI.PO_LINE_AMOUNT, 'FM999,999,999,999,999,999,999,999,999,999,999.999999'), TO_CHAR(0, 'D')) AS PO_LINE_AMOUNT
+		,      '*' AS PO_LINE_AMOUNT
+		,      RTRIM(TO_CHAR(DPI.LOCATION_QUANTITY_RECEIVED, 'FM999,999,999,999,999,999,999,999,999,999,999.999999'), TO_CHAR(0, 'D')) AS LOCATION_QUANTITY_RECEIVED
+		,      RTRIM(TO_CHAR(DPI.BILLED_AMOUNT, 'FM999,999,999,999,999,999,999,999,999,999,999.999999'), TO_CHAR(0, 'D')) AS BILLED_AMOUNT
+		FROM DESM_PO_INT DPI
+		WHERE DPI.PO_NO = #{PO_NO}
+	</select>
+
+	<resultMap type="HashMap" id="resultMap-getDesmMprPoRemarks">
+		<result property="LONG_TEXT" column="LONG_TEXT" jdbcType="LONGVARCHAR" javaType="java.lang.String" typeHandler="egovframework.desm.cmmn.LongHandler"/>
+	</resultMap>
+	<select id="getDesmMprPoRemarks" parameterType="java.util.Map" resultType="java.util.HashMap" resultMap="resultMap-getDesmMprPoRemarks" >
+		/* Remark 가져오기, 임시로 rownum 조건 추가.. */
+		SELECT FDLT.LONG_TEXT
+		   FROM   FND_DOCUMENTS_VL@LN_PROD_ZSHPIF FD
+		   ,      FND_ATTACHED_DOCUMENTS@LN_PROD_ZSHPIF FAD
+		   ,      FND_DOCUMENTS_LONG_TEXT@LN_PROD_ZSHPIF FDLT
+		   WHERE FAD.ENTITY_NAME = 'PO_HEADERS'
+		   AND  FAD.PK2_VALUE IS NULL
+		   AND  FAD.PK3_VALUE IS NULL
+		   AND  FAD.PK4_VALUE IS NULL
+		   AND  FD.DOCUMENT_ID = FAD.DOCUMENT_ID
+		   AND  FD.MEDIA_ID = FDLT.MEDIA_ID
+		   AND  FAD.PK1_VALUE =  (SELECT DISTINCT PO_HEADER_ID
+		                            FROM DESM_PO_HEADER_INT
+		                           WHERE PO_NO = #{PO_NO})
+		   AND ROWNUM = 1
+           ORDER BY FDLT.MEDIA_ID
+	</select>
+
+	<select id="getDesmMprStatus" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.STATUS
+		  FROM DESM_MPR_HEADER A
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<delete id="deleteDesmMprList" parameterType="java.util.Map">
+		BEGIN
+			DELETE FROM DESM_MPR_REMARKS WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_PROGRESS_NOTE WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_PROCURE WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_DETAIL_PROGRESS_REMARK WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_DETAIL_PROGRESS WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_HEADER WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_DESIGN WHERE MPR_SEQ = #{MPR_SEQ};
+			DELETE FROM DESM_MPR_QUALITY WHERE MPR_SEQ = #{MPR_SEQ};
+		END;
+	</delete>
+
+	<select id="getDesmMprSaveList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MPR_SEQ
+		  FROM DESM_MPR_HEADER
+		 WHERE PO_NO = #{PO_NO}
+		   AND MPR_NO = #{MPR_NO}
+	</select>
+
+	<delete id="deleteDesmMprSetupList" parameterType="java.util.Map">
+		BEGIN
+			DELETE FROM DESM_MPR_SETUP_REMARK WHERE PO_NO = #{PO_NO} AND MPR_NO = #{MPR_NO};
+			DELETE FROM DESM_MPR_SETUP_MAIL WHERE PO_NO = #{PO_NO} AND MPR_NO = #{MPR_NO};
+			DELETE FROM DESM_MPR_SETUP_DATA WHERE PO_NO = #{PO_NO} AND MPR_NO = #{MPR_NO};
+			DELETE FROM DESM_MPR_SETUP_DATE WHERE PO_NO = #{PO_NO} AND MPR_NO = #{MPR_NO};
+		END;
+	</delete>
+
+	<select id="getMprNoList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT CASE WHEN MAX(A.MPR_NO) IS NULL THEN 'MPR' || #{PO_NO} || '-1'
+		            ELSE 'MPR' || #{PO_NO} || '-' || TO_CHAR(TO_NUMBER(SUBSTR(MAX(A.MPR_NO), INSTR(MAX(A.MPR_NO), '-') + 1)) + 1)
+		            END AS MPR_NO
+		  FROM DESM_MPR_SETUP_DATE A
+		 WHERE A.PO_NO = #{PO_NO}
+	</select>
+
+	<select id="getDesmMprPo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+		       CASE WHEN DT.CUR_MPR_DATE IS NULL THEN TO_CHAR(SYSDATE, 'YYYY/MM')
+		            ELSE TO_CHAR(ADD_MONTHS(TO_DATE(DT.CUR_MPR_DATE || '/01', 'YYYY/MM/DD'), 1), 'YYYY/MM') END AS MPR_DATE,
+		       CASE WHEN (SELECT COUNT(*) FROM DESM_MPR_SETUP_DATE DMSD WHERE DMSD.PO_NO = DT.PO_NO) = 0 THEN 'N' ELSE 'Y' END AS MPR_SAVE_YN
+		  FROM (SELECT A.PO_NO,
+		               A.PO_DESCRIPTION,
+		               A.SUPPLIER_NUMBER,
+		               A.SUPPLIER_NAME,
+		               TO_CHAR(A.MAX_PROMISED_DATE, 'YYYY/MM/DD') AS PROMISED_DATE,
+		               (SELECT MAX(MPR_DATE) FROM DESM_MPR_HEADER WHERE PO_NO = A.PO_NO) AS CUR_MPR_DATE,
+		               A.PROJECT_CODE,
+		               A.PROJECT_NAME,
+		               A.BUYER_ID AS BUYER
+		          FROM DESM_PO_HEADER_INT A
+		         WHERE 1 = 1
+				   <if test='keyword2 != null and keyword2 !=""'>
+				   AND A.PROJECT_CODE = #{keyword2}
+				   </if>
+				   <if test='keyword != null and keyword !=""'>
+				   AND (UPPER(A.PO_NO) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(A.PO_DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%')
+				   </if>
+				   <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+				   AND A.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+				   </if>
+				 UNION
+				 SELECT A.PO_NO,
+		               A.PO_DESCRIPTION,
+		               A.SUPPLIER_NUMBER,
+		               A.SUPPLIER_NAME,
+		               TO_CHAR(A.MAX_PROMISED_DATE, 'YYYY/MM/DD') AS PROMISED_DATE,
+		               (SELECT MAX(MPR_DATE) FROM DESM_MPR_HEADER WHERE PO_NO = A.PO_NO) AS CUR_MPR_DATE,
+		               A.PROJECT_CODE,
+		               A.PROJECT_NAME,
+		               A.BUYER_ID AS BUYER
+		          FROM DESM_MANUAL_PO A
+		         WHERE 1 = 1
+				   <if test='keyword2 != null and keyword2 !=""'>
+				   AND A.PROJECT_CODE = #{keyword2}
+				   </if>
+				   <if test='keyword != null and keyword !=""'>
+				   AND (UPPER(A.PO_NO) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(A.PO_DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%')
+				   </if>
+				   <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+				   AND A.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+				   </if>
+		        ) DT
+	     <if test='mpr_yn != null and mpr_yn =="Y"'>
+	     	WHERE DT.PO_NO IN (
+			      SELECT DISTINCT PO_NO FROM DESM_MPR_SETUP_DATA
+			)
+	     </if>
+		 ORDER BY PO_NO DESC
+	</select>
+
+	<select id="getDesmMprNoPo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+		       CASE WHEN DT.CUR_MPR_DATE IS NULL THEN TO_CHAR(SYSDATE, 'YYYY/MM')
+		            ELSE TO_CHAR(ADD_MONTHS(TO_DATE(DT.CUR_MPR_DATE || '/01', 'YYYY/MM/DD'), 1), 'YYYY/MM') END AS MPR_DATE
+		  FROM (SELECT A.PO_NO,
+		               A.PO_DESCRIPTION,
+		               A.SUPPLIER_NUMBER,
+		               A.SUPPLIER_NAME,
+		               TO_CHAR(A.MAX_PROMISED_DATE, 'YYYY/MM/DD') AS PROMISED_DATE,
+		               (SELECT MAX(MPR_DATE) FROM DESM_MPR_HEADER WHERE PO_NO = A.PO_NO AND MPR_NO = B.MPR_NO) AS CUR_MPR_DATE,
+		               A.PROJECT_CODE,
+		               A.PROJECT_NAME,
+		               A.BUYER_ID AS BUYER,
+		               B.PRODUCT_NAME,
+		               B.MPR_NO,
+		               NVL(B.MPR_SUBMISSION, 1) AS MPR_SUBMISSION,
+	                   NVL(B.START_MONTH, '') AS START_MONTH,
+	                   NVL(B.END_MONTH, '') AS END_MONTH
+		          FROM DESM_PO_HEADER_INT A,
+		          	   DESM_MPR_SETUP_DATE B
+		         WHERE A.PO_NO = B.PO_NO(+)
+		           AND B.STATUS(+) = 'Confirmed'
+				   <if test='keyword2 != null and keyword2 !=""'>
+				   AND A.PROJECT_CODE = #{keyword2}
+				   </if>
+				   <if test='keyword != null and keyword !=""'>
+				   AND (UPPER(A.PO_NO) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(A.PO_DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%')
+				   </if>
+				   <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+				   AND A.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+				   </if>
+				 UNION
+				 SELECT A.PO_NO,
+		               A.PO_DESCRIPTION,
+		               A.SUPPLIER_NUMBER,
+		               A.SUPPLIER_NAME,
+		               TO_CHAR(A.MAX_PROMISED_DATE, 'YYYY/MM/DD') AS PROMISED_DATE,
+		               (SELECT MAX(MPR_DATE) FROM DESM_MPR_HEADER WHERE PO_NO = A.PO_NO AND MPR_NO = B.MPR_NO) AS CUR_MPR_DATE,
+		               A.PROJECT_CODE,
+		               A.PROJECT_NAME,
+		               A.BUYER_ID AS BUYER,
+		               B.PRODUCT_NAME,
+		               B.MPR_NO,
+		               NVL(B.MPR_SUBMISSION, 1) AS MPR_SUBMISSION,
+	                   NVL(B.START_MONTH, '') AS START_MONTH,
+	                   NVL(B.END_MONTH, '') AS END_MONTH
+		          FROM DESM_MANUAL_PO A,
+		          	   DESM_MPR_SETUP_DATE B
+		          WHERE A.PO_NO = B.PO_NO(+)
+		            AND B.STATUS(+) = 'Confirmed'
+				    <if test='keyword2 != null and keyword2 !=""'>
+				    AND A.PROJECT_CODE = #{keyword2}
+				    </if>
+				    <if test='keyword != null and keyword !=""'>
+				    AND (UPPER(A.PO_NO) LIKE '%' || UPPER(#{keyword}) || '%' OR UPPER(A.PO_DESCRIPTION) LIKE '%' || UPPER(#{keyword}) || '%')
+				    </if>
+				    <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+				    AND A.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+				    </if>
+		        ) DT
+	     <if test='mpr_yn != null and mpr_yn =="Y"'>
+	     	WHERE DT.PO_NO IN (
+			      SELECT DISTINCT PO_NO FROM DESM_MPR_SETUP_DATA
+			)
+	     </if>
+		 ORDER BY PO_NO DESC, MPR_NO DESC
+	</select>
+
+	<select id="getDesmMprProgressSummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT MST_CODE,
+		               DTL_CODE AS TYPE_CODE,
+		               CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                    WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		               ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		          FROM DESM_CODE_DTL
+		         WHERE MST_CODE = 'M001'
+		           AND DELEGATE_FLAG = 'N'
+		         UNION ALL
+		         SELECT 'T9999' AS MST_CODE,
+		                'T' AS TYPE_CODE,
+		                'Overall' AS TYPE_NAME,
+		                99999 TYPE_RN
+		           FROM DUAL ) CODE_DT,
+		        (SELECT TYPE_CODE,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(PLAN_VAR_PREV) / 100, 2) ELSE TRUNC(SUM(PLAN_VAR_PREV), 2) END) || '%' AS PLAN_VAR_PREV,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(ACTUAL_VAR_PREV) / 100, 2) ELSE TRUNC(SUM(ACTUAL_VAR_PREV), 2) END) || '%' AS ACTUAL_VAR_PREV,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(PLAN_VAR_CUR) / 100, 2) ELSE TRUNC(SUM(PLAN_VAR_CUR), 2) END) || '%' AS PLAN_VAR_CUR,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(ACTUAL_VAR_CUR) / 100, 2) ELSE TRUNC(SUM(ACTUAL_VAR_CUR), 2) END) || '%' AS ACTUAL_VAR_CUR,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(PLAN_VAR_NEXT) / 100, 2) ELSE TRUNC(SUM(PLAN_VAR_NEXT), 2) END) || '%' AS PLAN_VAR_NEXT,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(ACTUAL_VAR_NEXT) / 100, 2) ELSE TRUNC(SUM(ACTUAL_VAR_NEXT), 2) END) || '%' AS ACTUAL_VAR_NEXT,
+		                TO_CHAR(SUM(WEIGHT)) || '%'  AS WEIGHT
+		            FROM (SELECT CASE WHEN LV.LV = 1 THEN TYPE_CODE ELSE 'T' END AS TYPE_CODE,
+		                         CASE WHEN LV.LV = 1 THEN PLAN_VAR_PREV ELSE PLAN_VAR_PREV * WEIGHT END AS PLAN_VAR_PREV,
+		                         CASE WHEN LV.LV = 1 THEN ACTUAL_VAR_PREV ELSE ACTUAL_VAR_PREV * WEIGHT END AS ACTUAL_VAR_PREV,
+		                         CASE WHEN LV.LV = 1 THEN PLAN_VAR_CUR ELSE PLAN_VAR_CUR * WEIGHT END AS PLAN_VAR_CUR,
+		                         CASE WHEN LV.LV = 1 THEN ACTUAL_VAR_CUR ELSE ACTUAL_VAR_CUR * WEIGHT END AS ACTUAL_VAR_CUR,
+		                         CASE WHEN LV.LV = 1 THEN PLAN_VAR_NEXT ELSE PLAN_VAR_NEXT * WEIGHT END AS PLAN_VAR_NEXT,
+		                         CASE WHEN LV.LV = 1 THEN ACTUAL_VAR_NEXT ELSE ACTUAL_VAR_NEXT * WEIGHT END AS ACTUAL_VAR_NEXT,
+		                         WEIGHT
+		                    FROM (SELECT TYPE_CODE,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_PREV_YYYY AND MM = MPR_DATE_PREV_MM AND GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR_PREV,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_PREV_YYYY AND MM = MPR_DATE_PREV_MM AND GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR_PREV,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_CUR_YYYY AND MM = MPR_DATE_CUR_MM AND GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR_CUR,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_CUR_YYYY AND MM = MPR_DATE_CUR_MM AND GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR_CUR,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_NEXT_YYYY AND MM = MPR_DATE_NEXT_MM AND GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR_NEXT,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_NEXT_YYYY AND MM = MPR_DATE_NEXT_MM AND GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR_NEXT,
+		                                 NVL(MAX(CASE WHEN GUBUN_CODE = 'P' THEN WEIGHT END), 0) AS WEIGHT
+		                            FROM (SELECT TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'YYYY') AS MPR_DATE_CUR_YYYY,
+		                                         TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'MM') AS MPR_DATE_CUR_MM,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 1), 'YYYY') AS MPR_DATE_NEXT_YYYY,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 1), 'MM') AS MPR_DATE_NEXT_MM,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), -1), 'YYYY') AS MPR_DATE_PREV_YYYY,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), -1), 'MM') AS MPR_DATE_PREV_MM,
+		                                         DT.*
+		                                    FROM DESM_MPR_HEADER DMH,
+		                                         (SELECT DMDP.YYYY,
+		                                                 DMDP.MM,
+		                                                 DMDP.VAL,
+		                                                 DMDP.TYPE_CODE,
+		                                                 DMDP.GUBUN_CODE,
+		                                                 0 AS WEIGHT
+		                                            FROM DESM_MPR_HEADER DMH,
+		                                                 DESM_MPR_DETAIL_PROGRESS DMDP
+		                                           WHERE DMH.MPR_SEQ = DMDP.MPR_SEQ
+		                                             AND DMH.MPR_SEQ = #{MPR_SEQ}
+		                                          UNION ALL
+		                                          SELECT DMSD.YYYY,
+		                                                 DMSD.MM,
+		                                                 DMSD.VAL,
+		                                                 DMSD.TYPE_CODE,
+		                                                 DMSD.GUBUN_CODE,
+		                                                 DMSR.WEIGHT
+		                                            FROM DESM_MPR_HEADER DMH,
+		                                                 DESM_MPR_SETUP_DATA DMSD,
+		                                                 DESM_MPR_SETUP_DATE DMSDE,
+		                                                 DESM_MPR_SETUP_REMARK DMSR
+		                                           WHERE DMH.PO_NO = DMSD.PO_NO
+		                                             AND DMH.MPR_NO = DMSD.MPR_NO
+		                                             AND DMSD.PO_NO = DMSDE.PO_NO
+		                                             AND DMSD.MPR_NO = DMSDE.MPR_NO
+		                                             AND DMSD.PO_NO = DMSR.PO_NO
+		                                             AND DMSD.MPR_NO = DMSR.MPR_NO
+		                                             AND DMSD.TYPE_CODE = DMSR.TYPE_CODE
+		                                             AND DMSR.GUBUN_CODE = DMSR.GUBUN_CODE
+		                                             AND DMH.MPR_SEQ = #{MPR_SEQ}
+		                                             AND DMSDE.STATUS = 'Confirmed') DT
+		                                   WHERE DMH.MPR_SEQ = #{MPR_SEQ})
+		                          GROUP BY TYPE_CODE),
+		                         (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ < ]]> 3) LV)
+		          GROUP BY TYPE_CODE) VAL_DT
+		 WHERE CODE_DT.TYPE_CODE = VAL_DT.TYPE_CODE
+		ORDER BY CODE_DT.TYPE_RN
+	</select>
+
+	<select id="getMailMprSupplierReceiver" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT A.MAIL AS EMAIL
+		  FROM DESM_USER A
+		 WHERE A.USER_AD = #{P_USER_AD}
+		   AND A.MAIL IS NOT NULL
+	</select>
+
+	<select id="getMailMprSetupReceiver" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT A.MAIL AS EMAIL
+		  FROM DESM_MPR_SETUP_MAIL A
+		 WHERE A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+		   <if test='EXPEDITER_YN != null and EXPEDITER_YN !=""'>
+		   AND A.EXPEDITER_YN = #{EXPEDITER_YN}
+		   </if>
+		   <if test='TYPE_CODE != null and TYPE_CODE !=""'>
+		   AND A.TYPE_CODE = #{TYPE_CODE}
+		   </if>
+		   AND A.MAIL IS NOT NULL
+	</select>
+
+	<update id="saveDesmMprSupplierFileGrpCd" parameterType="java.util.Map">
+		UPDATE DESM_SUPPLIER
+		   SET ATTACH_GRP_CD = #{FILE_GRP_CD}
+		 WHERE USER_AD = #{P_USER_AD}
+	</update>
+
+	<update id="saveDesmMprSetupStatus" parameterType="java.util.Map">
+		UPDATE DESM_MPR_SETUP_DATE A
+		   SET A.STATUS = #{STATUS},
+		   	   A.REJECT_COMMENTS = #{REJECT_COMMENTS},
+		       A.LAST_UPDATED_BY = #{USER_AD},
+		       A.LAST_UPDATE_DATE = SYSDATE
+		 WHERE A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+	</update>
+
+	<update id="updateDesmSupplierSetupData" parameterType="java.util.Map">
+		UPDATE DESM_SUPPLIER A
+		   SET A.LAST_UPDATED_BY = #{USER_AD},
+		   	   <if test='IDCS_C != null and IDCS_C =="Y"'>
+		   	   A.IDCS_CREATION_DATE = SYSDATE,
+		   	   </if>
+		   	   <if test='IDCS_U != null and IDCS_U =="Y"'>
+		   	   A.IDCS_LAST_UPDATE_DATE = SYSDATE,
+		   	   </if>
+			   A.LAST_UPDATE_DATE = SYSDATE
+        WHERE A.USER_AD = #{P_USER_AD}
+	</update>
+
+	<select id="getMailMprSupplierMstData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.USER_NAME,
+		       A.USER_AD,
+		       A.MAIL,
+		       '123qwer@' AS PW,
+		       NVL(B.MAIL, C.ZEMAIL) AS UPDATE_BY_MAIL
+		  FROM DESM_USER A,
+		       DESM_USER B,
+		       ZVTS_EMP C
+		 WHERE A.LAST_UPDATED_BY = B.USER_AD
+		   AND B.USER_AD = C.AD_USER_ID(+)
+		   AND A.USER_AD = #{P_USER_AD}
+		   AND C.ZSTATUS_TYPE(+) = '재직'
+
+	</select>
+
+	<select id="getMailMprSetupMstData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT B.SUPPLIER_NAME,
+		       A.PRODUCT_NAME,
+		       A.PO_NO,
+		       B.PO_DESCRIPTION,
+		       A.MPR_NO,
+		       A.STATUS,
+		       REPLACE(A.REJECT_COMMENTS, chr(10), '<![CDATA[ <br/> ]]>') AS REJECT_COMMENTS,
+		       NVL(C.MAIL, D.ZEMAIL) AS UPDATE_BY_MAIL,
+		       A.LAST_UPDATED_BY
+		  FROM DESM_MPR_SETUP_DATE A,
+		       DESM_PO_HEADER_INT B,
+		       DESM_USER C,
+		       ZVTS_EMP D
+		 WHERE A.PO_NO = B.PO_NO
+		   AND A.LAST_UPDATED_BY = C.USER_AD
+		   AND C.USER_AD = D.AD_USER_ID(+)
+		   AND D.ZSTATUS_TYPE(+) = '재직'
+		   AND A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+	</select>
+
+	<select id="getDesmMprSetupStatus" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.STATUS
+		  FROM DESM_MPR_SETUP_DATE A
+		 WHERE A.PO_NO = #{PO_NO}
+		   AND A.MPR_NO = #{MPR_NO}
+	</select>
+
+	<select id="getMailMprRequestMstData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MAX(DPHI.SUPPLIER_NAME) AS SUPPLIER_NAME,
+		       MAX(DT.PRODUCT_NAME) AS PRODUCT_NAME,
+		       MAX(DPHI.PO_NO) AS PO_NO,
+		       MAX(DPHI.PO_DESCRIPTION) AS PO_DESCRIPTION,
+		       MAX(DT.MPR_NO) AS MPR_NO,
+		       MAX(DT.MPR_ROUND) AS MPR_ROUND,
+		       MAX(DT.MANAGER_MAIL) AS MANAGER_MAIL,
+		       MAX(CASE WHEN RN = 1 THEN DT.MPR_DATE END) AS MPR_DATE_1,
+		       MAX(CASE WHEN RN = 2 THEN DT.MPR_DATE END) AS MPR_DATE_2,
+		       MAX(CASE WHEN RN = 3 THEN DT.MPR_DATE END) AS MPR_DATE_3,
+		       MAX(CASE WHEN RN = 4 THEN DT.MPR_DATE END) AS MPR_DATE_4,
+		       MAX(CASE WHEN RN = 5 THEN DT.MPR_DATE END) AS MPR_DATE_5,
+		       MAX(CASE WHEN RN = 6 THEN DT.MPR_DATE END) AS MPR_DATE_6,
+		       MAX(CASE WHEN RN = 1 THEN DT.STATUS END) AS MPR_STATUS_1,
+		       MAX(CASE WHEN RN = 2 THEN DT.STATUS END) AS MPR_STATUS_2,
+		       MAX(CASE WHEN RN = 3 THEN DT.STATUS END) AS MPR_STATUS_3,
+		       MAX(CASE WHEN RN = 4 THEN DT.STATUS END) AS MPR_STATUS_4,
+		       MAX(CASE WHEN RN = 5 THEN DT.STATUS END) AS MPR_STATUS_5,
+		       MAX(CASE WHEN RN = 6 THEN DT.STATUS END) AS MPR_STATUS_6,
+	           MAX(CASE WHEN RN = 1 THEN DT.MPR_ROUND END) AS MPR_ROUND_1,
+	           MAX(CASE WHEN RN = 2 THEN DT.MPR_ROUND END) AS MPR_ROUND_2,
+	           MAX(CASE WHEN RN = 3 THEN DT.MPR_ROUND END) AS MPR_ROUND_3,
+	           MAX(CASE WHEN RN = 4 THEN DT.MPR_ROUND END) AS MPR_ROUND_4,
+	           MAX(CASE WHEN RN = 5 THEN DT.MPR_ROUND END) AS MPR_ROUND_5,
+	           MAX(CASE WHEN RN = 6 THEN DT.MPR_ROUND END) AS MPR_ROUND_6,
+		       MAX(DT.UPDATE_BY_MAIL) AS UPDATE_BY_MAIL,
+		       MAX(DT.LAST_UPDATED_BY) AS LAST_UPDATED_BY
+		  FROM (SELECT A.PO_NO,
+		               A.PRODUCT_NAME,
+		               A.MPR_NO,
+		               ROW_NUMBER() OVER(ORDER BY B.MPR_DATE DESC) AS RN,
+		               TO_CHAR(TO_DATE(B.MPR_DATE || '/01', 'YYYY/MM/DD'),'fmMM (Month). YYYY','NLS_DATE_LANGUAGE=ENGLISH') AS MPR_DATE,
+		               B.STATUS,
+		               NVL(B.M, 1) AS MPR_ROUND,
+		               DMSM.MAIL AS MANAGER_MAIL,
+		               NVL(DU.MAIL, ZE.ZEMAIL) AS UPDATE_BY_MAIL,
+		               A.LAST_UPDATED_BY
+		          FROM DESM_MPR_HEADER A,
+		               DESM_MPR_HEADER B,
+		               DESM_MPR_SETUP_MAIL DMSM,
+		               DESM_USER DU,
+		               ZVTS_EMP ZE
+		         WHERE A.PO_NO = B.PO_NO(+)
+		           AND A.MPR_NO = B.MPR_NO(+)
+		           AND A.PO_NO = DMSM.PO_NO(+)
+		           AND A.MPR_NO = DMSM.MPR_NO(+)
+		           AND A.LAST_UPDATED_BY = DU.USER_AD
+		           AND DU.USER_AD = ZE.AD_USER_ID(+)
+		           AND DMSM.EXPEDITER_YN(+) = 'Y'
+		           AND ZE.ZSTATUS_TYPE(+) = '재직'
+		           AND A.MPR_SEQ = #{MPR_SEQ}) DT,
+		        DESM_PO_HEADER_INT DPHI
+		 WHERE DT.PO_NO = DPHI.PO_NO
+	</select>
+
+	<select id="getMailMprMstData" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT B.SUPPLIER_NAME,
+		       A.PRODUCT_NAME,
+		       B.PO_NO,
+		       B.PO_DESCRIPTION,
+		       A.MPR_NO,
+		       TO_CHAR(TO_DATE(A.MPR_DATE || '/01', 'YYYY/MM/DD'),'fmMM (Month). YYYY','NLS_DATE_LANGUAGE=ENGLISH') AS MPR_DATE,
+		       A.STATUS,
+		       NVL(A.M, 1) AS MPR_ROUND,
+		       REPLACE(A.REJECT_COMMENTS, chr(10), '<![CDATA[ <br/> ]]>') AS REJECT_COMMENTS,
+		       NVL(C.MAIL, D.ZEMAIL) AS UPDATE_BY_MAIL,
+		       A.LAST_UPDATED_BY
+		  FROM DESM_MPR_HEADER A,
+		       DESM_PO_HEADER_INT B,
+		       DESM_USER C,
+		       ZVTS_EMP D
+		 WHERE A.PO_NO = B.PO_NO
+		   AND A.LAST_UPDATED_BY = C.USER_AD
+		   AND C.USER_AD = D.AD_USER_ID(+)
+		   AND D.ZSTATUS_TYPE(+) = '재직'
+		   AND A.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<update id="saveDesmMprDesign" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_DESIGN A
+		USING DUAL
+		ON (A.DESIGN_SEQ = #{DESIGN_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.ITEM1 = #{ITEM1},
+		     A.ITEM2 = #{ITEM2},
+		     A.SCHEDULE_PLAN = TO_DATE(#{SCHEDULE_PLAN}, 'YYYY/MM/DD'),
+		     A.SCHEDULE_ACTUAL = TO_DATE(#{SCHEDULE_ACTUAL}, 'YYYY/MM/DD'),
+		     A.REMARKS = #{REMARKS},
+		     A.MFG_YN = #{MFG_YN},
+		     A.APPROVAL_EXPECTED = TO_DATE(#{APPROVAL_EXPECTED}, 'YYYY/MM/DD'),
+		     A.APPROVAL_ACTUAL = TO_DATE(#{APPROVAL_ACTUAL}, 'YYYY/MM/DD'),
+		     A.DOCUMENT_NO = #{DOCUMENT_NO},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.DESIGN_SEQ
+		     ,A.MPR_SEQ
+		     ,A.ITEM1
+		     ,A.ITEM2
+		     ,A.SCHEDULE_PLAN
+		     ,A.SCHEDULE_ACTUAL
+		     ,A.REMARKS
+		     ,A.MFG_YN
+		     ,A.APPROVAL_EXPECTED
+		     ,A.APPROVAL_ACTUAL
+		     ,A.DOCUMENT_NO
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_DESIGN.NEXTVAL
+		     ,#{MPR_SEQ}
+		     ,#{ITEM1}
+		     ,#{ITEM2}
+		     ,#{SCHEDULE_PLAN}
+		     ,#{SCHEDULE_ACTUAL}
+		     ,#{REMARKS}
+		     ,#{MFG_YN}
+		     ,#{APPROVAL_EXPECTED}
+		     ,#{APPROVAL_ACTUAL}
+		     ,#{DOCUMENT_NO}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprDesign" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.DESIGN_SEQ,
+		       A.ITEM1,
+		       A.ITEM2,
+		       TO_CHAR(A.SCHEDULE_PLAN, 'YYYY/MM/DD') AS SCHEDULE_PLAN,
+		       TO_CHAR(A.SCHEDULE_ACTUAL, 'YYYY/MM/DD') AS SCHEDULE_ACTUAL,
+		       A.REMARKS,
+		       NVL(A.MFG_YN, 'N') AS MFG_YN,
+		       TO_CHAR(A.APPROVAL_PLAN, 'YYYY/MM/DD') AS APPROVAL_PLAN,
+		       TO_CHAR(A.APPROVAL_ACTUAL, 'YYYY/MM/DD') AS APPROVAL_ACTUAL,
+           	   TO_CHAR(A.APPROVAL_EXPECTED, 'YYYY/MM/DD') AS APPROVAL_EXPECTED,
+		       A.DOCUMENT_NO,
+		       ROW_NUMBER() OVER(ORDER BY A.DESIGN_SEQ) AS NO
+		 FROM DESM_MPR_DESIGN A
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<delete id="deleteDesmDesign" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_DESIGN
+		WHERE DESIGN_SEQ = #{DESIGN_SEQ}
+	</delete>
+
+	<update id="saveDesmMprQuality" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_QUALITY A
+		USING DUAL
+		ON (A.QUALITY_SEQ = #{QUALITY_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.ITEM1 = #{ITEM1},
+		     A.ITEM2 = #{ITEM2},
+		     A.SCHEDULE_PLAN = TO_DATE(#{SCHEDULE_PLAN}, 'YYYY/MM/DD'),
+		     A.SCHEDULE_ACTUAL = TO_DATE(#{SCHEDULE_ACTUAL}, 'YYYY/MM/DD'),
+		     A.REMARKS = #{REMARKS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.QUALITY_SEQ
+		     ,A.MPR_SEQ
+		     ,A.ITEM1
+		     ,A.ITEM2
+		     ,A.SCHEDULE_PLAN
+		     ,A.SCHEDULE_ACTUAL
+		     ,A.REMARKS
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_QUALITY.NEXTVAL
+		     ,#{MPR_SEQ}
+		     ,#{ITEM1}
+		     ,#{ITEM2}
+		     ,#{SCHEDULE_PLAN}
+		     ,#{SCHEDULE_ACTUAL}
+		     ,#{REMARKS}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprQuality" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.QUALITY_SEQ,
+		       A.ITEM1,
+		       A.ITEM2,
+		       TO_CHAR(A.SCHEDULE_PLAN, 'YYYY/MM/DD') AS SCHEDULE_PLAN,
+		       TO_CHAR(A.SCHEDULE_ACTUAL, 'YYYY/MM/DD') AS SCHEDULE_ACTUAL,
+		       A.REMARKS,
+		       ROW_NUMBER() OVER(ORDER BY A.QUALITY_SEQ) AS NO
+		  FROM DESM_MPR_QUALITY A
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<delete id="deleteDesmQuality" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_QUALITY
+		WHERE QUALITY_SEQ = #{QUALITY_SEQ}
+	</delete>
+
+	<update id="saveDesmMprManufacture" parameterType="java.util.Map">
+		MERGE INTO DESM_MPR_MFG A
+		USING DUAL
+		ON (A.MFG_SEQ = #{MFG_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.TYPE = #{TYPE},
+		     A.ITEM = #{ITEM},
+		     A.SCHEDULE_PLAN = TO_DATE(#{SCHEDULE_PLAN}, 'YYYY/MM/DD'),
+		     A.SCHEDULE_ACTUAL = TO_DATE(#{SCHEDULE_ACTUAL}, 'YYYY/MM/DD'),
+		     A.REMARKS = #{REMARKS},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.MFG_SEQ
+		     ,A.MPR_SEQ
+		     ,A.TYPE
+		     ,A.ITEM
+		     ,A.SCHEDULE_PLAN
+		     ,A.SCHEDULE_ACTUAL
+		     ,A.REMARKS
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (SEQ_DESM_MPR_MFG.NEXTVAL
+		     ,#{MPR_SEQ}
+		     ,#{TYPE}
+		     ,#{ITEM}
+		     ,#{SCHEDULE_PLAN}
+		     ,#{SCHEDULE_ACTUAL}
+		     ,#{REMARKS}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmMprManufacture" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.MFG_SEQ,
+		       A.TYPE,
+		       A.ITEM,
+		       TO_CHAR(A.SCHEDULE_PLAN, 'YYYY/MM/DD') AS SCHEDULE_PLAN,
+		       TO_CHAR(A.SCHEDULE_ACTUAL, 'YYYY/MM/DD') AS SCHEDULE_ACTUAL,
+		       A.REMARKS,
+		       ROW_NUMBER() OVER(ORDER BY A.MFG_SEQ) AS NO
+		  FROM DESM_MPR_MFG A
+		 WHERE A.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<delete id="deleteDesmManufacture" parameterType="java.util.Map">
+		DELETE FROM DESM_MPR_MFG
+		WHERE MFG_SEQ = #{MFG_SEQ}
+	</delete>
+
+	<select id="getDesmShippingMarkList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DSMH.HEADER_SEQ,
+		       DSMH.PROJECT_NO,
+		       DPHI.PROJECT_NAME,
+		       TO_CHAR(DSMH.LAST_UPDATE_DATE, 'YYYY/MM/DD') AS LAST_UPDATE_DATE,
+		       DSMH.PO_NO,
+		       DPHI.PO_DESCRIPTION,
+		       DPHI.SUPPLIER_NUMBER,
+		       DPHI.SUPPLIER_NAME
+		  FROM DESM_SHIPPING_MARK_HEADER DSMH,
+		       DESM_PO_HEADER_INT DPHI
+		 WHERE DSMH.PO_NO = DPHI.PO_NO
+		   <if test='PROJECT_NO != null and PROJECT_NO !=""'>
+		   AND DSMH.PROJECT_NO = #{PROJECT_NO}
+		   </if>
+		   <if test='PO_NO != null and PO_NO !=""'>
+		   AND DSMH.PO_NO = #{PO_NO}
+		   </if>
+		   <if test='SUPPLIER_NAME != null and SUPPLIER_NAME !=""'>
+		   AND UPPER(DPHI.SUPPLIER_NAME) LIKE '%' || UPPER(#{SUPPLIER_NAME}) || '%'
+		   </if>
+		   <if test='SUPPLIER_NO != null and SUPPLIER_NO !=""'>
+		   AND DPHI.SUPPLIER_NUMBER = #{SUPPLIER_NO}
+		   </if>
+		   <if test='START_DATE != null and START_DATE !=""'>
+		   AND DSMH.LAST_UPDATE_DATE >= TO_DATE(#{START_DATE}, 'YYYY/MM/DD')
+		   </if>
+		   <if test='END_DATE != null and END_DATE !=""'>
+		   AND DSMH.LAST_UPDATE_DATE <![CDATA[ < ]]> TO_DATE(#{END_DATE}, 'YYYY/MM/DD') + 1
+		   </if>
+		ORDER BY DSMH.HEADER_SEQ DESC
+	</select>
+
+	<delete id="deleteDesmShippingMarkList" parameterType="java.util.Map">
+		BEGIN
+			DELETE FROM DESM_SHIPPING_MARK_HEADER
+			WHERE HEADER_SEQ = #{HEADER_SEQ};
+
+			DELETE FROM DESM_SHIPPING_MARK_DETAIL
+			WHERE HEADER_SEQ = #{HEADER_SEQ};
+		END;
+
+	</delete>
+
+	<delete id="deleteDesmShippingMarkReportList" parameterType="java.util.Map">
+		DELETE FROM DESM_SHIPPING_MARK_REPORT
+		WHERE USER_AD = #{USER_AD}
+	</delete>
+
+	<insert id="saveDesmShippingMarkReportList" parameterType="java.util.Map">
+		INSERT INTO DESM_SHIPPING_MARK_REPORT
+		(HEADER_SEQ
+		,USER_AD)
+		VALUES
+		(#{HEADER_SEQ}
+		,#{USER_AD})
+	</insert>
+
+	<update id="saveDesmShippingMarkHeader" parameterType="java.util.Map">
+		MERGE INTO DESM_SHIPPING_MARK_HEADER A
+		USING DUAL
+		ON (A.HEADER_SEQ = #{HEADER_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.PO_NO = #{PO_NO},
+		     A.PROJECT_NO = #{PROJECT_NO},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.HEADER_SEQ
+		     ,A.PO_NO
+		     ,A.PROJECT_NO
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{HEADER_SEQ}
+		     ,#{PO_NO}
+		     ,#{PROJECT_NO}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<update id="saveDesmShippingMarkDetail" parameterType="java.util.Map">
+		MERGE INTO DESM_SHIPPING_MARK_DETAIL A
+		USING DUAL
+		ON (A.DETAIL_SEQ = #{DETAIL_SEQ})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     A.INVOICE_NO = #{INVOICE_NO},
+		     A.PACKAGE_LIST_NO = #{PACKAGE_LIST_NO},
+		     A.PACKAGE_NO = #{PACKAGE_NO},
+		     A.DESCRIPTION = #{DESCRIPTION},
+		     A.DIMENSIONS_L = #{DIMENSIONS_L},
+		     A.DIMENSIONS_W = #{DIMENSIONS_W},
+		     A.DIMENSIONS_H = #{DIMENSIONS_H},
+		     A.CBM = #{CBM},
+		     A.GROSS = #{GROSS},
+		     A.NET = #{NET},
+		     A.STORAGE_CLASSIFICATION = #{STORAGE_CLASSIFICATION},
+		     A.DEPARTURE_PORT = #{DEPARTURE_PORT},
+		     A.DESTINATION_PORT = #{DESTINATION_PORT},
+		     A.COUNTRY = #{COUNTRY},
+		     A.LAST_UPDATED_BY = #{USER_AD},
+		     A.LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (A.HEADER_SEQ
+		     ,A.DETAIL_SEQ
+		     ,A.INVOICE_NO
+		     ,A.PACKAGE_LIST_NO
+		     ,A.PACKAGE_NO
+		     ,A.DESCRIPTION
+		     ,A.DIMENSIONS_L
+		     ,A.DIMENSIONS_W
+		     ,A.DIMENSIONS_H
+		     ,A.CBM
+		     ,A.GROSS
+		     ,A.NET
+		     ,A.STORAGE_CLASSIFICATION
+		     ,A.DEPARTURE_PORT
+		     ,A.DESTINATION_PORT
+		     ,A.COUNTRY
+		     ,A.CREATED_BY
+		     ,A.CREATION_DATE
+		     ,A.LAST_UPDATED_BY
+		     ,A.LAST_UPDATE_DATE)
+		     VALUES
+		     (#{HEADER_SEQ}
+		     ,SEQ_DESM_SHIPPING_MARK_DETAIL.NEXTVAL
+		     ,#{INVOICE_NO}
+		     ,#{PACKAGE_LIST_NO}
+		     ,#{PACKAGE_NO}
+		     ,#{DESCRIPTION}
+		     ,#{DIMENSIONS_L}
+		     ,#{DIMENSIONS_W}
+		     ,#{DIMENSIONS_H}
+		     ,#{CBM}
+		     ,#{GROSS}
+		     ,#{NET}
+		     ,#{STORAGE_CLASSIFICATION}
+		     ,#{DEPARTURE_PORT}
+		     ,#{DESTINATION_PORT}
+		     ,#{COUNTRY}
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<select id="getDesmShippingMarkHeaderSeq" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT SEQ_DESM_SHIPPING_MARK_HEADER.NEXTVAL AS SEQ
+		  FROM DUAL
+	</select>
+
+	<delete id="deleteDesmShippingMarkDetail" parameterType="java.util.Map">
+		DELETE FROM DESM_SHIPPING_MARK_DETAIL
+		WHERE DETAIL_SEQ = #{DETAIL_SEQ}
+	</delete>
+
+	<select id="getDesmShippingMarkDetailList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.INVOICE_NO,
+		       A.DETAIL_SEQ,
+		       A.PACKAGE_LIST_NO,
+		       A.PACKAGE_NO,
+		       A.DESCRIPTION,
+		       A.DIMENSIONS_L,
+		       A.DIMENSIONS_W,
+		       A.DIMENSIONS_H,
+		       A.CBM,
+		       A.GROSS,
+		       A.NET,
+		       A.STORAGE_CLASSIFICATION,
+		       A.DEPARTURE_PORT,
+		       A.DESTINATION_PORT,
+		       A.COUNTRY
+		  FROM DESM_SHIPPING_MARK_DETAIL A
+		 WHERE A.HEADER_SEQ = #{HEADER_SEQ}
+		ORDER BY A.DETAIL_SEQ
+	</select>
+
+	<update id="saveDesmSupplierSetupMemo" parameterType="java.util.Map">
+		UPDATE DESM_SUPPLIER A
+		   SET A.MEMO = #{MEMO},
+		       A.LAST_UPDATED_BY = #{USER_AD},
+		       A.LAST_UPDATE_DATE = SYSDATE
+		 WHERE A.USER_AD = #{P_USER_AD}
+	</update>
+
+	<select id="getDesmSupplierSetupCheckList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT USER_AD
+		  FROM DESM_SUPPLIER A
+		 WHERE A.SUPPLIER_NO = #{SUPPLIER_NO}
+	</select>
+
+	<select id="getDesmMprProcurePrev" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMP.PROCURE_SEQ,
+		       DMP.ITEM,
+		       DMP.VENDOR_NAME,
+		       DMP.VENDOR_COUNTRY,
+		       TO_CHAR(DMP.PO_PLAN, 'YYYY/MM/DD') AS PO_PLAN,
+		       TO_CHAR(DMP.PO_EXPECTED, 'YYYY/MM/DD') AS PO_EXPECTED,
+		       TO_CHAR(DMP.PO_ACTUAL, 'YYYY/MM/DD') AS PO_ACTUAL,
+		       TO_CHAR(DMP.DELIVERY_PLAN, 'YYYY/MM/DD') AS DELIVERY_PLAN,
+		       TO_CHAR(DMP.DELIVERY_EXPECTED, 'YYYY/MM/DD') AS DELIVERY_EXPECTED,
+		       TO_CHAR(DMP.DELIVERY_ACTUAL, 'YYYY/MM/DD') AS DELIVERY_ACTUAL,
+		       DMP.REMARKS,
+		       ROW_NUMBER() OVER(ORDER BY DMP.PROCURE_SEQ) AS NO
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DMH.MPR_SEQ DESC) AS RN,
+		               DMH.MPR_SEQ
+		          FROM DESM_MPR_HEADER DMH
+		         WHERE 1 = 1
+				   AND DMH.MPR_DATE <![CDATA[ < ]]> #{MPR_DATE}
+		           AND DMH.PO_NO = #{PO_NO}
+		           AND DMH.MPR_NO = #{MPR_NO}) MT,
+		        DESM_MPR_PROCURE DMP
+		 WHERE MT.MPR_SEQ = DMP.MPR_SEQ
+		   AND MT.RN = 1
+	</select>
+
+	<select id="getDesmMprDesignPrev" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMD.DESIGN_SEQ,
+		       DMD.ITEM1,
+		       DMD.ITEM2,
+		       TO_CHAR(DMD.SCHEDULE_PLAN, 'YYYY/MM/DD') AS SCHEDULE_PLAN,
+		       TO_CHAR(DMD.SCHEDULE_ACTUAL, 'YYYY/MM/DD') AS SCHEDULE_ACTUAL,
+		       DMD.REMARKS,
+		       DMD.MFG_YN,
+		       TO_CHAR(DMD.APPROVAL_PLAN, 'YYYY/MM/DD') AS APPROVAL_PLAN,
+		       TO_CHAR(DMD.APPROVAL_ACTUAL, 'YYYY/MM/DD') AS APPROVAL_ACTUAL,
+		       DMD.DOCUMENT_NO,
+		       ROW_NUMBER() OVER(ORDER BY DMD.DESIGN_SEQ) AS NO
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DMH.MPR_SEQ DESC) AS RN,
+		               DMH.MPR_SEQ
+		          FROM DESM_MPR_HEADER DMH
+		         WHERE 1 = 1
+				   AND DMH.MPR_DATE <![CDATA[ < ]]> #{MPR_DATE}
+		           AND DMH.PO_NO = #{PO_NO}
+		           AND DMH.MPR_NO = #{MPR_NO}) MT,
+		        DESM_MPR_DESIGN DMD
+		 WHERE MT.MPR_SEQ = DMD.MPR_SEQ
+		   AND MT.RN = 1
+	</select>
+
+	<select id="getDesmMprRemarkPrev" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MT.DESIGN_REMARK, MT.DESIGN_NOTE, MT.QUALITY_REMARK, MT.QUALITY_NOTE
+		  FROM (SELECT DMH.DESIGN_REMARK,
+                   	   DMH.DESIGN_NOTE,
+                   	   DMH.QUALITY_REMARK,
+                   	   DMH.QUALITY_NOTE,
+                   	   ROW_NUMBER() OVER(ORDER BY DMH.MPR_SEQ DESC) AS RN
+		          FROM DESM_MPR_HEADER DMH
+		         WHERE 1 = 1
+				   AND DMH.MPR_DATE <![CDATA[ < ]]> #{MPR_DATE}
+		           AND DMH.PO_NO = #{PO_NO}
+		           AND DMH.MPR_NO = #{MPR_NO}) MT
+		 WHERE MT.RN = 1
+	</select>
+
+	<select id="getDesmMprQualityPrev" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMQ.QUALITY_SEQ,
+		       DMQ.ITEM1,
+		       DMQ.ITEM2,
+		       TO_CHAR(DMQ.SCHEDULE_PLAN, 'YYYY/MM/DD') AS SCHEDULE_PLAN,
+		       TO_CHAR(DMQ.SCHEDULE_ACTUAL, 'YYYY/MM/DD') AS SCHEDULE_ACTUAL,
+		       DMQ.REMARKS,
+		       ROW_NUMBER() OVER(ORDER BY DMQ.QUALITY_SEQ) AS NO
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DMH.MPR_SEQ DESC) AS RN,
+		               DMH.MPR_SEQ
+		          FROM DESM_MPR_HEADER DMH
+		         WHERE 1 = 1
+				   AND DMH.MPR_DATE <![CDATA[ < ]]> #{MPR_DATE}
+		           AND DMH.PO_NO = #{PO_NO}
+		           AND DMH.MPR_NO = #{MPR_NO}) MT,
+		        DESM_MPR_QUALITY DMQ
+		 WHERE MT.MPR_SEQ = DMQ.MPR_SEQ
+		   AND MT.RN = 1
+	</select>
+
+	<select id="getDesmMprManufacturePrev" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MFG.MFG_SEQ,
+		       MFG.TYPE,
+		       MFG.ITEM,
+		       TO_CHAR(MFG.SCHEDULE_PLAN, 'YYYY/MM/DD') AS SCHEDULE_PLAN,
+		       TO_CHAR(MFG.SCHEDULE_ACTUAL, 'YYYY/MM/DD') AS SCHEDULE_ACTUAL,
+		       MFG.REMARKS,
+		       ROW_NUMBER() OVER(ORDER BY MFG.MFG_SEQ) AS NO
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DMH.MPR_SEQ DESC) AS RN,
+		               DMH.MPR_SEQ
+		          FROM DESM_MPR_HEADER DMH
+		         WHERE 1 = 1
+				   AND DMH.MPR_DATE <![CDATA[ < ]]> #{MPR_DATE}
+		           AND DMH.PO_NO = #{PO_NO}
+		           AND DMH.MPR_NO = #{MPR_NO}) MT,
+		        DESM_MPR_MFG MFG
+		 WHERE MT.MPR_SEQ = MFG.MPR_SEQ
+		   AND MT.RN = 1
+	</select>
+
+	<select id="getRole" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DUR.USER_AD,
+		       NVL(ZE.ZEMP_NM, DU.USER_NAME) AS USER_NAME
+		  FROM DESM_USER_ROLE DUR,
+		       DESM_USER DU,
+		       ZVTS_EMP ZE
+		 WHERE DUR.USER_AD = DU.USER_AD
+		   AND DUR.USER_AD = ZE.AD_USER_ID(+)
+		   AND DUR.ROLE_SEQ = '289'
+		   AND DUR.USER_AD = #{USER_AD}
+	</select>
+
+	<select id="getMprTeam" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT
+		       ZE.ZORG_ID,
+		       ZE.ZORG_NM
+		  FROM DESM_MPR_SETUP_MAIL DMSM,
+		       ZVTS_EMP ZE
+		 WHERE DMSM.USER_AD = ZE.AD_USER_ID
+		   AND DMSM.TYPE_CODE = 'D'
+		   AND UPPER(ZE.ZORG_NM) like '%'|| UPPER(#{keyword}) ||'%'
+		 ORDER BY ZE.ZORG_NM
+	</select>
+</mapper>

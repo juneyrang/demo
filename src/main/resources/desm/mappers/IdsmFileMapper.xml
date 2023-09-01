@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.IdsmFileMapper">	
+
+	<select id="getIdsmSetupDlgItemScheduleFile" parameterType="java.util.Map" resultType="java.util.HashMap">
+	
+	  SELECT ATT_ID AS ID
+	     , GRP_CD AS GROUPID
+	     , ORGN_FILE_NM AS NAME    
+	     , ATT_FILE_PATH AS REFERENCE
+	     , TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+	     , SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+	  FROM  ESAATTH
+	  WHERE SYS_ID = 'EMRO'
+	    AND GRP_CD = #{FILE_GRP_CD}
+	    AND STS <![CDATA[<>]]> 'D'
+	    
+	</select>	
+	
+	<select id="getIdsmSetupDlgItemScheduleFileById" parameterType="java.util.Map" resultType="java.util.HashMap">
+	
+	  SELECT ATT_ID AS ID
+	     , GRP_CD AS GROUPID
+	     , ORGN_FILE_NM AS NAME    
+	     , ATT_FILE_PATH AS REFERENCE
+	     , TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+	     , SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+	  FROM  ESAATTH
+	  WHERE SYS_ID = 'EMRO'
+	    AND ATT_ID = #{ATT_ID}
+	    AND STS <![CDATA[<>]]> 'D'
+	    
+	</select>	
+	
+	<update id="deleteIdsmSetupDlgItemScheduleFile" parameterType="java.util.Map">
+		UPDATE ESAATTH SET 
+			STS = 'D',
+			MOD_ID = #{USER_AD},
+			MOD_DT = SYSDATE 
+		WHERE SYS_ID = 'EMRO'
+		  AND ATT_ID = #{key}
+	</update>
+	
+	<insert id="saveIdsmSetupDlgItemScheduleFile" parameterType="java.util.Map">
+		INSERT INTO ESAATTH
+		(SYS_ID
+		,ATT_ID
+		,GRP_CD
+		,ORGN_FILE_NM
+		,ATT_FILE_NM
+		,ATT_FILE_PATH
+		,ATT_FILE_SIZ
+		,SORT_ORD
+		,STS
+		,REG_ID
+		,MOD_ID)
+		VALUES
+		('EMRO'
+		,#{ATT_ID}
+		,#{FILE_GRP_CD}
+		,#{ORGN_FILE_NM}
+		,#{ATT_FILE_NM}
+		,#{ATT_FILE_PATH}
+		,#{ATT_FILE_SIZ}
+		,0
+		,'C'
+		,#{USER_AD}
+		,#{USER_AD})		
+	</insert>	
+					
+	<select id="getIdsmSetupDlgItemScheduleFileCheckGrp" parameterType="java.util.Map" resultType="java.util.HashMap">
+	
+	  SELECT ATT_ID AS ID
+	     , GRP_CD AS GROUPID
+	     , ORGN_FILE_NM AS NAME    
+	     , ATT_FILE_PATH AS REFERENCE
+	     , TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+	     , SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+	  FROM  ESAATTH
+	  WHERE SYS_ID = 'EMRO'
+	    AND GRP_CD = #{FILE_GRP_CD}
+	    
+	</select>	
+	
+	<select id="getIdsmSetupDlgItemScheduleFileCheckId" parameterType="java.util.Map" resultType="java.util.HashMap">
+	
+	  SELECT ATT_ID AS ID
+	     , GRP_CD AS GROUPID
+	     , ORGN_FILE_NM AS NAME    
+	     , ATT_FILE_PATH AS REFERENCE
+	     , TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+	     , SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+	  FROM  ESAATTH
+	  WHERE SYS_ID = 'EMRO'
+	    AND ATT_ID = #{ATT_ID}
+	    
+	</select>						
+															
+</mapper>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.TestMapper">
+
+	<update id="updateSetLanguage" parameterType="java.util.Map">
+	    <![CDATA[
+	    	alter session set nls_language = 'AMERICAN'
+	    ]]>	
+	</update>
+
+	<select id="getTestGridView" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* TestMapper.getTestGridView : Test Grid Data 갖고오기.. */
+		SELECT * FROM DESM_TEST_TABLE
+		ORDER BY SEQ_NO
+	</select>
+	
+	<select id="getTestDataList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		
+		SELECT * FROM DESM_DATA_TMP
+	</select>
+	
+	<select id="getContentSupplySummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* TestMapper.getContentSupplySummary : 기자재 일정관리 Summary 메일 발송 컨텐트 확인 */
+		SELECT COUNT(*) AS ALLC
+        -- MPS ALL, MPS EMPTY
+        ,      COUNT(A.MPS_PLAN_DATE) AS ALL_PMC
+        ,      COUNT(*) - COUNT(A.MPS_PLAN_DATE) AS PMC
+        ,      COUNT(A.MPS_EXPECTED_DATE) AS ALL_EMC
+        ,      COUNT(*) - COUNT(A.MPS_EXPECTED_DATE) AS EMC
+        -- TE ALL, TE EMPTY
+        ,      COUNT(A.TE_PLAN_DATE) AS ALL_PTC
+        ,      COUNT(*) - COUNT(A.TE_PLAN_DATE) AS PTC
+        ,      COUNT(A.TE_EXPECTED_DATE) AS ALL_ETC
+        ,      COUNT(*) - COUNT(A.TE_EXPECTED_DATE) AS ETC
+        -- PO ALL, PO EMPTY
+        ,      COUNT(A.PO_PLAN_DATE) AS ALL_PPC
+        ,      COUNT(*) - COUNT(A.PO_PLAN_DATE) AS PPC
+        ,      COUNT(A.PO_EXPECTED_DATE) AS ALL_EPC
+        ,      COUNT(*) - COUNT(A.PO_EXPECTED_DATE) AS EPC
+        -- CARGO ALL, CARGO EMPTY
+        ,      COUNT(A.CARGO_PLAN_DATE) AS ALL_PCC
+        ,      COUNT(*) - COUNT(A.CARGO_PLAN_DATE) AS PCC
+        ,      COUNT(A.CARGO_EXPECTED_DATE) AS ALL_ECC
+        ,      COUNT(*) - COUNT(A.CARGO_EXPECTED_DATE) AS ECC
+        -- FOB ALL, FOB EMPTY
+        ,      COUNT(A.FOB_PLAN_DATE) AS ALL_PFC
+        ,      COUNT(*) - COUNT(A.FOB_PLAN_DATE) AS PFC
+        ,      COUNT(A.FOB_EXPECTED_DATE) AS ALL_EFC
+        ,      COUNT(*) - COUNT(A.FOB_EXPECTED_DATE) AS EFC
+        -- ONSITE ALL, ONSITE EMPTY
+        ,      COUNT(A.ONSITE_PLAN_DATE) AS ALL_POC
+        ,      COUNT(*) - COUNT(A.ONSITE_PLAN_DATE) AS POC
+        ,      COUNT(A.ONSITE_EXPECTED_DATE) AS ALL_EOC
+        ,      COUNT(*) - COUNT(A.ONSITE_EXPECTED_DATE) AS EOC
+        -- PM
+        ,      COUNT(A.PM_AD) AS ALL_MPMC
+        ,      COUNT(*) - COUNT(A.PM_AD) AS MPMC
+        -- 설계
+        ,      COUNT(A.EM_AD) AS ALL_MEMC
+        ,      COUNT(*) - COUNT(A.EM_AD) AS MEMC
+        -- 구매
+        ,      COUNT(A.BUYER_AD) AS ALL_MBUYERC
+        ,      COUNT(*) - COUNT(A.BUYER_AD) AS MBUYERC
+        -- 공정관리
+        ,      COUNT(A.SM_AD) AS ALL_MSMC
+        ,      COUNT(*) - COUNT(A.SM_AD) AS MSMC
+        -- 품질
+        ,      COUNT(A.QC_AD) AS ALL_MQCC
+        ,      COUNT(*) - COUNT(A.QC_AD) AS MQCC
+        FROM DESM_SUPPLY_SUMMARY_V A
+        WHERE 1=1
+        AND A.PROJECT_NO = 'T19020'
+        AND A.LV IN (3, 4)
+	</select>
+	
+	<select id="getMailSupplySummaryReceeiver" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_AD
+        ,      DU.MAIL AS EMAIL
+        FROM DESM_USER DU
+        WHERE DU.USER_AD IN ('HANBYUL1.LEE', 'DESMPARK2022')
+	</select>
+	
+	<select id="getTestTable" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* TestMapper.getTestTable : Test Grid Data 갖고오기.. */
+		SELECT SEQ_NO
+		,	   COLINTA
+		,	   COLINTB
+		,      COLINTC
+		,	   COLINTD
+		,	   COLTEXTA
+		,	   COLTEXTB
+		,	   COLTEXTC
+		,	   COLTEXTD
+		,	   TO_CHAR(COLDATE, 'YYYY/MM/DD')
+		,	   FILE_GRP_CD
+		FROM DESM_TEST_TABLE
+		ORDER BY SEQ_NO
+	</select>
+	
+	<update id="saveDesmTestTableFileGrpCd" parameterType="java.util.Map">
+		UPDATE DESM_TEST_TABLE
+		   SET FILE_GRP_CD = #{FILE_GRP_CD}
+		 WHERE SEQ_NO = #{SEQ_NO}
+	</update>
+</mapper>

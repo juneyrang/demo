@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.ManageMapper">
+
+	<!-- OP목록 조회 -->
+	<select id="selectOperatorList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT A.MYACCT_AUTH_ID, A.DEPT_CODE, ORG.ORG_NM AS DEPT_NAME, 
+			A.OPERATOR_AD, EMP.NAME AS OP_NAME,
+			A.OPERATOR_AD_SUB, EMP_SUB.NAME AS SUB_OP_NAME, 
+			A.CREATION_DATE, A.LAST_UPDATE_DATE
+		FROM zfin_ap_myacct_auth A
+			JOIN INF_HVLEG_ORG@erp_int_l3 ORG ON UPPER(ORG.ORG_ID) = UPPER(A.DEPT_CODE)
+			JOIN INF_HVERP_EMPLOYEE@erp_int_l3 EMP ON UPPER(EMP.AD_USER_ID) = UPPER(A.OPERATOR_AD)
+			LEFT OUTER JOIN INF_HVERP_EMPLOYEE@erp_int_l3 EMP_SUB ON UPPER(EMP_SUB.AD_USER_ID) = UPPER(A.OPERATOR_AD_SUB)
+		WHERE 1=1 
+	        <if test="idx != null">
+				AND A.MYACCT_AUTH_ID = #{idx}
+			</if>
+	        <if test="deptCode != null">
+				AND A.DEPT_CODE = #{deptCode} 
+			</if>
+	        <if test="opAD != null">
+				AND (A.OPERATOR_AD = #{opAD} OR A.OPERATOR_AD = #{opAD})
+			</if>
+		ORDER BY ORG.ORG_NM
+	</select>
+	
+	<!-- OP 등록/수정 -->
+	<update id="saveOperatorInfo" parameterType="java.util.Map">
+		MERGE INTO ZFIN_AP_MYACCT_AUTH
+			USING DUAL
+			ON (MYACCT_AUTH_ID = #{jobCode})
+			WHEN MATCHED THEN
+				UPDATE SET
+					DEPT_CODE = #{deptCode, jdbcType=VARCHAR},
+					OPERATOR_AD = UPPER(#{opAD, jdbcType=VARCHAR}),
+					OPERATOR_AD_SUB = UPPER(#{opSubAD, jdbcType=VARCHAR}),
+					LAST_UPDATED_BY = NVL((SELECT fu.user_id FROM FND_USER_INT fu WHERE fu.user_name = #{ssoUserAD} AND ROWNUM = 1), -1),	
+					LAST_UPDATE_DATE = SYSDATE
+			WHEN NOT MATCHED THEN
+				INSERT (
+					MYACCT_AUTH_ID,		DEPT_CODE,				OPERATOR_AD,		OPERATOR_AD_SUB,
+					CREATED_BY,			CREATION_DATE,			LAST_UPDATED_BY,	LAST_UPDATE_LOGIN,			LAST_UPDATE_DATE
+				) VALUES (
+					ZFIN_AP_MYACCT_AUTH_S.NEXTVAL,
+					#{deptCode, jdbcType=VARCHAR},
+					UPPER(#{opAD, jdbcType=VARCHAR}),
+					UPPER(#{opSubAD, jdbcType=VARCHAR}),
+
+					NVL((SELECT fu.user_id FROM FND_USER_INT fu WHERE fu.user_name = #{ssoUserAD} AND ROWNUM = 1), -1),
+    				SYSDATE, 
+					NVL((SELECT fu.user_id FROM FND_USER_INT fu WHERE fu.user_name = #{ssoUserAD} AND ROWNUM = 1), -1),
+    				-1,
+    				SYSDATE
+				)
+	</update>
+	
+	<!-- OP 정보 삭제 -->
+	<delete id="deleteOperatorInfo" parameterType="java.util.Map">
+		DELETE FROM ZFIN_AP_MYACCT_AUTH
+		WHERE MYACCT_AUTH_ID = #{jobCode} 
+	</delete>				
+</mapper>

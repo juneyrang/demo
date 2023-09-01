@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="DashboardMapper">
+
+	<update id="updateSetLanguage" >
+	    <![CDATA[
+	    	alter session set nls_language = 'AMERICAN'
+	    ]]>
+    </update>
+
+	<select id="getPackageSummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* DashboardMapper.xml -> getPackageSummary : Project Package Info 합산 결과 조회 */
+		SELECT '1.DESM_ALL' AS CONDITION
+        ,      TO_CHAR(COUNT(1), 'FM999,999,999,999,990') AS PKG_COUNT
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.VOLUME, 0))), 'FM999,999,999,999,990') AS CBM_SUM -- m3
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.NET, 0)) / 1000), 'FM999,999,999,999,990') AS NET_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.GROSS, 0)) / 1000), 'FM999,999,999,999,990') AS GROSS_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.L_CM, 0) * GREATEST(DPM.W_CM, 0) / 10000)), 'FM999,999,999,999,990') AS SQM_SUM -- m2
+        FROM DESM_PACKING_MST DPM
+        WHERE DPM.PROJECT_NO = #{PROJECT_NO}
+        UNION 
+        SELECT '2.MATERIAL_CONFIRM' AS CONDITION
+        ,      TO_CHAR(COUNT(1), 'FM999,999,999,999,990') AS PKG_COUNT
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.VOLUME, 0))), 'FM999,999,999,999,990') AS CBM_SUM -- m3
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.NET, 0)) / 1000), 'FM999,999,999,999,990') AS NET_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.GROSS, 0)) / 1000), 'FM999,999,999,999,990') AS GROSS_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.L_CM, 0) * GREATEST(DPM.W_CM, 0) / 10000)), 'FM999,999,999,999,990') AS SQM_SUM -- m2
+        FROM DESM_PACKING_MST DPM
+        WHERE DPM.PROJECT_NO = #{PROJECT_NO}
+        AND NVL(DPM.IS_CONFIRM_MATERIAL, 'N') = 'Y'
+        UNION
+        SELECT '3.RECEIPTED' AS CONDITION
+        ,      TO_CHAR(COUNT(1), 'FM999,999,999,999,990') AS PKG_COUNT
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.VOLUME, 0))), 'FM999,999,999,999,990') AS CBM_SUM -- m3
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.NET, 0)) / 1000), 'FM999,999,999,999,990') AS NET_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.GROSS, 0)) / 1000), 'FM999,999,999,999,990') AS GROSS_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.L_CM, 0) * GREATEST(DPM.W_CM, 0) / 10000)), 'FM999,999,999,999,990') AS SQM_SUM -- m2
+        FROM DESM_PACKING_MST DPM
+        WHERE DPM.PROJECT_NO = #{PROJECT_NO}
+        AND DPM.RECEIPT_DATE IS NOT NULL
+        UNION
+        SELECT '4.ISSUED' AS CONDITION
+        ,      TO_CHAR(COUNT(1), 'FM999,999,999,999,990') AS PKG_COUNT
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.VOLUME, 0))), 'FM999,999,999,999,990') AS CBM_SUM -- m3
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.NET, 0)) / 1000), 'FM999,999,999,999,990') AS NET_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.GROSS, 0)) / 1000), 'FM999,999,999,999,990') AS GROSS_SUM -- ton
+        ,      TO_CHAR(ROUND(SUM(GREATEST(DPM.L_CM, 0) * GREATEST(DPM.W_CM, 0) / 10000)), 'FM999,999,999,999,990') AS SQM_SUM -- m2
+        FROM DESM_PACKING_MST DPM
+        WHERE DPM.PROJECT_NO = #{PROJECT_NO}
+        AND DPM.PACKAGE_NO NOT IN (SELECT DISTINCT A.PACKAGE_NO
+                                   FROM DESM_PACKING_DTL A
+                                   WHERE A.PROJECT_NO = #{PROJECT_NO}
+                                   AND NVL(A.IN_QTY, 0) - NVL(A.OUT_QTY, 0) + NVL(A.RETURN_QTY, 0) != 0)
+	</select>
+	
+	<select id="getMrrChartSummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* DashboardMapper.xml -> getMrrChartSummary : Project MRR Info 현황 조회 */
+		SELECT DRH.STATUS, COUNT(*) AS CNT
+		FROM DESM_MRR_HEADER DRH
+		WHERE DRH.PROJECT_NO = #{PROJECT_NO}
+		GROUP BY DRH.STATUS
+	</select>
+	
+	<select id="getMirChartSummary" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* DashboardMapper.xml -> getMirChartSummary : Project Package Info 현황 조회 */
+		SELECT DMH.STATUS, COUNT(*) AS CNT
+		FROM DESM_MIR_HEADER DMH
+		WHERE DMH.PROJECT_NO = #{PROJECT_NO}
+		GROUP BY DMH.STATUS
+	</select>
+	
+</mapper>

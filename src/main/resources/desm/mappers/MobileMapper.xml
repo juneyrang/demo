@@ -1,0 +1,3081 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.MobileMapper">
+
+	<select id="getMobileToDoList" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT 'RSI' AS S_TYPE,
+           DRH.RSI_HEADER_ID AS HEADER_ID,
+           DRH.RSI_NO AS HEADER_NO,
+           DRH.RSI_NAME AS HEADER_NAME,
+           DRH.STATUS,
+           DRH.DESCRIPTION,
+           DRH.SUBCONTRACTOR,
+           DRH.SUBCON_MANAGER,
+           DRH.CREATED_BY,
+           TO_CHAR(DRH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CREATION_DATE,
+           DRH.LAST_UPDATED_BY,
+           TO_CHAR(DRH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS LAST_UPDATE_DATE,
+           TO_CHAR(DRH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+           TO_CHAR(DRH.HANDOVER_DATE, 'YYYY/MM/DD') AS T_DATE,
+           TO_CHAR(DRH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+           DRH.REMARK,
+           DRH.ATTACH_GRP_CD,
+           DRH.REQUESTED_BY,
+           DRH.CHECKED_BY,
+           DRH.CONFIRMED_BY,
+           DRH.APPROVED_BY,
+           (SELECT COUNT(*) FROM DESM_RSI_LINE DRL WHERE DRL.RSI_HEADER_ID = DRH.RSI_HEADER_ID) AS LINE_CNT,
+           (SELECT COUNT(*)
+              FROM ESAATTH A
+             WHERE A.SYS_ID = 'EMRO'
+               AND A.STS != 'D'
+               AND A.GRP_CD = DRH.ATTACH_GRP_CD) AS ATT_CNT
+      FROM DESM_RSI_HEADER DRH,
+           DESM_USER_DEFAULT_PROJECT DUDP,
+           (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+              FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+                   DESM_CODE_DTL DCD
+             WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+               AND DCD.DELEGATE_FLAG = 'N'
+               AND DUDC.USER_AD = #{USER_AD}) CT,
+            (SELECT MAX(CASE WHEN AUTH_CODE = 'CheckS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS CheckS,
+                    MAX(CASE WHEN AUTH_CODE = 'ConS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS ConS,
+                    MAX(CASE WHEN AUTH_CODE = 'AppS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS AppS
+               FROM (SELECT S.MENU_SEQ,
+                            S.AUTH_CODE,
+                            MAX(CASE WHEN DRMA.ROLE_SEQ IS NOT NULL THEN 'Y' ELSE 'N' END) AS USE_YN
+                       FROM (SELECT DUR.ROLE_SEQ,
+                                    DM.MENU_SEQ,
+                                    DMA.AUTH_CODE,
+                                    DMA.AUTH_NAME
+                               FROM DESM_USER_ROLE DUR,
+                                    DESM_MENU DM,
+                                    DESM_MENU_AUTH DMA
+                              WHERE DM.MENU_SEQ = DMA.MENU_SEQ
+                                AND DM.MOBILE_YN = 'Y'
+		                        AND DM.DELEGATE_FLAG = 'N'
+                                AND DUR.USER_AD = #{USER_AD}
+                                AND DM.MENU_SEQ = '519') S,
+                            DESM_ROLE_MENU_AUTH DRMA
+                      WHERE S.ROLE_SEQ = DRMA.ROLE_SEQ(+)
+                        AND S.MENU_SEQ = DRMA.MENU_SEQ(+)
+                        AND S.AUTH_CODE = DRMA.AUTH_CODE(+)
+                     GROUP BY S.MENU_SEQ,
+                              S.AUTH_CODE)) AUTH
+       WHERE DRH.PROJECT_NO = DUDP.PROJECT_CODE
+         AND DUDP.USER_AD = #{USER_AD}
+         AND ((DRH.STATUS = 'Pre-Checked' AND AUTH.CheckS = 'Y') OR
+              (DRH.STATUS = 'Pre-Confirmed' AND AUTH.ConS = 'Y') OR
+              (DRH.STATUS = 'Pre-Approved' AND AUTH.AppS = 'Y'))
+    UNION ALL
+    SELECT 'MRF' AS S_TYPE,
+           DMH.MRF_HEADER_ID,
+           DMH.MRF_NO,
+           DMH.MRF_NAME,
+           DMH.STATUS,
+           DMH.DESCRIPTION,
+           DMH.SUBCONTRACTOR,
+           DMH.SUBCON_MANAGER,
+           DMH.CREATED_BY,
+           TO_CHAR(DMH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CREATION_DATE,
+           DMH.LAST_UPDATED_BY,
+           TO_CHAR(DMH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS LAST_UPDATE_DATE,
+           TO_CHAR(DMH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+           TO_CHAR(DMH.RETURN_REQ_DATE, 'YYYY/MM/DD') AS RETURN_REQ_DATE,
+           TO_CHAR(DMH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+           DMH.REMARK,
+           DMH.ATTACH_GRP_CD,
+           DMH.REQUESTED_BY,
+           DMH.CHECKED_BY,
+           DMH.CONFIRMED_BY,
+           DMH.APPROVED_BY,
+           (SELECT COUNT(*) FROM DESM_MRF_LINE DML WHERE DMH.MRF_HEADER_ID = DML.MRF_HEADER_ID) AS LINE_CNT,
+           (SELECT COUNT(*)
+              FROM ESAATTH A
+             WHERE A.SYS_ID = 'EMRO'
+               AND A.STS != 'D'
+               AND A.GRP_CD = DMH.ATTACH_GRP_CD) AS ATT_CNT
+      FROM DESM_MRF_HEADER DMH,
+           DESM_USER_DEFAULT_PROJECT DUDP,
+           (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+              FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+                   DESM_CODE_DTL DCD
+             WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+               AND DCD.DELEGATE_FLAG = 'N'
+               AND DUDC.USER_AD = #{USER_AD}) CT,
+            (SELECT MAX(CASE WHEN AUTH_CODE = 'CheckS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS CheckS,
+                    MAX(CASE WHEN AUTH_CODE = 'ConS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS ConS,
+                    MAX(CASE WHEN AUTH_CODE = 'AppS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS AppS
+               FROM (SELECT S.MENU_SEQ,
+                            S.AUTH_CODE,
+                            MAX(CASE WHEN DRMA.ROLE_SEQ IS NOT NULL THEN 'Y' ELSE 'N' END) AS USE_YN
+                       FROM (SELECT DUR.ROLE_SEQ,
+                                    DM.MENU_SEQ,
+                                    DMA.AUTH_CODE,
+                                    DMA.AUTH_NAME
+                               FROM DESM_USER_ROLE DUR,
+                                    DESM_MENU DM,
+                                    DESM_MENU_AUTH DMA
+                              WHERE DM.MENU_SEQ = DMA.MENU_SEQ
+                                AND DM.MOBILE_YN = 'Y'
+		                        AND DM.DELEGATE_FLAG = 'N'
+                                AND DUR.USER_AD = #{USER_AD}
+                                AND DM.MENU_SEQ = '520') S,
+                            DESM_ROLE_MENU_AUTH DRMA
+                      WHERE S.ROLE_SEQ = DRMA.ROLE_SEQ(+)
+                        AND S.MENU_SEQ = DRMA.MENU_SEQ(+)
+                        AND S.AUTH_CODE = DRMA.AUTH_CODE(+)
+                     GROUP BY S.MENU_SEQ,
+                              S.AUTH_CODE)) AUTH
+     WHERE DMH.PROJECT_NO = DUDP.PROJECT_CODE
+       AND DUDP.USER_AD = #{USER_AD}
+       AND ((DMH.STATUS = 'Pre-Checked' AND AUTH.CheckS = 'Y') OR
+            (DMH.STATUS = 'Pre-Confirmed' AND AUTH.ConS = 'Y') OR
+            (DMH.STATUS = 'Pre-Approved' AND AUTH.AppS = 'Y'))
+            
+     UNION ALL
+
+	SELECT 'MRR' AS S_TYPE,
+           DRH.MRR_HEADER_ID AS HEADER_ID,
+           DRH.MRR_NO AS HEADER_NO,
+           DRH.MRR_NAME AS HEADER_NAME,
+           DRH.STATUS,
+           NULL AS DESCRIPTION,
+           NULL AS SUBCONTRACTOR,
+           NULL AS SUBCON_MANAGER,
+           DRH.CREATED_BY,
+           TO_CHAR(DRH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CREATION_DATE,
+           DRH.LAST_UPDATED_BY,
+           TO_CHAR(DRH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS LAST_UPDATE_DATE,
+           TO_CHAR(DRH.Prepared_Date, 'YYYY/MM/DD') AS REQUEST_DATE,
+           null AS T_DATE,
+           TO_CHAR(DRH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+           DRH.REMARK,
+           DRH.ATTACH_GRP_CD,
+           DRH.PREPARED_BY AS REQUESTED_BY,
+           null as CHECKED_BY,
+           null as CONFIRMED_BY ,
+           DRH.CONFIRMED_BY as APPROVED_BY,
+           (SELECT COUNT(*) FROM DESM_MRR_LINE DRL WHERE DRL.MRR_HEADER_ID = DRH.MRR_HEADER_ID) AS LINE_CNT,
+           (SELECT COUNT(*)
+              FROM ESAATTH A
+             WHERE A.SYS_ID = 'EMRO'
+               AND A.STS != 'D'
+               AND A.GRP_CD = DRH.ATTACH_GRP_CD) AS ATT_CNT
+      FROM DESM_MRR_HEADER DRH,
+           DESM_USER_DEFAULT_PROJECT DUDP,
+           (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+              FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+                   DESM_CODE_DTL DCD
+             WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+               AND DCD.DELEGATE_FLAG = 'N'
+               AND DUDC.USER_AD = #{USER_AD}) CT,
+            (SELECT MAX(CASE WHEN AUTH_CODE = 'CheckS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS CheckS,
+                    MAX(CASE WHEN AUTH_CODE = 'ConS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS ConS,
+                    MAX(CASE WHEN AUTH_CODE = 'AppS' AND USE_YN = 'Y' THEN 'Y' ELSE 'N' END) AS AppS
+               FROM (SELECT S.MENU_SEQ,
+                            S.AUTH_CODE,
+                            MAX(CASE WHEN DRMA.ROLE_SEQ IS NOT NULL THEN 'Y' ELSE 'N' END) AS USE_YN
+                       FROM (SELECT DUR.ROLE_SEQ,
+                                    DM.MENU_SEQ,
+                                    DMA.AUTH_CODE,
+                                    DMA.AUTH_NAME
+                               FROM DESM_USER_ROLE DUR,
+                                    DESM_MENU DM,
+                                    DESM_MENU_AUTH DMA
+                              WHERE DM.MENU_SEQ = DMA.MENU_SEQ
+                                AND DM.MOBILE_YN = 'Y'
+                            AND DM.DELEGATE_FLAG = 'N'
+                                AND DUR.USER_AD = #{USER_AD}
+                                AND DM.MENU_SEQ = '876') S,
+                            DESM_ROLE_MENU_AUTH DRMA
+                      WHERE S.ROLE_SEQ = DRMA.ROLE_SEQ(+)
+                        AND S.MENU_SEQ = DRMA.MENU_SEQ(+)
+                        AND S.AUTH_CODE = DRMA.AUTH_CODE(+)
+                     GROUP BY S.MENU_SEQ,
+                              S.AUTH_CODE)) AUTH
+       WHERE DRH.PROJECT_NO = DUDP.PROJECT_CODE
+         AND DUDP.USER_AD = #{USER_AD}
+         AND ((DRH.STATUS = 'Pre-Confirmed' AND AUTH.ConS = 'Y'))       
+            
+	</select>
+
+
+	<select id="getMobileRsiHeaderList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DRH.RSI_HEADER_ID,
+		       DRH.RSI_NO,
+		       DRH.RSI_NAME,
+		       DRH.STATUS,
+		       DRH.DESCRIPTION,
+		       DRH.SUBCONTRACTOR,
+		       DRH.SUBCON_MANAGER,
+		       TO_CHAR(DRH.HANDOVER_DATE, 'YYYY/MM/DD') AS HANDOVER_DATE,
+		       DRH.REMARK,
+		       DRH.ATTACH_GRP_CD,
+		       TO_CHAR(DRH.REQUEST_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS REQUEST_DATE,
+		       DRH.REQUESTED_BY,
+		       TO_CHAR(DRH.CHECKED_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CHECKED_DATE,
+		       DRH.CHECKED_BY,
+		       TO_CHAR(DRH.CONFIRMED_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CONFIRMED_DATE,
+		       DRH.CONFIRMED_BY,
+		       TO_CHAR(DRH.APPROVED_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS APPROVED_DATE,
+		       DRH.APPROVED_BY,
+		       NVL(DRH.CLOSED_CODE, 'OPEN') AS CLOSED_CODE
+		  FROM DESM_RSI_HEADER DRH,
+		       (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+		          FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+		               DESM_CODE_DTL DCD
+		         WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+		           AND DCD.DELEGATE_FLAG = 'N'
+		           AND DUDC.USER_AD = #{USER_AD}) CT
+		 WHERE DRH.RSI_HEADER_ID = #{RSI_HEADER_ID}
+	</select>
+
+	<select id="getMobileRsiLineList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ROW_NUMBER() OVER(ORDER BY DRL.RSI_LINE_ID) AS NO,
+		       DRL.RSI_HEADER_ID,
+		       DRL.RSI_LINE_ID,
+		       DRL.PACKING_LIST_NO AS PACKAGE_LIST_NO,
+		       DRL.PACKAGE_NO,
+		       DRL.MATERIAL_CODE,
+		       DRL.DESCRIPTION,
+		       DRL.DRAWING_NO,
+		       DRL.REQ_QTY,
+		       DRL.ITEM_NO AS TAG_NO,
+		       DPD.MATERIAL,
+		       DPD.PACKAGE_TYPE,
+		       DPD.UNIT,
+		       DPD.IN_QTY,
+		       DPD.PROJECT_NO,
+		       DPD.LOCATION,
+		       ZIM.ATTRIBUTE10,
+		       (SELECT NVL(SUM(DRO.HANDOVER_QTY), 0) AS HANDOVER_QTY
+		          FROM DESM_RSI_OUTGOING DRO WHERE DRO.RSI_LINE_ID = DRL.RSI_LINE_ID) AS HANDOVER_QTY,
+		       TO_CHAR(SYSDATE - 1, 'YYYY/MM/DD') AS HANDOVER_DATE,
+		       DRL.REQ_QTY -
+		       (SELECT NVL(SUM(DRO.HANDOVER_QTY), 0) AS HANDOVER_QTY
+		          FROM DESM_RSI_OUTGOING DRO WHERE DRO.RSI_LINE_ID = DRL.RSI_LINE_ID) -
+		       (SELECT NVL(SUM(DML.REQ_RETURN_QTY), 0) AS REQ_RETURN_QTY
+		          FROM DESM_MRF_LINE DML
+		         WHERE DML.RSI_LINE_ID = DRL.RSI_LINE_ID) AS HANDOVER_AVAILABLE_QTY
+		      FROM DESM_PACKING_MST DPM,
+		           DESM_PACKING_DTL DPD,
+		           DESM_RSI_LINE DRL,
+           		   DESM_RSI_HEADER DRH,
+           		   ZVTS_ITEM_MASTER ZIM
+		     WHERE DPM.PROJECT_NO = DPD.PROJECT_NO
+		       AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+		       AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+		       AND DPD.MATERIAL_CODE = DRL.MATERIAL_CODE
+		       AND DRL.RSI_HEADER_ID = DRH.RSI_HEADER_ID
+		       AND DPD.PROJECT_NO = DRH.PROJECT_NO
+		       AND DPM.PROJECT_NO = ZIM.PROJECT_NO
+		       AND DPM.TRK_ITEM_NAME = ZIM.TRK_ITEM_NAME
+		       AND DPM.IS_CONFIRM_MATERIAL = 'Y'
+		       AND DRL.RSI_HEADER_ID = #{RSI_HEADER_ID}
+	</select>
+
+	<insert id="insertAccessTokenDelegate" parameterType="java.util.Map">
+		/* MobileMapper.insertAccessTokenDelegate */
+		INSERT INTO DESM_ACCESS_TOKEN_DELEGATE
+		(RETURN_CODE
+		,EXPIRES_IN
+		,ACCESS_TOKEN
+		,TOKEN_TYPE
+		,CREATION_DATE)
+		VALUES
+		(#{return_code}
+		,#{expires_in}
+		,#{access_token}
+		,#{token_type}
+		,SYSDATE)
+	</insert>
+
+	<select id="selectAccessToken" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ACCESS_TOKEN
+		FROM DESM_ACCESS_TOKEN_DELEGATE
+		WHERE RETURN_CODE = #{RETURN_CODE}
+	</select>
+
+	<select id="getMobileMrfHeaderList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMH.MRF_HEADER_ID,
+		       DMH.MRF_NO,
+		       DMH.MRF_NAME,
+		       DMH.STATUS,
+		       DMH.DESCRIPTION,
+		       DMH.SUBCONTRACTOR,
+		       DMH.SUBCON_MANAGER,
+		       TO_CHAR(DMH.RETURN_REQ_DATE, 'YYYY/MM/DD') AS RETURN_REQ_DATE,
+		       DMH.REMARK,
+		       DMH.ATTACH_GRP_CD,
+		       TO_CHAR(DMH.REQUEST_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS REQUEST_DATE,
+		       DMH.REQUESTED_BY,
+		       TO_CHAR(DMH.CHECKED_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CHECKED_DATE,
+		       DMH.CHECKED_BY,
+		       TO_CHAR(DMH.CONFIRMED_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CONFIRMED_DATE,
+		       DMH.CONFIRMED_BY,
+		       TO_CHAR(DMH.APPROVED_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS APPROVED_DATE,
+		       DMH.APPROVED_BY,
+		       NVL(DMH.CLOSED_CODE, 'OPEN') AS CLOSED_CODE
+		  FROM DESM_MRF_HEADER DMH,
+		       (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+		          FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+		               DESM_CODE_DTL DCD
+		         WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+		           AND DCD.DELEGATE_FLAG = 'N'
+		           AND DUDC.USER_AD = #{USER_AD}) CT
+		 WHERE DMH.MRF_HEADER_ID = #{MRF_HEADER_ID}
+	</select>
+
+
+	<select id="getMobileMrfLineList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+		       DPD.DESCRIPTION,
+		       DPD.DRAWING_NO,
+		       DPD.TAG_NO,
+		       DPD.IN_QTY,
+		       DPD.MATERIAL,
+		       DPD.PACKAGE_LIST_NO,
+		       DPD.PACKAGE_NO,
+		       DPD.UNIT,
+		       DPD.LOCATION,
+		       CASE WHEN RETURN_TYPE = 'RSI Cancel' THEN DT.REQ_QTY - DT.HANDOVER_QTY - DT.MRF_QTY
+		            WHEN RETURN_TYPE = 'Outgoing Return' THEN DT.HANDOVER_QTY - DT.MRF_QTY
+		            END  AS RETURN_AVAILABLE_QTY,
+		       ROW_NUMBER() OVER(ORDER BY DT.MRF_LINE_ID) AS NO
+		  FROM DESM_PACKING_DTL DPD,
+		       (SELECT DML.MRF_HEADER_ID,
+		               DML.MRF_LINE_ID,
+		               DML.RSI_HEADER_ID,
+		               DML.RSI_LINE_ID,
+		               DML.RSI_OUTGOING_ID,
+		               DRH.RSI_NO,
+		               DRH.RSI_NAME,
+		               DRH.SUBCONTRACTOR,
+		               TO_CHAR(DRH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+		               DRL.MATERIAL_CODE,
+		               DRL.REQ_QTY,
+		               (SELECT NVL(SUM(HANDOVER_QTY), 0)
+		                   FROM DESM_RSI_OUTGOING
+		                  WHERE RSI_LINE_ID = DRL.RSI_LINE_ID) AS HANDOVER_QTY,
+		               (SELECT NVL(SUM(REQ_RETURN_QTY), 0)
+		                  FROM DESM_MRF_LINE
+		                 WHERE RSI_LINE_ID = DRL.RSI_LINE_ID
+		                   AND MRF_LINE_ID != DML.MRF_LINE_ID
+		                   AND RSI_OUTGOING_ID IS NULL) AS MRF_QTY,
+		               DML.REQ_RETURN_QTY AS RETURN_QTY,
+		               'RSI Cancel' AS RETURN_TYPE
+		          FROM DESM_RSI_HEADER DRH,
+		               DESM_RSI_LINE DRL,
+		               DESM_MRF_LINE DML
+		         WHERE DRH.RSI_HEADER_ID = DRL.RSI_HEADER_ID
+		           AND DRL.RSI_LINE_ID = DML.RSI_LINE_ID
+		           AND DML.RSI_OUTGOING_ID IS NULL
+		           AND DML.MRF_HEADER_ID = #{MRF_HEADER_ID}
+		           AND DRH.STATUS = 'Approved'
+		        UNION ALL
+		        SELECT DML.MRF_HEADER_ID,
+		               DML.MRF_LINE_ID,
+		               DML.RSI_HEADER_ID,
+		               DML.RSI_LINE_ID,
+		               DML.RSI_OUTGOING_ID,
+		               DRH.RSI_NO,
+		               DRH.RSI_NAME,
+		               DRH.SUBCONTRACTOR,
+		               TO_CHAR(DRH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+		               DRL.MATERIAL_CODE,
+		               DRL.REQ_QTY,
+		               NVL(DRO.HANDOVER_QTY, 0) AS HANDOVER_QTY,
+		               (SELECT NVL(SUM(REQ_RETURN_QTY), 0)
+		                  FROM DESM_MRF_LINE
+		                 WHERE RSI_OUTGOING_ID = DRO.RSI_OUTGOING_ID
+		                   AND MRF_LINE_ID != DML.MRF_LINE_ID) AS MRF_QTY,
+		               DML.REQ_RETURN_QTY AS RETURN_QTY,
+		               'Outgoing Return' AS RETURN_TYPE
+		          FROM DESM_RSI_HEADER DRH,
+		               DESM_RSI_LINE DRL,
+		               DESM_RSI_OUTGOING DRO,
+		               DESM_MRF_LINE DML
+		         WHERE DRH.RSI_HEADER_ID = DRL.RSI_HEADER_ID
+		           AND DRL.RSI_LINE_ID = DRO.RSI_LINE_ID
+		           AND DRO.RSI_LINE_ID = DML.RSI_LINE_ID
+		           AND DRO.RSI_OUTGOING_ID = DML.RSI_OUTGOING_ID
+		           AND DML.MRF_HEADER_ID = #{MRF_HEADER_ID}
+		           AND DRH.STATUS = 'Approved') DT
+		 WHERE DPD.MATERIAL_CODE = DT.MATERIAL_CODE
+	</select>
+
+	<update id="saveMobileRsi" parameterType="java.util.Map">
+		MERGE INTO DESM_RSI_HEADER
+		USING DUAL
+		ON (RSI_HEADER_ID = #{RSI_HEADER_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		         <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+		            REQUESTED_BY = #{REQUESTED_BY},
+		            <if test='STATUS != null and STATUS == "Pre-Checked"'>
+		            REQUEST_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='CHECKED_BY != null and CHECKED_BY != ""'>
+		            CHECKED_BY = #{CHECKED_BY},
+		            <if test='STATUS != null and STATUS == "Pre-Confirmed"'>
+		            CHECKED_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='CONFIRMED_BY != null and CONFIRMED_BY != ""'>
+		            CONFIRMED_BY = #{CONFIRMED_BY},
+		            <if test='STATUS != null and STATUS == "Pre-Approved"'>
+		            CONFIRMED_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+		            APPROVED_BY = #{APPROVED_BY},
+		            <if test='STATUS != null and STATUS == "Approved"'>
+		            APPROVED_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='REMARK != null and REMARK != ""'>
+		         	REMARK = #{REMARK},
+		         </if>
+		            STATUS = #{STATUS},
+		            LAST_UPDATED_BY = #{USER_AD},
+		            LAST_UPDATE_DATE = SYSDATE
+	</update>
+
+	<update id="saveMobileMrf" parameterType="java.util.Map">
+		MERGE INTO DESM_MRF_HEADER
+		USING DUAL
+		ON (MRF_HEADER_ID = #{MRF_HEADER_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		         <if test='REQUESTED_BY != null and REQUESTED_BY != ""'>
+		            REQUESTED_BY = #{REQUESTED_BY},
+		            <if test='STATUS != null and STATUS == "Pre-Checked"'>
+		            REQUEST_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='CHECKED_BY != null and CHECKED_BY != ""'>
+		            CHECKED_BY = #{CHECKED_BY},
+		            <if test='STATUS != null and STATUS == "Pre-Confirmed"'>
+		            CHECKED_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='CONFIRMED_BY != null and CONFIRMED_BY != ""'>
+		            CONFIRMED_BY = #{CONFIRMED_BY},
+		            <if test='STATUS != null and STATUS == "Pre-Approved"'>
+		            CONFIRMED_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         <if test='APPROVED_BY != null and APPROVED_BY != ""'>
+		            APPROVED_BY = #{APPROVED_BY},
+		            <if test='STATUS != null and STATUS == "Approved"'>
+		            APPROVED_DATE = SYSDATE,
+		            </if>
+		         </if>
+		         	REMARK = #{REMARK},
+		            STATUS = #{STATUS},
+		            LAST_UPDATED_BY = #{USER_AD},
+		            LAST_UPDATE_DATE = SYSDATE
+
+	</update>
+
+	<select id="getMobileQrCodePackageInfo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DPM.PACKAGE_LIST_NO,
+		       DPM.PACKAGE_NO,
+		       DPM.DESCRIPTION,
+		       DPM.PACKAGE_TYPE,
+		       TRUNC(DPM.L_CM) AS L_CM,
+		       TRUNC(DPM.W_CM) AS W_CM,
+		       TRUNC(DPM.H_CM) AS H_CM,
+		       TRUNC(DPM.VOLUME, 1) AS VOLUME,
+		       TRUNC(DPM.NET, 1) AS NET,
+		       TRUNC(DPM.GROSS, 1) AS GROSS,
+		       DPM.HAZARDOUS_MATERIAL,
+		       DPM.REMARKS,
+		       DPM.QTY,
+		       DPM.REMARK,
+		       DPM.VENDOR,
+		       DPM.OLD_INF_OF_VENDOR,
+		       TO_CHAR(DPM.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE,
+		       DPM.STORAGE_LOCATION,
+		       DPM.SUB_CONTRACTOR,
+		       DPM.REPORT_SHORT,
+	           DPM.REPORT_OVER,
+	           DPM.REPORT_DMG,
+	           DPM.REPORT_MISSING,
+	           DPM.TRK_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 1 THEN ZIM.TRK_ITEM_NAME
+	                ELSE SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 1) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 2) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 1) + 4))
+	                END AS LV1_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 2 THEN ZIM.TRK_ITEM_NAME
+	                WHEN ZIM.LV > 2 THEN SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 2) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 3) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 2) + 4))
+	                END AS LV2_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 3 THEN ZIM.TRK_ITEM_NAME
+	                WHEN ZIM.LV > 3 THEN SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 3) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 4) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 3) + 4))
+	                END AS LV3_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 4 THEN ZIM.TRK_ITEM_NAME
+	                WHEN ZIM.LV > 4 THEN SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 4) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 5) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 4) + 4))
+	                END AS LV4_ITEM_NAME,
+		       (SELECT COUNT(*) FROM DESM_PACKING_DTL WHERE PACKAGE_NO = DPM.PACKAGE_NO) AS NUMBER_OF_ITEMS,
+		       
+		       CASE WHEN (SELECT COUNT(*)
+                          FROM DESM_PACKING_DTL DETAIL
+                          WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                          AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO)
+                       = (SELECT COUNT(*)
+                          FROM DESM_PACKING_DTL DETAIL
+                          WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                          AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                          AND NVL(DETAIL.IN_QTY, 0) - NVL(DETAIL.OUT_QTY, 0) + NVL(DETAIL.RETURN_QTY, 0) = 0)
+                     THEN 'CLOSE'
+                     WHEN (SELECT COUNT(*)
+                          FROM DESM_PACKING_DTL DETAIL
+                          WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                          AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                          AND NVL(DETAIL.IN_QTY, 0) - NVL(DETAIL.OUT_QTY, 0) + NVL(DETAIL.RETURN_QTY, 0) = 0) > 0
+                     THEN 'PARTIALLY'
+                     ELSE ''
+               END AS PACKAGE_STATUS,
+	          (SELECT COUNT(*)
+	                  FROM DESM_PACKING_DTL DETAIL
+	                  WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+	                  AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO)
+	                  || '/' ||
+	                 (SELECT COUNT(*)
+	                  FROM DESM_PACKING_DTL DETAIL
+	                  WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+	                  AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+	                  AND NVL(DETAIL.IN_QTY, 0) - NVL(DETAIL.OUT_QTY, 0) + NVL(DETAIL.RETURN_QTY, 0) = 0) AS OUT_STATUS,
+	          (SELECT SUM(DETAIL.IN_QTY)
+	                  FROM DESM_PACKING_DTL DETAIL
+	                  WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+	                  AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO)
+	                  || '/' ||
+	                 (SELECT SUM(NVL(DETAIL.OUT_QTY, 0) - NVL(DETAIL.RETURN_QTY, 0))
+	                  FROM DESM_PACKING_DTL DETAIL
+	                  WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+	                  AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+	                  ) AS OUT_STATUS_QTY,
+	         TO_CHAR( DPM.RECEIPT_DATE, 'YYYY/MM/DD') AS RECEIPT_DATE,
+	         MRRT.VISUAL_CHECK,
+	         TO_CHAR(MRRT.MRR_RECEIVED_DATE, 'YYYY/MM/DD') AS MRR_RECEIVED_DATE,
+	         MRRT.MRR_HEADER_ID  
+		  FROM (SELECT A.PROJECT_NO,
+	                   A.TRK_ITEM_NAME,
+	                   LEVEL AS LV,
+	                   SYS_CONNECT_BY_PATH(A.TRK_ITEM_NAME, '!@#$') AS ROOT_NAME
+	              FROM ZVTS_ITEM_MASTER A
+	             WHERE A.PROJECT_NO = #{PROJECT_NO}
+	            START WITH A.TRK_ITEM_GROUP IS NULL
+	            CONNECT BY PRIOR A.TRK_ITEM_SEQ = A.TRK_ITEM_GROUP) ZIM,
+		       DESM_PACKING_MST DPM,
+		       
+		       (SELECT DMLL.TRK_ITEM_NAME
+	            ,      DMLL.PACKAGE_NO
+	            ,      DMLL.VISUAL_CHECK
+	            ,      DMLL.RECEIVED_DATE AS MRR_RECEIVED_DATE
+	            ,      DMH.MRR_HEADER_ID
+	            FROM DESM_MRR_HEADER DMH
+	            ,    DESM_MRR_LINE   DMLL
+	            WHERE DMH.MRR_HEADER_ID = DMLL.MRR_HEADER_ID
+	            AND DMH.PROJECT_NO = UPPER(#{PROJECT_NO}) ) MRRT
+		 WHERE ZIM.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		   AND ZIM.PROJECT_NO = DPM.PROJECT_NO
+		   AND DPM.PROJECT_NO = #{PROJECT_NO}
+		   AND DPM.TRK_ITEM_NAME = MRRT.TRK_ITEM_NAME(+)
+       	   AND DPM.PACKAGE_NO = MRRT.PACKAGE_NO(+)
+		   <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+		   AND DPM.TRK_ITEM_NAME = #{TRK_ITEM_NAME}
+		   </if>
+		   AND DPM.PACKAGE_NO = #{PACKAGE_NO}
+	</select>
+
+	<select id="getMobileQrCodeDetailItemInfo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DPM.PACKAGE_LIST_NO,
+		       DPM.PACKAGE_NO,
+		       DPD.DESCRIPTION,
+		       DPD.DRAWING_NO,
+		       DPD.TAG_NO,
+		       DPD.UNIT,
+		       TRUNC(DPD.NOS) AS NOS,
+		       TRUNC(DPD.IN_QTY) AS IN_QTY,
+		       TRUNC(DPD.RSI_QTY) AS RSI_QTY,
+		       TRUNC(DPD.OUT_QTY) AS OUT_QTY,
+		       TRUNC(DPD.MRF_QTY) AS MRF_QTY,
+		       TRUNC(DPD.RSI_CANCEL_QTY) AS RSI_CANCEL_QTY,
+		       TRUNC(DPD.RETURN_QTY) AS RETURN_QTY,
+		       TRUNC(NVL(DPD.RSI_QTY, 0) - NVL(DPD.OUT_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0)) AS BALANCE_QTY,
+		       TRUNC(NVL(DPD.MRF_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0) - NVL(DPD.RETURN_QTY, 0)) AS MRF_BALANCE_QTY,
+		       TRUNC(NVL(DPD.IN_QTY, 0) - NVL(DPD.OUT_QTY, 0) + NVL(DPD.RETURN_QTY, 0)) AS REMAIN_QTY,
+		       DPD.MATERIAL_CODE,
+		       DPD.MATERIAL,
+		       DPD.PACKAGE_TYPE,
+		       TRUNC(DPD.GROSS, 1) AS GROSS,
+		       TRUNC(DPD.NET, 1) AS NET,
+		       TRUNC(DPD.RT, 1) AS RT,
+		       TRUNC(DPD.L_CM) AS L_CM,
+		       TRUNC(DPD.W_CM) AS W_CM,
+		       TRUNC(DPD.H_CM) AS H_CM,
+		       TRUNC(DPD.VOLUME, 1) AS VOLUME,
+		       TO_CHAR(ZIM.ONSITE_ACTUAL_DATE, 'YYYY/MM/DD') AS ONSITE_ACTUAL_DATE,
+		       DPD.LOCATION,
+		       DPD.REMARKS,
+		       DPD.REPORT_SHORT,
+	           DPD.REPORT_OVER,
+	           DPD.REPORT_DMG,
+	           DPD.REPORT_MISSING,
+	           DPD.TRK_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 1 THEN ZIM.TRK_ITEM_NAME
+	                ELSE SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 1) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 2) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 1) + 4))
+	                END AS LV1_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 2 THEN ZIM.TRK_ITEM_NAME
+	                WHEN ZIM.LV > 2 THEN SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 2) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 3) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 2) + 4))
+	                END AS LV2_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 3 THEN ZIM.TRK_ITEM_NAME
+	                WHEN ZIM.LV > 3 THEN SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 3) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 4) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 3) + 4))
+	                END AS LV3_ITEM_NAME,
+	           CASE WHEN ZIM.LV = 4 THEN ZIM.TRK_ITEM_NAME
+	           		WHEN ZIM.LV > 4 THEN SUBSTR(ZIM.ROOT_NAME, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 4) + 4, INSTR(ZIM.ROOT_NAME, '!@#$', 1, 5) - (INSTR(ZIM.ROOT_NAME, '!@#$', 1, 4) + 4))
+	                END AS LV4_ITEM_NAME,
+	           NVL(DPM.IS_CONFIRM_MATERIAL, 'N') AS IS_CONFIRM_MATERIAL
+		  FROM (SELECT A.PROJECT_NO,
+	                   A.TRK_ITEM_NAME,
+	                   A.ONSITE_ACTUAL_DATE,
+	                   LEVEL AS LV,
+	                   SYS_CONNECT_BY_PATH(A.TRK_ITEM_NAME, '!@#$') AS ROOT_NAME
+	              FROM ZVTS_ITEM_MASTER A
+	             WHERE A.PROJECT_NO = #{PROJECT_NO}
+	            START WITH A.TRK_ITEM_GROUP IS NULL
+	            CONNECT BY PRIOR A.TRK_ITEM_SEQ = A.TRK_ITEM_GROUP) ZIM,
+		       DESM_PACKING_MST DPM,
+		       DESM_PACKING_DTL DPD
+		 WHERE ZIM.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		   AND ZIM.PROJECT_NO = DPM.PROJECT_NO
+		   AND DPM.PROJECT_NO = DPD.PROJECT_NO
+		   AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+		   AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+		   AND DPD.PROJECT_NO = #{PROJECT_NO}
+		   AND DPD.TRK_ITEM_NAME = #{TRK_ITEM_NAME}
+		   AND DPD.MATERIAL_CODE = #{MATERIAL_CODE}
+	</select>
+
+	<select id="getMobileSearchRsiList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DRH.RSI_HEADER_ID DESC) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		               DRH.RSI_HEADER_ID,
+		               DRH.RSI_NO,
+		               DRH.RSI_NAME,
+		               DRH.STATUS,
+		               DRH.DESCRIPTION,
+		               DRH.SUBCONTRACTOR,
+		               DRH.SUBCON_MANAGER,
+		               DRH.CREATED_BY,
+		               TO_CHAR(DRH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CREATION_DATE,
+		               DRH.LAST_UPDATED_BY,
+		               TO_CHAR(DRH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS LAST_UPDATE_DATE,
+		               TO_CHAR(DRH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+		               TO_CHAR(DRH.HANDOVER_DATE, 'YYYY/MM/DD') AS HANDOVER_DATE,
+		               TO_CHAR(DRH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+		               DRH.REMARK,
+		               DRH.ATTACH_GRP_CD,
+		               CASE WHEN DRH.REQUEST_DATE IS NOT NULL THEN DRH.REQUESTED_BY END AS REQUESTED_BY,
+		               CASE WHEN DRH.CHECKED_DATE IS NOT NULL THEN DRH.CHECKED_BY END AS CHECKED_BY,
+		               CASE WHEN DRH.CONFIRMED_DATE IS NOT NULL THEN DRH.CONFIRMED_BY END AS CONFIRMED_BY,
+		               CASE WHEN DRH.APPROVED_DATE IS NOT NULL THEN DRH.APPROVED_BY END AS APPROVED_BY,
+		               (SELECT COUNT(*)
+		                  FROM ESAATTH A
+		                 WHERE A.SYS_ID = 'EMRO'
+		                   AND A.STS != 'D'
+		                   AND A.GRP_CD = DRH.ATTACH_GRP_CD) AS ATT_CNT,
+		               NVL(DRH.CLOSED_CODE, 'OPEN') AS CLOSED
+		          FROM DESM_RSI_HEADER DRH,
+		               (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+		                  FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+		                       DESM_CODE_DTL DCD
+		                 WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+		                   AND DCD.DELEGATE_FLAG = 'N'
+		                   AND DUDC.USER_AD = #{USER_AD}) CT
+		           WHERE DRH.PROJECT_NO = #{PROJECT_NO}
+		             <if test='RSI_NO != null and RSI_NO != ""'>
+		             AND UPPER(DRH.RSI_NO) LIKE '%' || UPPER(#{RSI_NO}) || '%'
+		             </if>
+	                 <if test='RSI_NAME != null and RSI_NAME != ""'>
+	                 AND UPPER(DRH.RSI_NAME) LIKE '%' || UPPER(#{RSI_NAME}) || '%'
+	                 </if>
+	                 <if test='SUBCONTRACTOR != null and SUBCONTRACTOR != ""'>
+	                 AND UPPER(DRH.SUBCONTRACTOR) LIKE '%' || UPPER(#{SUBCONTRACTOR}) || '%'
+	                 </if>
+	                 <if test='START_HANDOVER_DATE != null and START_HANDOVER_DATE != ""'>
+	                 AND DRH.HANDOVER_DATE >= TO_DATE(#{START_HANDOVER_DATE}, 'YYYY/MM/DD')
+	                 </if>
+	                 <if test='END_HANDOVER_DATE != null and END_HANDOVER_DATE != ""'>
+	                 AND DRH.HANDOVER_DATE <![CDATA[ < ]]> TO_DATE(#{END_HANDOVER_DATE}, 'YYYY/MM/DD') + 1
+	                 </if>
+	                 <if test='(MATERIAL_CODE != null and MATERIAL_CODE != "") or (ATTRIBUTE10 != null and ATTRIBUTE10 != "")'>
+	                 AND EXISTS (SELECT 1
+	                               FROM DESM_RSI_LINE DRL,
+	                                    DESM_PACKING_DTL DPD,
+	                                    DESM_PACKING_MST DPM,
+	                                    ZVTS_ITEM_MASTER ZIM
+	                              WHERE DRL.MATERIAL_CODE = DPD.MATERIAL_CODE
+	                                AND DPD.PROJECT_NO = DPM.PROJECT_NO
+	                                AND DPD.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+	                                AND DPD.PACKAGE_NO = DPM.PACKAGE_NO
+	                                AND DPM.PROJECT_NO = ZIM.PROJECT_NO
+	                                AND DPM.TRK_ITEM_NAME = ZIM.TRK_ITEM_NAME
+	                                <if test='MATERIAL_CODE != null and MATERIAL_CODE != ""'>
+	                                AND DRL.MATERIAL_CODE = #{MATERIAL_CODE}
+	                                </if>
+	                                <if test='ATTRIBUTE10 != null and ATTRIBUTE10 != ""'>
+	                                AND ZIM.ATTRIBUTE10 = #{ATTRIBUTE10}
+	                                </if>
+	                                AND DPD.PROJECT_NO = DRH.PROJECT_NO
+	                                AND DRL.RSI_HEADER_ID = DRH.RSI_HEADER_ID)
+	                 </if>
+              	     <if test='STATUS != null and STATUS != ""'>
+              	     AND DRH.STATUS = #{STATUS}
+              	     </if>
+	                 <if test='CLOSED_CODE != null and CLOSED_CODE != ""'>
+	                 AND NVL(DRH.CLOSED_CODE, 'OPEN') = #{CLOSED_CODE}
+	                 </if>
+		      ) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileSearchMrfList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DMH.MRF_HEADER_ID DESC) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		               DMH.MRF_HEADER_ID,
+		               DMH.MRF_NO,
+		               DMH.MRF_NAME,
+		               DMH.STATUS,
+		               DMH.DESCRIPTION,
+		               DMH.SUBCONTRACTOR,
+		               DMH.SUBCON_MANAGER,
+		               DMH.CREATED_BY,
+		               TO_CHAR(DMH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS CREATION_DATE,
+		               DMH.LAST_UPDATED_BY,
+		               TO_CHAR(DMH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'HH24:MI DD/MM/YY') AS LAST_UPDATE_DATE,
+		               TO_CHAR(DMH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+		               TO_CHAR(DMH.RETURN_REQ_DATE, 'YYYY/MM/DD') AS RETURN_REQ_DATE,
+		               TO_CHAR(DMH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+		               DMH.REMARK,
+		               DMH.ATTACH_GRP_CD,
+		               CASE WHEN DMH.REQUEST_DATE IS NOT NULL THEN DMH.REQUESTED_BY END AS REQUESTED_BY,
+		               CASE WHEN DMH.CHECKED_DATE IS NOT NULL THEN DMH.CHECKED_BY END AS CHECKED_BY,
+		               CASE WHEN DMH.CONFIRMED_DATE IS NOT NULL THEN DMH.CONFIRMED_BY END AS CONFIRMED_BY,
+		               CASE WHEN DMH.APPROVED_DATE IS NOT NULL THEN DMH.APPROVED_BY END AS APPROVED_BY,
+		               (SELECT COUNT(*)
+		                  FROM ESAATTH A
+		                 WHERE A.SYS_ID = 'EMRO'
+		                   AND A.STS != 'D'
+		                   AND A.GRP_CD = DMH.ATTACH_GRP_CD) AS ATT_CNT,
+		               NVL(DMH.CLOSED_CODE, 'OPEN') AS CLOSED
+		          FROM DESM_MRF_HEADER DMH,
+		               (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+		                  FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+		                       DESM_CODE_DTL DCD
+		                 WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+		                   AND DCD.DELEGATE_FLAG = 'N'
+		                   AND DUDC.USER_AD = #{USER_AD}) CT
+		           WHERE DMH.PROJECT_NO = #{PROJECT_NO}
+		             <if test='MRF_NO != null and MRF_NO != ""'>
+		             AND UPPER(DMH.MRF_NO) LIKE '%' || UPPER(#{MRF_NO}) || '%'
+		             </if>
+	                 <if test='MRF_NAME != null and MRF_NAME != ""'>
+	                 AND UPPER(DMH.MRF_NAME) LIKE '%' || UPPER(#{MRF_NAME}) || '%'
+	                 </if>
+	                 <if test='SUBCONTRACTOR != null and SUBCONTRACTOR != ""'>
+	                 AND UPPER(DMH.SUBCONTRACTOR) LIKE '%' || UPPER(#{SUBCONTRACTOR}) || '%'
+	                 </if>
+	                 <if test='MATERIAL_CODE != null and MATERIAL_CODE != ""'>
+	                 AND EXISTS (SELECT 1
+	                               FROM DESM_MRF_LINE DML
+	                              WHERE DML.MATERIAL_CODE = #{MATERIAL_CODE}
+	                                AND DML.MRF_HEADER_ID = DMH.MRF_HEADER_ID)
+	                 </if>
+	                 <if test='START_RETURN_REQ_DATE != null and START_RETURN_REQ_DATE != ""'>
+	                 AND DMH.RETURN_REQ_DATE >= TO_DATE(#{START_RETURN_REQ_DATE}, 'YYYY/MM/DD')
+	                 </if>
+	                 <if test='END_RETURN_REQ_DATE != null and END_RETURN_REQ_DATE != ""'>
+	                 AND DMH.RETURN_REQ_DATE <![CDATA[ < ]]> TO_DATE(#{END_RETURN_REQ_DATE}, 'YYYY/MM/DD') + 1
+	                 </if>
+	                 <if test='STATUS != null and STATUS != ""'>
+	                 AND DMH.STATUS = #{STATUS}
+	                 </if>
+	                 <if test='CLOSED_CODE != null and CLOSED_CODE != ""'>
+	                 AND DMH.CLOSED_CODE = #{CLOSED_CODE}
+	                 </if>
+		      ) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileSearchSummaryList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		 SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM ( SELECT TT.*,
+                ROW_NUMBER() OVER(ORDER BY TT.SEL_INVOICE_NUM, TT.PACKAGE_NO) AS RN,
+                COUNT(*) OVER() AS TOTAL_CNT
+          FROM (SELECT DPM.PACKAGE_NO,
+                       DPM.PACKAGE_LIST_NO,
+                       DPM.DESCRIPTION,
+                       DPM.PACKAGE_TYPE,
+                       TRUNC(DPM.L_CM) AS L_CM,
+                       TRUNC(DPM.W_CM) AS W_CM,
+                       TRUNC(DPM.H_CM) AS H_CM,
+                       TRUNC(DPM.VOLUME, 1) AS VOLUME,
+                       TRUNC(DPM.NET, 1) AS NET,
+                       TRUNC(DPM.GROSS, 1) AS GROSS,
+                       DPM.REMARKS,
+                       DPM.COUNTRY,
+                       DPM.TRK_ITEM_NAME,
+                       DPM.PROJECT_NO,
+                       DPM.REPORT_SHORT,
+                       DPM.REPORT_OVER,
+                       DPM.REPORT_DMG,
+                       DPM.REPORT_MISSING,
+                       DPM.REPORT_LOST,
+                       DPM.REPORT_DESCRIPTION,
+                       DPM.HAZARDOUS_MATERIAL,
+                       DPM.QTY,
+                       DPM.REMARK,
+                       DPM.VENDOR,
+                       DPM.OLD_INF_OF_VENDOR,
+                       TO_CHAR(DPM.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE,
+                       DPM.STORAGE_LOCATION,
+                       DPM.SUB_CONTRACTOR,
+                       T.SEL_INVOICE_NUM,
+                       CASE WHEN T.LV = 1 THEN T.TRK_ITEM_NAME
+                            ELSE SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 1) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 2) - (INSTR(T.ROOT_NAME, '!@#$', 1, 1) + 4))
+                            END AS LV1_ITEM_NAME,
+                       CASE WHEN T.LV = 2 THEN T.TRK_ITEM_NAME
+                            WHEN T.LV > 2 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 2) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 3) - (INSTR(T.ROOT_NAME, '!@#$', 1, 2) + 4))
+                            END AS LV2_ITEM_NAME,
+                       CASE WHEN T.LV = 3 THEN T.TRK_ITEM_NAME
+                            WHEN T.LV > 3 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 3) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 4) - (INSTR(T.ROOT_NAME, '!@#$', 1, 3) + 4))
+                            END AS LV3_ITEM_NAME,
+                       CASE WHEN T.LV = 4 THEN T.TRK_ITEM_NAME
+                            WHEN T.LV > 4 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 4) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 5) - (INSTR(T.ROOT_NAME, '!@#$', 1, 4) + 4))
+                            END AS LV4_ITEM_NAME,
+                       (SELECT COUNT(*) FROM DESM_PACKING_DTL WHERE PACKAGE_NO = DPM.PACKAGE_NO AND PROJECT_NO = DPM.PROJECT_NO AND TRK_ITEM_NAME = DPM.TRK_ITEM_NAME) AS NUMBER_OF_ITEMS
+                  FROM (SELECT ZIM.TRK_ITEM_SEQ,
+                               ZIM.TRK_ITEM_NAME,
+                               ZIM.TRK_ITEM_GROUP,
+                               ZIM.ORGANIZATION_ID,
+                               ZIM.PROJECT_ID,
+                               ZIM.PROJECT_NO,
+                               PPA.NAME as PROJECT_NAME,
+                               ZIM.TASK_ID,
+                               ZIM.TASK_NUMBER,
+                               ZIM.BATCH,
+                               ZIM.OFFSHORE,
+                               ZIM.PRIMAVERA_ID,
+                               TO_CHAR(ZIM.MPS_PLAN_DATE, 'YYYY/MM/DD') as MPS_PLAN_DATE,
+                               TO_CHAR(ZIM.MPS_EXPECTED_DATE, 'YYYY/MM/DD') as MPS_EXPECTED_DATE,
+                               TO_CHAR(ZIM.MPS_ACTUAL_DATE, 'YYYY/MM/DD') as MPS_ACTUAL_DATE,
+                               ZIM.PURCHASE_DURATION,
+                               TO_CHAR(ZIM.PO_PLAN_DATE, 'YYYY/MM/DD') as PO_PLAN_DATE,
+                               TO_CHAR(ZIM.PO_EXPECTED_DATE, 'YYYY/MM/DD') as PO_EXPECTED_DATE,
+                               TO_CHAR(ZIM.PO_ATCUAL_DATE, 'YYYY/MM/DD') as PO_ATCUAL_DATE,
+                               ZIM.MAKE_DURATION,
+                               ZIM.PROGRESS,
+                               TO_CHAR(ZIM.CARGO_PLAN_DATE, 'YYYY/MM/DD') as CARGO_PLAN_DATE,
+                               TO_CHAR(ZIM.CARGO_EXPECTED_DATE, 'YYYY/MM/DD') as CARGO_EXPECTED_DATE,
+                               TO_CHAR(ZIM.CARGO_PROMISED_DATE, 'YYYY/MM/DD') as CARGO_PROMISED_DATE,
+                               TO_CHAR(ZIM.CARGO_ACTUAL_DATE, 'YYYY/MM/DD') as CARGO_ACTUAL_DATE,
+                               ZIM.SHIPMENT_DURATION,
+                               TO_CHAR(ZIM.FOB_PLAN_DATE, 'YYYY/MM/DD') as FOB_PLAN_DATE,
+                               TO_CHAR(ZIM.FOB_EXPECTED_DATE, 'YYYY/MM/DD') as FOB_EXPECTED_DATE,
+                               TO_CHAR(ZIM.FOB_ACTUAL_DATE, 'YYYY/MM/DD') as FOB_ACTUAL_DATE,
+                               ZIM.TRANS_DURATION,
+                               TO_CHAR(ZIM.ONSITE_PLAN_DATE, 'YYYY/MM/DD') as ONSITE_PLAN_DATE,
+                               TO_CHAR(ZIM.ONSITE_EXPECTED_DATE, 'YYYY/MM/DD') as ONSITE_EXPECTED_DATE,
+                               TO_CHAR(ZIM.ONSITE_ACTUAL_DATE, 'YYYY/MM/DD') as ONSITE_ACTUAL_DATE,
+                               ZIM.PAYMENT_MILESTONE,
+                               ZIM.TRK_ITEM_DEFAULT,
+                               ZIM.INVOICE_NUM,
+                               ZIM.ATTRIBUTE1,
+                               ZIM.ATTRIBUTE2,
+                               ZIM.ATTRIBUTE3,
+                               ZIM.ATTRIBUTE4,
+                               ZIM.ATTRIBUTE5,
+                               ZIM.ATTRIBUTE6,
+                               ZIM.ATTRIBUTE7,
+                               ZIM.ATTRIBUTE8,
+                               ZIM.ATTRIBUTE9,
+                               ZIM.ATTRIBUTE10,
+                               LEVEL AS LV,
+                               SYS_CONNECT_BY_PATH(ZIM.TRK_ITEM_NAME, '!@#$')  AS ROOT_NAME,
+                               CASE WHEN DI.CNT = 1 THEN DI.INVOICE_NUM
+                                    WHEN DI.CNT > 1 THEN DI.INVOICE_NUM || ' 외 ' || DI.CALC_CNT || '건' END AS SEL_INVOICE_NUM
+                          FROM ZVTS_ITEM_MASTER ZIM,
+                               PA_PROJECTS_ALL_INT PPA,
+                               (SELECT ZDI.TRK_ITEM_SEQ,
+                                       COUNT(*) AS CNT,
+                                       COUNT(*) - 1 AS CALC_CNT,
+                                       MAX(ZDI.INVOICE_NUM) AS INVOICE_NUM
+                                  FROM ZVTS_DESM_INVOICE ZDI
+                                GROUP BY ZDI.TRK_ITEM_SEQ) DI
+                         WHERE ZIM.PROJECT_ID = PPA.PROJECT_ID
+                           AND ZIM.TRK_ITEM_SEQ = DI.TRK_ITEM_SEQ(+)
+                           AND ZIM.PROJECT_NO = UPPER(#{PROJECT_NO})
+                        START WITH ZIM.TRK_ITEM_GROUP IS NULL
+                        CONNECT BY PRIOR ZIM.TRK_ITEM_SEQ = ZIM.TRK_ITEM_GROUP) T,
+                        DESM_PACKING_MST DPM
+                  WHERE T.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+                    AND T.PROJECT_NO = DPM.PROJECT_NO
+
+                    <if test='PACKAGE_LIST_NO != null and PACKAGE_LIST_NO != ""'>
+                    AND UPPER(DPM.PACKAGE_LIST_NO) LIKE '%' || UPPER(#{PACKAGE_LIST_NO}) || '%'
+                    </if>
+                    <if test='ATTRIBUTE10 != null and ATTRIBUTE10 != ""'>
+                    AND T.ATTRIBUTE10 = #{ATTRIBUTE10}
+                    </if>
+                    <if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+                    AND UPPER(DPM.PACKAGE_NO) LIKE '%' || UPPER(#{PACKAGE_NO}) || '%'
+                    </if>
+                    <if test='DESCRIPTION != null and DESCRIPTION != ""'>
+                    AND UPPER(DPM.DESCRIPTION) LIKE '%' || UPPER(#{DESCRIPTION}) || '%'
+                    </if>
+                    <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+                    AND UPPER(DPM.TRK_ITEM_NAME) LIKE '%' || UPPER(#{TRK_ITEM_NAME}) || '%'
+                    </if>
+                 ) TT
+            WHERE 1 = 1
+            <if test='LV3_ITEM_NAME_F != null and LV3_ITEM_NAME_F != ""'>
+              AND UPPER(TT.LV3_ITEM_NAME) LIKE '%' || UPPER(#{LV3_ITEM_NAME_F}) || '%'
+            </if>
+            <if test='LV3_ITEM_NAME_S != null and LV3_ITEM_NAME_S != ""'>
+              AND UPPER(TT.LV3_ITEM_NAME) LIKE '%' || UPPER(#{LV3_ITEM_NAME_S}) || '%'
+            </if>
+            <if test='LV4_ITEM_NAME_F != null and LV4_ITEM_NAME_F != ""'>
+              AND UPPER(TT.LV4_ITEM_NAME) LIKE '%' || UPPER(#{LV4_ITEM_NAME_F}) || '%'
+            </if>
+            <if test='LV4_ITEM_NAME_S != null and LV4_ITEM_NAME_S != ""'>
+              AND UPPER(TT.LV4_ITEM_NAME) LIKE '%' || UPPER(#{LV4_ITEM_NAME_S}) || '%'
+            </if>
+                 ) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileSearchDetailList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+		       CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+		            ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM ( SELECT TT.*,
+		                ROW_NUMBER() OVER(ORDER BY TT.MATERIAL_CODE, TT.PACKAGE_LIST_NO, TT.PACKAGE_NO, TT.DRAWING_NO, TT.TAG_NO) AS RN,
+		                COUNT(*) OVER() AS TOTAL_CNT
+		      FROM (SELECT DPD.PACKAGE_LIST_NO,
+		                   DPD.PACKAGE_NO,
+		                   DPD.DESCRIPTION,
+		                   DPD.DRAWING_NO,
+		                   DPD.TAG_NO,
+		                   DPD.MATERIAL,
+		                   DPD.MATERIAL_CODE,
+		                   DPD.PACKAGE_TYPE,
+		                   DPD.TRK_ITEM_NAME,
+		                   DPD.PROJECT_NO,
+		                   DPD.LOCATION,
+		                   TRUNC(DPD.GROSS, 1) AS GROSS,
+		                   TRUNC(DPD.NET, 1) AS NET,
+		                   TRUNC(DPD.RT, 1) AS RT,
+		                   TRUNC(DPD.L_CM) AS L_CM,
+		                   TRUNC(DPD.W_CM) AS W_CM,
+		                   TRUNC(DPD.H_CM) AS H_CM,
+		                   TRUNC(DPD.VOLUME, 1) AS VOLUME,
+		                   T.ONSITE_ACTUAL_DATE,
+		                   DPD.UNIT,
+		                   TO_CHAR(DPD.NOS) AS NOS,
+		                   DPD.IN_QTY AS IN_QTY,
+		                   DPD.RSI_QTY AS RSI_QTY,
+		                   TO_CHAR(DPD.OUT_QTY) AS OUT_QTY,
+		                   NVL(DPD.RSI_QTY, 0) - NVL(DPD.OUT_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0) AS BALANCE_QTY,
+		                   NVL(DPD.IN_QTY, 0) - NVL(DPD.OUT_QTY, 0) + NVL(DPD.RETURN_QTY, 0) AS REMAIN_QTY,
+		                   DPD.MRF_QTY,
+		                   DPD.RSI_CANCEL_QTY,
+		                   DPD.RETURN_QTY,
+		                   NVL(DPD.MRF_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0) - NVL(DPD.RETURN_QTY, 0) AS MRF_BALANCE_QTY,
+		                   DPD.REMARKS,
+		                   CASE WHEN T.LV = 1 THEN T.TRK_ITEM_NAME
+		                        ELSE SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 1) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 2) - (INSTR(T.ROOT_NAME, '!@#$', 1, 1) + 4))
+		                        END AS LV1_ITEM_NAME,
+		                   CASE WHEN T.LV = 2 THEN T.TRK_ITEM_NAME
+		                        WHEN T.LV > 2 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 2) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 3) - (INSTR(T.ROOT_NAME, '!@#$', 1, 2) + 4))
+		                        END AS LV2_ITEM_NAME,
+		                   CASE WHEN T.LV = 3 THEN T.TRK_ITEM_NAME
+		                        WHEN T.LV > 3 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 3) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 4) - (INSTR(T.ROOT_NAME, '!@#$', 1, 3) + 4))
+		                        END AS LV3_ITEM_NAME,
+		                   CASE WHEN T.LV = 4 THEN T.TRK_ITEM_NAME
+		                        WHEN T.LV > 4 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 4) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 5) - (INSTR(T.ROOT_NAME, '!@#$', 1, 4) + 4))
+		                        END AS LV4_ITEM_NAME,
+		                   DPM.IS_CONFIRM_MATERIAL
+		              FROM (SELECT ZIM.TRK_ITEM_SEQ,
+		                           ZIM.TRK_ITEM_NAME,
+		                           ZIM.TRK_ITEM_GROUP,
+		                           ZIM.ORGANIZATION_ID,
+		                           ZIM.PROJECT_ID,
+		                           ZIM.PROJECT_NO,
+		                           PPA.NAME as PROJECT_NAME,
+		                           ZIM.TASK_ID,
+		                           ZIM.TASK_NUMBER,
+		                           ZIM.BATCH,
+		                           ZIM.OFFSHORE,
+		                           ZIM.PRIMAVERA_ID,
+		                           TO_CHAR(ZIM.MPS_PLAN_DATE, 'YYYY/MM/DD') as MPS_PLAN_DATE,
+		                           TO_CHAR(ZIM.MPS_EXPECTED_DATE, 'YYYY/MM/DD') as MPS_EXPECTED_DATE,
+		                           TO_CHAR(ZIM.MPS_ACTUAL_DATE, 'YYYY/MM/DD') as MPS_ACTUAL_DATE,
+		                           ZIM.PURCHASE_DURATION,
+		                           TO_CHAR(ZIM.PO_PLAN_DATE, 'YYYY/MM/DD') as PO_PLAN_DATE,
+		                           TO_CHAR(ZIM.PO_EXPECTED_DATE, 'YYYY/MM/DD') as PO_EXPECTED_DATE,
+		                           TO_CHAR(ZIM.PO_ATCUAL_DATE, 'YYYY/MM/DD') as PO_ATCUAL_DATE,
+		                           ZIM.MAKE_DURATION,
+		                           ZIM.PROGRESS,
+		                           TO_CHAR(ZIM.CARGO_PLAN_DATE, 'YYYY/MM/DD') as CARGO_PLAN_DATE,
+		                           TO_CHAR(ZIM.CARGO_EXPECTED_DATE, 'YYYY/MM/DD') as CARGO_EXPECTED_DATE,
+		                           TO_CHAR(ZIM.CARGO_PROMISED_DATE, 'YYYY/MM/DD') as CARGO_PROMISED_DATE,
+		                           TO_CHAR(ZIM.CARGO_ACTUAL_DATE, 'YYYY/MM/DD') as CARGO_ACTUAL_DATE,
+		                           ZIM.SHIPMENT_DURATION,
+		                           TO_CHAR(ZIM.FOB_PLAN_DATE, 'YYYY/MM/DD') as FOB_PLAN_DATE,
+		                           TO_CHAR(ZIM.FOB_EXPECTED_DATE, 'YYYY/MM/DD') as FOB_EXPECTED_DATE,
+		                           TO_CHAR(ZIM.FOB_ACTUAL_DATE, 'YYYY/MM/DD') as FOB_ACTUAL_DATE,
+		                           ZIM.TRANS_DURATION,
+		                           TO_CHAR(ZIM.ONSITE_PLAN_DATE, 'YYYY/MM/DD') as ONSITE_PLAN_DATE,
+		                           TO_CHAR(ZIM.ONSITE_EXPECTED_DATE, 'YYYY/MM/DD') as ONSITE_EXPECTED_DATE,
+		                           TO_CHAR(ZIM.ONSITE_ACTUAL_DATE, 'YYYY/MM/DD') as ONSITE_ACTUAL_DATE,
+		                           ZIM.PAYMENT_MILESTONE,
+		                           ZIM.TRK_ITEM_DEFAULT,
+		                           ZIM.INVOICE_NUM,
+		                           ZIM.ATTRIBUTE1,
+		                           ZIM.ATTRIBUTE2,
+		                           ZIM.ATTRIBUTE3,
+		                           ZIM.ATTRIBUTE4,
+		                           ZIM.ATTRIBUTE5,
+		                           ZIM.ATTRIBUTE6,
+		                           ZIM.ATTRIBUTE7,
+		                           ZIM.ATTRIBUTE8,
+		                           ZIM.ATTRIBUTE9,
+		                           ZIM.ATTRIBUTE10,
+		                           LEVEL AS LV,
+		                           SYS_CONNECT_BY_PATH(ZIM.TRK_ITEM_NAME, '!@#$')  AS ROOT_NAME,
+		                           CASE WHEN DI.CNT = 1 THEN DI.INVOICE_NUM
+		                                WHEN DI.CNT > 1 THEN DI.INVOICE_NUM || ' 외 ' || DI.CALC_CNT || '건' END AS SEL_INVOICE_NUM
+		                      FROM ZVTS_ITEM_MASTER ZIM,
+		                           PA_PROJECTS_ALL_INT PPA,
+		                           (SELECT ZDI.TRK_ITEM_SEQ,
+		                                   COUNT(*) AS CNT,
+		                                   COUNT(*) - 1 AS CALC_CNT,
+		                                   MAX(ZDI.INVOICE_NUM) AS INVOICE_NUM
+		                              FROM ZVTS_DESM_INVOICE ZDI
+		                            GROUP BY ZDI.TRK_ITEM_SEQ) DI
+		                     WHERE ZIM.PROJECT_ID = PPA.PROJECT_ID
+		                       AND ZIM.TRK_ITEM_SEQ = DI.TRK_ITEM_SEQ(+)
+		                       AND ZIM.PROJECT_NO = UPPER(#{PROJECT_NO})
+		                    START WITH ZIM.TRK_ITEM_GROUP IS NULL
+		                    CONNECT BY PRIOR ZIM.TRK_ITEM_SEQ = ZIM.TRK_ITEM_GROUP) T,
+		                    DESM_PACKING_DTL DPD,
+		                    DESM_PACKING_MST DPM
+		             WHERE T.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+		               AND T.PROJECT_NO = DPD.PROJECT_NO
+		                 AND DPD.PROJECT_NO = DPM.PROJECT_NO
+		                 AND DPD.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		                 AND DPD.PACKAGE_NO = DPM.PACKAGE_NO
+
+		                 <if test='PACKAGE_LIST_NO != null and PACKAGE_LIST_NO != ""'>
+		                 AND UPPER(DPD.PACKAGE_LIST_NO) LIKE '%' || UPPER(#{PACKAGE_LIST_NO}) || '%'
+		                 </if>
+		                 <if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+		                 AND UPPER(DPD.PACKAGE_NO) LIKE '%' || UPPER(#{PACKAGE_NO}) || '%'
+		                 </if>
+		                 <if test='DESCRIPTION != null and DESCRIPTION != ""'>
+		                 AND UPPER(DPD.DESCRIPTION) LIKE '%' || UPPER(#{DESCRIPTION}) || '%'
+		                 </if>
+		                 <if test='DRAWING_NO != null and DRAWING_NO != ""'>
+		                 AND UPPER(DPD.DRAWING_NO) LIKE '%' || UPPER(#{DRAWING_NO}) || '%'
+		                 </if>
+		                 <if test='TAG_NO != null and TAG_NO != ""'>
+		                 AND UPPER(DPD.TAG_NO) LIKE '%' || UPPER(#{TAG_NO}) || '%'
+		                 </if>
+		                 <if test='MATERIAL != null and MATERIAL != ""'>
+		                 AND UPPER(DPD.MATERIAL) LIKE '%' || UPPER(#{MATERIAL}) || '%'
+		                 </if>
+		                 <if test='MATERIAL_CODE != null and MATERIAL_CODE != ""'>
+		                 AND UPPER(DPD.MATERIAL_CODE) LIKE '%' || UPPER(#{MATERIAL_CODE}) || '%'
+		                 </if>
+		                 <if test='ATTRIBUTE10 != null and ATTRIBUTE10 != ""'>
+		                 AND T.ATTRIBUTE10 = #{ATTRIBUTE10}
+		                 </if>
+		                 <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+		                 AND UPPER(DPD.TRK_ITEM_NAME) LIKE '%' || UPPER(#{TRK_ITEM_NAME}) || '%'
+		                 </if>
+		                 <if test='RSI_NO != null and RSI_NO != ""'>
+		                 AND EXISTS (SELECT 1
+		                               FROM DESM_RSI_HEADER DRH,
+		                                    DESM_RSI_LINE DRL
+		                              WHERE DRH.RSI_HEADER_ID = DRL.RSI_HEADER_ID
+		                                AND DRH.RSI_NO LIKE '%' || UPPER(#{RSI_NO}) || '%'
+		                                AND DRH.PROJECT_NO = DPD.PROJECT_NO
+		                                AND DRL.MATERIAL_CODE = DPD.MATERIAL_CODE)
+		                 </if>
+		                 <if test='MRF_NO != null and MRF_NO != ""'>
+		                 AND EXISTS (SELECT 1
+		                               FROM DESM_MRF_HEADER DMH,
+		                                    DESM_MRF_LINE DML
+		                              WHERE DMH.MRF_HEADER_ID = DML.MRF_HEADER_ID
+		                                AND DMH.MRF_NO LIKE '%' || UPPER(#{MRF_NO}) || '%'
+		                                AND DMH.PROJECT_NO = DPD.PROJECT_NO
+		                                AND DML.MATERIAL_CODE = DPD.MATERIAL_CODE)
+		                 </if>
+
+		            ) TT
+		     WHERE 1 = 1
+            <if test='LV3_ITEM_NAME_F != null and LV3_ITEM_NAME_F != ""'>
+              AND UPPER(TT.LV3_ITEM_NAME) LIKE '%' || UPPER(#{LV3_ITEM_NAME_F}) || '%'
+            </if>
+            <if test='LV3_ITEM_NAME_S != null and LV3_ITEM_NAME_S != ""'>
+              AND UPPER(TT.LV3_ITEM_NAME) LIKE '%' || UPPER(#{LV3_ITEM_NAME_S}) || '%'
+            </if>
+            <if test='LV4_ITEM_NAME_F != null and LV4_ITEM_NAME_F != ""'>
+              AND UPPER(TT.LV4_ITEM_NAME) LIKE '%' || UPPER(#{LV4_ITEM_NAME_F}) || '%'
+            </if>
+            <if test='LV4_ITEM_NAME_S != null and LV4_ITEM_NAME_S != ""'>
+              AND UPPER(TT.LV4_ITEM_NAME) LIKE '%' || UPPER(#{LV4_ITEM_NAME_S}) || '%'
+            </if>
+		     ) DT
+		WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		  AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileOutgoingList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT RSI_HEADER_ID,
+		               RSI_LINE_ID,
+		               STATUS,
+		               RSI_NO,
+		               RSI_NAME,
+		               REQUEST_DATE,
+		               PACKAGE_NO,
+		               HEADER_DESCRIPTION,
+		               LINE_DESCRIPTION,
+		               UNIT,
+		               MATERIAL,
+		               DRAWING_NO,
+		               ITEM_NO,
+		               SUBCONTRACTOR,
+		               MATERIAL_CODE,
+		               REQ_QTY,
+		               REQ_QTY - HANDOVER_QTY -
+		               (SELECT NVL(SUM(DML.REQ_RETURN_QTY), 0) AS REQ_RETURN_QTY
+		                  FROM DESM_MRF_LINE DML
+		                 WHERE DML.RSI_LINE_ID = DT.RSI_LINE_ID) AS HANDOVER_AVAILABLE_QTY,
+		               REQ_QTY - HANDOVER_QTY -
+		               (SELECT NVL(SUM(DML.REQ_RETURN_QTY), 0) AS REQ_RETURN_QTY
+		                  FROM DESM_MRF_LINE DML
+		                 WHERE DML.RSI_LINE_ID = DT.RSI_LINE_ID) AS HANDOVER_QTY,
+		               TO_CHAR(SYSDATE - 1, 'YYYY/MM/DD') AS HANDOVER_DATE
+		          FROM (SELECT DRH.RSI_HEADER_ID,
+		                       DRL.RSI_LINE_ID,
+		                       DRH.STATUS,
+		                       DRH.RSI_NO,
+		                       DRH.RSI_NAME,
+		                       TO_CHAR(DRH.REQUEST_DATE, 'YYYY/MM/DD') AS REQUEST_DATE,
+		                       DRL.PACKAGE_NO,
+		                       DRH.DESCRIPTION AS HEADER_DESCRIPTION,
+		                       DPD.DESCRIPTION AS LINE_DESCRIPTION,
+		                       DPD.UNIT,
+		                       DPD.MATERIAL,
+		                       DRL.DRAWING_NO,
+		                       DRL.ITEM_NO,
+		                       DRH.SUBCONTRACTOR,
+		                       DRL.MATERIAL_CODE,
+		                       DRL.REQ_QTY,
+		                       SUM(NVL(DRO.HANDOVER_QTY, 0)) AS HANDOVER_QTY
+		                 FROM ZVTS_ITEM_MASTER ZIM,
+		                      DESM_PACKING_MST DPM,
+		                      DESM_PACKING_DTL DPD,
+		                      DESM_RSI_LINE DRL,
+		                      DESM_RSI_HEADER DRH,
+		                      DESM_RSI_OUTGOING DRO
+		                WHERE ZIM.PROJECT_NO = DPM.PROJECT_NO
+		                  AND ZIM.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		                  AND DRH.RSI_HEADER_ID = DRL.RSI_HEADER_ID
+		                  AND DPM.PROJECT_NO = DPD.PROJECT_NO
+		                  AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+		                  AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+		                  AND DPD.MATERIAL_CODE = DRL.MATERIAL_CODE
+		                  AND DRL.RSI_HEADER_ID = DRH.RSI_HEADER_ID
+		                  AND DRL.RSI_LINE_ID = DRO.RSI_LINE_ID(+)
+		                  AND DPM.IS_CONFIRM_MATERIAL = 'Y'
+		                  AND DRH.STATUS = 'Approved'
+		                  AND DRH.PROJECT_NO = #{PROJECT_NO}
+		                  <if test='RSI_LINE_ID != null and RSI_LINE_ID != ""'>
+		                  AND DRL.RSI_LINE_ID = #{RSI_LINE_ID}
+		                  </if>
+		                  <if test='MATERIAL_CODE != null and MATERIAL_CODE != ""'>
+		                  AND DPD.MATERIAL_CODE = #{MATERIAL_CODE}
+		                  </if>
+		           GROUP BY DRH.RSI_HEADER_ID,
+		                    DRL.RSI_LINE_ID,
+		                    DRH.STATUS,
+		                    DRH.RSI_NO,
+		                    DRH.RSI_NAME,
+		                    DRH.REQUEST_DATE,
+		                    DRL.PACKAGE_NO,
+		                    DRH.DESCRIPTION,
+		                    DPD.DESCRIPTION,
+		                    DPD.UNIT,
+		                    DPD.MATERIAL,
+		                    DRL.DRAWING_NO,
+		                    DRL.ITEM_NO,
+		                    DRH.SUBCONTRACTOR,
+		                    DRL.MATERIAL_CODE,
+		                    DRL.REQ_QTY) DT )
+		WHERE 1=1
+		<if test='RSI_LINE_ID != null and RSI_LINE_ID != ""'>
+			AND HANDOVER_AVAILABLE_QTY > 0
+		</if>
+		ORDER BY RSI_HEADER_ID,
+		         RSI_LINE_ID,
+		         PACKAGE_NO
+	</select>
+
+	<select id="getMobileReturnList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+		       DT.RETURN_AVAILABLE_QTY AS RETURN_QTY
+		  FROM (SELECT DMH.MRF_NO,
+		               DMH.MRF_NAME,
+		               DMH.SUBCONTRACTOR,
+		               DMH.STATUS,
+		               TO_CHAR(DMH.RETURN_REQ_DATE, 'YYYY/MM/DD') AS RETURN_REQ_DATE,
+		               DML.MATERIAL_CODE,
+		               DML.REQ_RETURN_QTY,
+		               DML.REQ_RETURN_QTY - (SELECT NVL(SUM(RETURN_QTY), 0)
+		                                       FROM DESM_MRF_RETURN
+		                                      WHERE MRF_LINE_ID = DML.MRF_LINE_ID) AS RETURN_AVAILABLE_QTY,
+		               TO_CHAR(SYSDATE - 1, 'YYYY/MM/DD') AS RETURN_DATE,
+		               DPD.PACKAGE_NO,
+		               DMH.DESCRIPTION AS HEADER_DESCRIPTION,
+		               DPD.DESCRIPTION AS LINE_DESCRIPTION,
+		               DPD.UNIT,
+		               DPD.MATERIAL,
+		               DPD.DRAWING_NO,
+		               DML.MRF_HEADER_ID,
+		               DML.MRF_LINE_ID,
+		               DML.RSI_HEADER_ID,
+		               DML.RSI_LINE_ID,
+		               DML.RSI_OUTGOING_ID,
+		               DRH.RSI_NO,
+		               DRH.RSI_NAME
+		          FROM DESM_MRF_HEADER DMH,
+		               DESM_MRF_LINE DML,
+		               DESM_PACKING_DTL DPD,
+		               DESM_PACKING_MST DPM,
+		               ZVTS_ITEM_MASTER ZIM,
+		               DESM_RSI_HEADER DRH
+		          WHERE DMH.MRF_HEADER_ID = DML.MRF_HEADER_ID
+		           AND DML.MATERIAL_CODE = DPD.MATERIAL_CODE
+		           AND DPD.PROJECT_NO = DPM.PROJECT_NO
+		           AND DPD.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		           AND DPD.PACKAGE_NO = DPM.PACKAGE_NO
+		           AND DPM.PROJECT_NO = ZIM.PROJECT_NO
+		           AND DPM.TRK_ITEM_NAME = ZIM.TRK_ITEM_NAME
+		           AND DML.RSI_HEADER_ID = DRH.RSI_HEADER_ID
+		           AND DPM.IS_CONFIRM_MATERIAL = 'Y'
+		           AND DMH.STATUS = 'Approved'
+		           AND ZIM.PROJECT_NO = #{PROJECT_NO}
+                  <if test='MRF_LINE_ID != null and MRF_LINE_ID != ""'>
+                  AND DML.MRF_LINE_ID = #{MRF_LINE_ID}
+                  </if>
+                  <if test='MATERIAL_CODE != null and MATERIAL_CODE != ""'>
+                  AND DPD.MATERIAL_CODE = #{MATERIAL_CODE}
+                  </if>
+		   ) DT
+		WHERE 1=1
+		<if test='MRF_LINE_ID != null and MRF_LINE_ID != ""'>
+			AND RETURN_AVAILABLE_QTY > 0
+		</if>
+		ORDER BY MATERIAL_CODE, MRF_HEADER_ID, MRF_LINE_ID
+	</select>
+
+	<select id="getMobileCodeList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DCD.DTL_CODE AS CODE,
+		       DCD.DTL_NAME_EN AS NAME
+		  FROM DESM_CODE_MST DCM,
+		       DESM_CODE_DTL DCD
+		 WHERE DCM.MST_CODE = DCD.MST_CODE
+		   AND DCM.DELEGATE_FLAG ='N'
+		   AND DCD.DELEGATE_FLAG = 'N'
+		   AND DCM.MST_CODE = #{MST_CODE}
+		ORDER BY DCD.DTL_ORDER
+	</select>
+
+	<select id="getMobileSubconInfo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT CASE WHEN SUBCON_YN = 'Y' THEN DU.DEPT_NAME END AS DEPT_NAME,
+		       SUBCON_YN,
+		       DU.USER_NAME
+		  FROM DESM_USER DU,
+		       (SELECT CASE WHEN MAX(DUR.USER_AD) IS NOT NULL THEN 'Y' ELSE 'N' END AS SUBCON_YN
+		          FROM DESM_SUBCON_USER DSU,
+		               DESM_USER_ROLE DUR
+		         WHERE DSU.USER_AD = DUR.USER_AD(+)
+		           AND DSU.USER_AD = #{USER_AD}
+		           AND DUR.ROLE_SEQ(+) = 111)
+		 WHERE DU.USER_AD = #{USER_AD}
+	</select>
+
+	<select id="getLeftMenu" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT MENU_SEQ,
+		       MENU_NAME,
+		       MENU_ORDER
+		  FROM (SELECT DM.MENU_SEQ,
+		               DM.MENU_NAME_EN AS MENU_NAME,
+		               DM.MENU_ORDER,
+		               MAX(CASE WHEN DRMA.AUTH_CODE IS NOT NULL THEN 'Y' ELSE 'N' END) AS MENU_YN
+		          FROM DESM_USER DU,
+		               DESM_USER_ROLE DUR,
+		               DESM_MENU DM,
+		               DESM_MENU_AUTH DMA,
+		               DESM_ROLE_MENU_AUTH DRMA
+		         WHERE DU.USER_AD = DUR.USER_AD
+		           AND DM.MENU_SEQ = DMA.MENU_SEQ
+		           AND DUR.ROLE_SEQ = DRMA.ROLE_SEQ(+)
+		           AND DM.MENU_SEQ = DRMA.MENU_SEQ(+)
+		           AND DMA.AUTH_CODE = DRMA.AUTH_CODE(+)
+		           AND DU.USER_AD = #{USER_AD}
+		           AND DU.DELEGATE_FLAG = 'N'
+               	   AND DU.EXPIRE_FLAG = 'N'
+		           AND DM.MOBILE_YN = 'Y'
+		           AND DM.DELEGATE_FLAG = 'N'
+		           AND DMA.AUTH_CODE = 'R'
+		        GROUP BY DM.MENU_SEQ,
+		                 DM.MENU_NAME_EN,
+		                 DM.MENU_ORDER)
+		 WHERE MENU_YN = 'Y'
+		ORDER BY MENU_ORDER
+	</select>
+
+	<select id="getMenuAuthCheckList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DM.MENU_SEQ,
+		       DM.MENU_ORDER,
+		       DM.MENU_NAME_EN AS MENU_NAME,
+		       DMA.AUTH_CODE,
+		       DMA.AUTH_NAME,
+		       MAX(CASE WHEN DU.EXPIRE_FLAG = 'Y' OR DU.DELEGATE_FLAG = 'Y' THEN 'N'
+                    	WHEN DRMA.AUTH_CODE IS NOT NULL THEN 'Y' ELSE 'N' END) AS AUTH_YN
+		  FROM DESM_USER DU,
+		       DESM_USER_ROLE DUR,
+		       DESM_MENU DM,
+		       DESM_MENU_AUTH DMA,
+		       DESM_ROLE_MENU_AUTH DRMA
+		 WHERE DU.USER_AD = DUR.USER_AD
+		   AND DM.MENU_SEQ = DMA.MENU_SEQ
+		   AND DUR.ROLE_SEQ = DRMA.ROLE_SEQ(+)
+		   AND DM.MENU_SEQ = DRMA.MENU_SEQ(+)
+		   AND DMA.AUTH_CODE = DRMA.AUTH_CODE(+)
+		   AND DU.USER_AD = #{USER_AD}
+		   <if test='MENU_SEQ != null and MENU_SEQ != ""'>
+		   AND DM.MENU_SEQ = #{MENU_SEQ}
+		   </if>
+		   AND DM.MOBILE_YN = 'Y'
+		   AND DM.DELEGATE_FLAG = 'N'
+		GROUP BY DM.MENU_SEQ,
+				 DM.MENU_ORDER,
+		         DM.MENU_NAME_EN,
+		         DMA.AUTH_CODE,
+		         DMA.AUTH_NAME
+		ORDER BY DM.MENU_ORDER
+	</select>
+
+	<select id="getAppVersion" resultType="java.util.HashMap">
+		/* MobileMapper.getAppVersion : 현재 모바일 버전 SELECT */
+		SELECT APP_VERSION, CREATION_DATE, INSTALL_URL, INSTALL_URL_IOS, INSTALL_URL_AOS
+		FROM (SELECT * FROM DESM_APP_VERSION ORDER BY CREATION_DATE DESC)
+		WHERE ROWNUM = 1
+	</select>
+
+	<select id="getMobileDetailItemList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+	      FROM (SELECT ROW_NUMBER() OVER(ORDER BY DPD.MATERIAL_CODE) AS RN,
+                 	   COUNT(*) OVER() AS TOTAL_CNT,
+	                   DPM.PACKAGE_LIST_NO,
+				       DPM.PACKAGE_NO,
+				       DPD.DESCRIPTION,
+				       DPD.DRAWING_NO,
+				       DPD.TAG_NO,
+				       DPD.UNIT,
+				       TRUNC(DPD.NOS) AS NOS,
+				       TRUNC(DPD.IN_QTY) AS IN_QTY,
+				       TRUNC(DPD.RSI_QTY) AS RSI_QTY,
+				       TRUNC(DPD.OUT_QTY) AS OUT_QTY,
+				       TRUNC(DPD.MRF_QTY) AS MRF_QTY,
+				       TRUNC(DPD.RSI_CANCEL_QTY) AS RSI_CANCEL_QTY,
+				       TRUNC(DPD.RETURN_QTY) AS RETURN_QTY,
+				       TRUNC(NVL(DPD.RSI_QTY, 0) - NVL(DPD.OUT_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0)) AS BALANCE_QTY,
+				       TRUNC(NVL(DPD.MRF_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0) - NVL(DPD.RETURN_QTY, 0)) AS MRF_BALANCE_QTY,
+				       TRUNC(NVL(DPD.IN_QTY, 0) - NVL(DPD.OUT_QTY, 0) + NVL(DPD.RETURN_QTY, 0)) AS REMAIN_QTY,
+				       DPD.MATERIAL_CODE,
+				       DPD.MATERIAL,
+				       DPD.PACKAGE_TYPE,
+				       TRUNC(DPD.GROSS, 1) AS GROSS,
+				       TRUNC(DPD.NET, 1) AS NET,
+				       TRUNC(DPD.RT, 1) AS RT,
+				       TRUNC(DPD.L_CM) AS L_CM,
+				       TRUNC(DPD.W_CM) AS W_CM,
+				       TRUNC(DPD.H_CM) AS H_CM,
+				       TRUNC(DPD.VOLUME, 1) AS VOLUME,
+				       TO_CHAR(ZIM.ONSITE_ACTUAL_DATE, 'YYYY/MM/DD') AS ONSITE_ACTUAL_DATE,
+				       DPD.LOCATION,
+				       DPD.REMARKS,
+				       DPD.TRK_ITEM_NAME
+				  FROM ZVTS_ITEM_MASTER ZIM,
+				       DESM_PACKING_MST DPM,
+				       DESM_PACKING_DTL DPD
+				 WHERE ZIM.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+				   AND ZIM.PROJECT_NO = DPM.PROJECT_NO
+				   AND DPM.PROJECT_NO = DPD.PROJECT_NO
+				   AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+				   AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+				   AND DPD.PROJECT_NO = #{PROJECT_NO}
+				   <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+				   AND DPD.TRK_ITEM_NAME = #{TRK_ITEM_NAME}
+				   </if>
+				   AND DPD.PACKAGE_NO = #{PACKAGE_NO}) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileVinaQrCodeDetailItemList"  parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MobileMapper.getMobileVinaQrCodeDetailItemList : VINA에서 부착한 QR Code 데이터 존재하는지 확인 */
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+	      FROM (SELECT ROW_NUMBER() OVER(ORDER BY DPD.TAG_NO) AS RN,
+			           COUNT(*) OVER() AS TOTAL_CNT,
+			           DPM.PACKAGE_LIST_NO,
+			           DPM.PACKAGE_NO,
+			           DPD.DESCRIPTION,
+			           DPD.DRAWING_NO,
+			           DPD.TAG_NO,
+			           DPD.UNIT,
+			           TRUNC(DPD.NOS) AS NOS,
+			           TRUNC(DPD.IN_QTY) AS IN_QTY,
+			           TRUNC(DPD.RSI_QTY) AS RSI_QTY,
+			           TRUNC(DPD.OUT_QTY) AS OUT_QTY,
+			           TRUNC(DPD.MRF_QTY) AS MRF_QTY,
+			           TRUNC(DPD.RSI_CANCEL_QTY) AS RSI_CANCEL_QTY,
+			           TRUNC(DPD.RETURN_QTY) AS RETURN_QTY,
+			           TRUNC(NVL(DPD.RSI_QTY, 0) - NVL(DPD.OUT_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0)) AS BALANCE_QTY,
+			           TRUNC(NVL(DPD.MRF_QTY, 0) - NVL(DPD.RSI_CANCEL_QTY, 0) - NVL(DPD.RETURN_QTY, 0)) AS MRF_BALANCE_QTY,
+			           TRUNC(NVL(DPD.IN_QTY, 0) - NVL(DPD.OUT_QTY, 0) + NVL(DPD.RETURN_QTY, 0)) AS REMAIN_QTY,
+			           DPD.MATERIAL_CODE,
+			           DPD.MATERIAL,
+			           DPD.PACKAGE_TYPE,
+			           TRUNC(DPD.GROSS, 1) AS GROSS,
+			           TRUNC(DPD.NET, 1) AS NET,
+			           TRUNC(DPD.RT, 1) AS RT,
+			           TRUNC(DPD.L_CM) AS L_CM,
+			           TRUNC(DPD.W_CM) AS W_CM,
+			           TRUNC(DPD.H_CM) AS H_CM,
+			           TRUNC(DPD.VOLUME, 1) AS VOLUME,
+			           TO_CHAR(ZIM.ONSITE_ACTUAL_DATE, 'YYYY/MM/DD') AS ONSITE_ACTUAL_DATE,
+			           DPD.LOCATION,
+			           DPD.REMARKS,
+			           DPD.PROJECT_NO,
+                 	   DPD.TRK_ITEM_NAME
+			      FROM ZVTS_ITEM_MASTER ZIM,
+			           DESM_PACKING_MST DPM,
+			           DESM_PACKING_DTL DPD
+			     WHERE ZIM.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+			       AND ZIM.PROJECT_NO = DPM.PROJECT_NO
+			       AND DPM.PROJECT_NO = DPD.PROJECT_NO
+			       AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+			       AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+			       AND DPD.PROJECT_NO = #{PROJECT_NO}
+			       AND (DPD.TAG_NO = SUBSTR(#{QR_CODE}, 6)
+			       OR DPD.TAG_NO = SUBSTR(#{QR_CODE}, 7)
+			       OR DPD.TAG_NO = SUBSTR(#{QR_CODE}, INSTR(#{QR_CODE},',')+1 ,INSTR(#{QR_CODE},',',-1) - (INSTR(#{QR_CODE},',')+1)))) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getDesmDesmMapLocationSummaryCnt" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS CNT
+		  FROM DESM_MAP_LOCATION DML,
+		       DESM_PACKING_MST DPM
+		 WHERE DML.PROJECT_NO = DPM.PROJECT_NO
+		   AND DML.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		   AND DML.PACKAGE_NO = DPM.PACKAGE_NO
+		   AND DML.MAP_DTL_ID = #{MAP_DTL_ID}
+		   AND DML.CODE_TYPE = 'SUMMARY'
+		ORDER BY DPM.PACKAGE_NO
+	</select>
+
+	<select id="getDesmDesmMapLocationDetailCnt" parameterType="java.util.Map" resultType="java.util.HashMap">
+    SELECT COUNT(*) AS CNT
+      FROM DESM_PACKING_MST DPM,
+           DESM_PACKING_DTL DPD,
+           DESM_MAP_LOCATION DML_S,
+           DESM_MAP_LOCATION DML_D
+     WHERE DPM.PROJECT_NO = DPD.PROJECT_NO
+       AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+       AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+       AND DPM.PROJECT_NO = DML_S.PROJECT_NO(+)
+       AND DPM.TRK_ITEM_NAME = DML_S.TRK_ITEM_NAME(+)
+       AND DPM.PACKAGE_NO = DML_S.PACKAGE_NO(+)
+       AND DPD.PROJECT_NO = DML_D.PROJECT_NO(+)
+       AND DPD.TRK_ITEM_NAME = DML_D.TRK_ITEM_NAME(+)
+       AND DPD.MATERIAL_CODE = DML_D.MATERIAL_CODE(+)
+       AND DPD.LOCATION IS NOT NULL
+       AND DML_S.CODE_TYPE(+) = 'SUMMARY'
+       AND DML_D.CODE_TYPE(+) = 'DETAIL'
+       AND DML_S.MAP_DTL_ID(+) = #{MAP_DTL_ID}
+       AND DML_D.MAP_DTL_ID(+) = #{MAP_DTL_ID}
+       AND (DML_S.LOCATION_ID IS NOT NULL OR DML_D.LOCATION_ID IS NOT NULL)
+    ORDER BY DPD.MATERIAL_CODE,
+             DPD.PACKAGE_LIST_NO,
+             DPD.PACKAGE_NO,
+             DPD.DRAWING_NO,
+             DPD.TAG_NO
+	</select>
+
+	<select id="getDesmDesmMapLocationSummaryList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DPM.PACKAGE_NO) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		               DPM.PACKAGE_NO,
+		               DPM.PACKAGE_LIST_NO,
+		               DPM.DESCRIPTION,
+		               DPM.PACKAGE_TYPE,
+		               TO_CHAR(DPM.L_CM, 'FM999,999,999,999,999') AS L_CM,
+		               TO_CHAR(DPM.W_CM, 'FM999,999,999,999,999') AS W_CM,
+		               TO_CHAR(DPM.H_CM, 'FM999,999,999,999,999') AS H_CM,
+		               TO_CHAR(DPM.VOLUME, 'FM999,999,999,999,990.0') AS VOLUME,
+		               TO_CHAR(DPM.NET, 'FM999,999,999,999,990.0') AS NET,
+		               TO_CHAR(DPM.GROSS, 'FM999,999,999,999,990.0') AS GROSS,
+		               DPM.TRK_ITEM_NAME,
+		               DPM.PROJECT_NO,
+		               (SELECT COUNT(*) FROM DESM_PACKING_DTL WHERE PACKAGE_NO = DPM.PACKAGE_NO AND PROJECT_NO = DPM.PROJECT_NO AND TRK_ITEM_NAME = DPM.TRK_ITEM_NAME) AS NUMBER_OF_ITEMS
+		          FROM DESM_MAP_LOCATION DML,
+		               DESM_PACKING_MST DPM
+		         WHERE DML.PROJECT_NO = DPM.PROJECT_NO
+		           AND DML.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		           AND DML.PACKAGE_NO = DPM.PACKAGE_NO
+		           AND DML.MAP_DTL_ID = #{MAP_DTL_ID}
+		           AND DML.CODE_TYPE = 'SUMMARY') DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getDesmDesmMapLocationDetailList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	           ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY DPD.MATERIAL_CODE, DPD.PACKAGE_LIST_NO, DPD.PACKAGE_NO, DPD.DRAWING_NO, DPD.TAG_NO) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		               DPD.PACKAGE_LIST_NO,
+		               DPD.PACKAGE_NO,
+		               DPD.DESCRIPTION,
+		               DPD.DRAWING_NO,
+		               DPD.TAG_NO,
+		               DPD.MATERIAL,
+		               DPD.MATERIAL_CODE,
+		               DPD.PACKAGE_TYPE,
+		               DPD.TRK_ITEM_NAME,
+		               DPD.PROJECT_NO,
+		               DPD.LOCATION,
+		               TO_CHAR(DPD.GROSS, 'FM999,999,999,999,990.0') AS GROSS,
+		               TO_CHAR(DPD.NET, 'FM999,999,999,999,990.0') AS NET,
+		               TO_CHAR(DPD.RT, 'FM999,999,999,999,990.0') AS RT,
+		               TO_CHAR(DPD.L_CM, 'FM999,999,999,999,999') AS L_CM,
+		               TO_CHAR(DPD.W_CM, 'FM999,999,999,999,999') AS W_CM,
+		               TO_CHAR(DPD.H_CM, 'FM999,999,999,999,999') AS H_CM,
+		               TO_CHAR(DPD.VOLUME, 'FM999,999,999,999,990.0') AS VOLUME,
+		               DPD.UNIT,
+		               TO_CHAR(DPD.NOS, 'FM999,999,999,999,999') AS NOS
+			      FROM DESM_PACKING_MST DPM,
+			           DESM_PACKING_DTL DPD,
+			           DESM_MAP_LOCATION DML_S,
+			           DESM_MAP_LOCATION DML_D
+			     WHERE DPM.PROJECT_NO = DPD.PROJECT_NO
+			       AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+			       AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+			       AND DPM.PROJECT_NO = DML_S.PROJECT_NO(+)
+			       AND DPM.TRK_ITEM_NAME = DML_S.TRK_ITEM_NAME(+)
+			       AND DPM.PACKAGE_NO = DML_S.PACKAGE_NO(+)
+			       AND DPD.PROJECT_NO = DML_D.PROJECT_NO(+)
+			       AND DPD.TRK_ITEM_NAME = DML_D.TRK_ITEM_NAME(+)
+			       AND DPD.MATERIAL_CODE = DML_D.MATERIAL_CODE(+)
+			       AND DPD.LOCATION IS NOT NULL
+			       AND DML_S.CODE_TYPE(+) = 'SUMMARY'
+			       AND DML_D.CODE_TYPE(+) = 'DETAIL'
+			       AND DML_S.MAP_DTL_ID(+) = #{MAP_DTL_ID}
+			       AND DML_D.MAP_DTL_ID(+) = #{MAP_DTL_ID}
+			       AND (DML_S.LOCATION_ID IS NOT NULL OR DML_D.LOCATION_ID IS NOT NULL)) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileOutgoingReturnList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	           ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM (SELECT T.*,
+		               DPD.IN_QTY,
+		               DPD.PACKAGE_NO,
+		               DPD.DRAWING_NO,
+		               DPD.TAG_NO,
+		               DPD.DESCRIPTION,
+		               ROW_NUMBER() OVER(ORDER BY HANDOVER_RETURN_DATE DESC, T.MATERIAL_CODE, T.OUTGOING_RETURN_ID) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT
+		          FROM ZVTS_ITEM_MASTER ZIM,
+		               DESM_PACKING_MST DPM,
+		               DESM_PACKING_DTL DPD,
+		               (SELECT 'RSI' AS S_TYPE,
+		                       DRH.RSI_NO AS RSI_MRF_NO,
+		                       DRH.RSI_NAME AS RSI_MRF_NAME,
+		                       TO_CHAR(DRH.HANDOVER_DATE, 'YYYY/MM/DD') AS REQUEST_RETURN_REQ_DATE,
+		                       DRL.MATERIAL_CODE,
+		                       DRH.SUBCONTRACTOR,
+		                       TO_CHAR(DRO.HANDOVER_DATE, 'YYYY/MM/DD') AS HANDOVER_RETURN_DATE,
+		                       DRL.REQ_QTY AS REQ_REQ_RETURN_QTY,
+		                       DRO.HANDOVER_QTY AS HANDOVER_RETURN_QTY,
+		                       'Outgoing' AS TYPE,
+		                       DRO.RSI_OUTGOING_ID AS OUTGOING_RETURN_ID,
+		                       DRO.CREATED_BY,
+		                       DRL.REQ_QTY
+		                  FROM DESM_RSI_HEADER DRH,
+		                       DESM_RSI_LINE DRL,
+		                       DESM_RSI_OUTGOING DRO
+		                 WHERE DRH.RSI_HEADER_ID = DRL.RSI_HEADER_ID
+		                   AND DRL.RSI_LINE_ID = DRO.RSI_LINE_ID
+		                   AND DRH.PROJECT_NO = #{PROJECT_NO}
+		                   <if test='START_HANDOVER_DATE != null and START_HANDOVER_DATE != ""'>
+		                   AND DRO.HANDOVER_DATE >= TO_DATE(#{START_HANDOVER_DATE}, 'YYYY/MM/DD')
+		                   </if>
+		                   <if test='END_HANDOVER_DATE != null and END_HANDOVER_DATE != ""'>
+		                   AND DRO.HANDOVER_DATE <![CDATA[ < ]]> TO_DATE(#{END_HANDOVER_DATE}, 'YYYY/MM/DD') + 1
+		                   </if>
+		                   <if test='(START_HANDOVER_DATE == null or START_HANDOVER_DATE == "") and (END_HANDOVER_DATE == null or END_HANDOVER_DATE == "")'>
+		                   	   <if test='(START_RETURN_DATE != null and START_RETURN_DATE != "") or (END_RETURN_DATE != null and END_RETURN_DATE != "")'>
+		                   	   AND 1 = 2
+		                   	   </if>
+		                   </if>
+		                   <if test='USER_AD != null and USER_AD != ""'>
+		                   AND UPPER(DRO.CREATED_BY) LIKE '%' || UPPER(#{USER_AD}) || '%'
+		                   </if>
+		                   <if test='SUBCONTRACTOR != null and SUBCONTRACTOR != ""'>
+		                   AND UPPER(DRH.SUBCONTRACTOR) LIKE '%' || UPPER(#{SUBCONTRACTOR}) || '%'
+		                   </if>
+		                UNION ALL
+		                SELECT 'MRF' AS S_TYPE,
+		                       DMH.MRF_NO,
+		                       DMH.MRF_NAME,
+		                       TO_CHAR(DMH.RETURN_REQ_DATE, 'YYYY/MM/DD') AS RETURN_REQ_DATE,
+		                       DML.MATERIAL_CODE,
+		                       DMH.SUBCONTRACTOR,
+		                       TO_CHAR(DMR.RETURN_DATE, 'YYYY/MM/DD') AS RETURN_DATE,
+		                       DML.REQ_RETURN_QTY,
+		                       DMR.RETURN_QTY,
+		                       CASE WHEN DML.RSI_OUTGOING_ID IS NULL THEN 'RSI Cancel' ELSE 'Outgoing Return' END AS RETURN_TYPE,
+		                       DMR.MRF_RETURN_ID,
+		                       DMR.CREATED_BY,
+		                       DRL.REQ_QTY
+		                  FROM DESM_MRF_HEADER DMH,
+		                       DESM_MRF_LINE DML,
+		                       DESM_MRF_RETURN DMR,
+		                       DESM_RSI_LINE DRL
+		                 WHERE DMH.MRF_HEADER_ID = DML.MRF_HEADER_ID
+		                   AND DML.MRF_LINE_ID = DMR.MRF_LINE_ID
+		                   AND DML.RSI_LINE_ID = DRL.RSI_LINE_ID
+		                   AND DMH.PROJECT_NO = #{PROJECT_NO}
+		                   <if test='START_RETURN_DATE != null and START_RETURN_DATE != ""'>
+		                   AND DMR.RETURN_DATE >= TO_DATE(#{START_RETURN_DATE}, 'YYYY/MM/DD')
+		                   </if>
+		                   <if test='END_RETURN_DATE != null and END_RETURN_DATE != ""'>
+		                   AND DMR.RETURN_DATE <![CDATA[ < ]]> TO_DATE(#{END_RETURN_DATE}, 'YYYY/MM/DD') + 1
+		                   </if>
+		                   <if test='(START_RETURN_DATE == null or START_RETURN_DATE == "") and (END_RETURN_DATE == null or END_RETURN_DATE == "")'>
+		                   	   <if test='(START_HANDOVER_DATE != null and START_HANDOVER_DATE != "") or (END_HANDOVER_DATE != null and END_HANDOVER_DATE != "")'>
+		                   	   AND 1 = 2
+		                   	   </if>
+		                   </if>
+		                   <if test='USER_AD != null and USER_AD != ""'>
+		                   AND UPPER(DMR.CREATED_BY) LIKE '%' || UPPER(#{USER_AD}) || '%'
+		                   </if>
+		                   <if test='SUBCONTRACTOR != null and SUBCONTRACTOR != ""'>
+		                   AND UPPER(DMH.SUBCONTRACTOR) LIKE '%' || UPPER(#{SUBCONTRACTOR}) || '%'
+		                   </if>
+		                   ) T
+		        WHERE ZIM.PROJECT_NO = DPM.PROJECT_NO
+		          AND ZIM.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+		          AND DPM.PROJECT_NO = DPD.PROJECT_NO
+		          AND DPM.TRK_ITEM_NAME = DPD.TRK_ITEM_NAME
+		          AND DPM.PACKAGE_NO = DPD.PACKAGE_NO
+		          AND DPD.MATERIAL_CODE = T.MATERIAL_CODE
+		          AND ZIM.PROJECT_NO = #{PROJECT_NO}) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileShippingStatusList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DVM.IMO,
+		       DVM.VESSEL_NAME,
+		       DVM.LATITUDE,
+		       DVM.LONGITUDE,
+		       DVM.POL,
+		       NVL(DVM.ETD_ATD, '-') AS ETD_ATD,
+		       DVM.POD,
+		       NVL(DVM.ETA_ATA, '-') AS ETA_ATA,
+		       DVM.INV_NO,
+		       DVM.PL_NO,
+		       DVM.MFR,
+		       DVM.ITEM_NAME,
+		       DVM.PROJECT_NO
+		  FROM DESM_VESSEL_MAP DVM
+		 WHERE DVM.PROJECT_NO = #{PROJECT_NO}
+           <if test='INV_NO != null and INV_NO != ""'>
+           AND UPPER(DVM.INV_NO) LIKE '%' || UPPER(#{INV_NO}) || '%'
+           </if>
+        ORDER BY DVM.INV_NO
+	</select>
+
+	<select id="getMobileMprPoList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT
+		       DPHI.PO_NO,
+		       DPHI.PO_DESCRIPTION
+		  FROM DESM_MPR_HEADER DMH,
+		       DESM_PO_HEADER_INT DPHI
+		 WHERE DMH.PO_NO = DPHI.PO_NO
+           <if test='PO_NO != null and PO_NO != ""'>
+           AND UPPER(DMH.PO_NO) LIKE '%' || UPPER(#{PO_NO}) || '%'
+           </if>
+           <if test='PO_DESCRIPTION != null and PO_DESCRIPTION != ""'>
+           AND UPPER(DPHI.PO_DESCRIPTION) LIKE '%' || UPPER(#{PO_DESCRIPTION}) || '%'
+           </if>
+           <if test='SUPPLIER_NUMBER != null and SUPPLIER_NUMBER != ""'>
+           AND DPHI.SUPPLIER_NUMBER = #{SUPPLIER_NUMBER}
+           </if>
+        ORDER BY DPHI.PO_NO DESC
+	</select>
+
+	<select id="getMobileMprProjectList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT
+		       DPHI.PROJECT_CODE,
+		       DPHI.PROJECT_NAME
+		  FROM DESM_MPR_HEADER DMH,
+		       DESM_PO_HEADER_INT DPHI
+		 WHERE DMH.PO_NO = DPHI.PO_NO
+		   AND DPHI.PROJECT_CODE IS NOT NULL
+           <if test='PROJECT_CODE != null and PROJECT_CODE != ""'>
+           AND UPPER(DPHI.PROJECT_CODE) LIKE '%' || UPPER(#{PROJECT_CODE}) || '%'
+           </if>
+           <if test='PROJECT_NAME != null and PROJECT_NAME != ""'>
+           AND UPPER(DPHI.PROJECT_NAME) LIKE '%' || UPPER(#{PROJECT_NAME}) || '%'
+           </if>
+           <if test='SUPPLIER_NUMBER != null and SUPPLIER_NUMBER != ""'>
+           AND DPHI.SUPPLIER_NUMBER = #{SUPPLIER_NUMBER}
+           </if>
+        ORDER BY DPHI.PROJECT_CODE
+	</select>
+
+	<select id="getMobileMprSupplierList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_AD AS USER_AD,
+		       DU.USER_NAME AS SUPPLIER_NAME,
+		       DS.SUPPLIER_NO AS SUPPLIER_NUMBER
+		  FROM DESM_SUPPLIER DS,
+		       DESM_USER DU
+		 WHERE DS.USER_AD = DU.USER_AD
+           <if test='SUPPLIER_NUMBER != null and SUPPLIER_NUMBER != ""'>
+           AND UPPER(DS.SUPPLIER_NO) LIKE '%' || UPPER(#{SUPPLIER_NUMBER}) || '%'
+           </if>
+           <if test='SUPPLIER_NAME != null and SUPPLIER_NAME != ""'>
+           AND UPPER(DU.USER_NAME) LIKE '%' || UPPER(#{SUPPLIER_NAME}) || '%'
+           </if>
+        ORDER BY DS.SUPPLIER_NO
+	</select>
+
+	<select id="getMobileMprList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT DMH.MPR_SEQ,
+		       DMH.MPR_DATE,
+		       DMH.STATUS,
+		       DPHI.PROJECT_CODE,
+		       DMH.PO_NO,
+		       DMH.MPR_NO,
+		       DMH.RESULT_YN,
+		       TO_CHAR(DMH.PO_PROMISED_DATE, 'YYYY/MM/DD') AS PO_PROMISED_DATE,
+		       DMH.PRODUCT_NAME,
+		       DPHI.PROJECT_NAME,
+		       DPHI.PO_DESCRIPTION,
+		       DPHI.SUPPLIER_NUMBER,
+		       DPHI.SUPPLIER_NAME,
+		       (SELECT DMSM.USER_AD FROM DESM_MPR_SETUP_MAIL DMSM WHERE DMSM.PO_NO = DMH.PO_NO AND DMSM.MPR_NO = DMH.MPR_NO AND EXPEDITER_YN = 'Y') AS MANAGER
+		  FROM DESM_MPR_HEADER DMH,
+		       DESM_PO_HEADER_INT DPHI
+		 WHERE DMH.PO_NO = DPHI.PO_NO
+		   <if test='START_MPR_DATE != null and START_MPR_DATE != ""'>
+		   AND DMH.MPR_DATE >= #{START_MPR_DATE}
+		   </if>
+		   <if test='END_MPR_DATE != null and END_MPR_DATE != ""'>
+		   AND DMH.MPR_DATE <![CDATA[ <= ]]> #{END_MPR_DATE}
+		   </if>
+		   <if test='PO_NO != null and PO_NO != ""'>
+		   AND DMH.PO_NO = #{PO_NO}
+		   </if>
+		   <if test='PROJECT_CODE != null and PROJECT_CODE != ""'>
+		   AND DPHI.PROJECT_CODE = #{PROJECT_CODE}
+		   </if>
+		   <if test='SUPPLIER_NUMBER != null and SUPPLIER_NUMBER != ""'>
+		   AND DPHI.SUPPLIER_NUMBER = #{SUPPLIER_NUMBER}
+		   </if>
+				   <if test='SUPPLIER_NAME != null and SUPPLIER_NAME != ""'>
+				   AND UPPER(DPHI.SUPPLIER_NAME) LIKE '%' || UPPER(#{SUPPLIER_NAME}) || '%'
+				   </if>
+		   <if test='RESULT_YN != null and RESULT_YN != ""'>
+		   AND NVL(DMH.RESULT_YN, 'N') = #{RESULT_YN}
+		   </if>
+				   <if test='STATUS != null and STATUS != ""'>
+				   AND DMH.STATUS = #{STATUS}
+				   </if>
+				   )
+		  WHERE 1 = 1
+		  <if test='MANAGER != null and MANAGER != ""'>
+		  AND UPPER(MANAGER) LIKE '%' || UPPER(#{MANAGER}) || '%'
+		  </if>
+		 ORDER BY PO_NO DESC
+	</select>
+
+	<select id="getMobileMprDetailHeaderList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DMH.MPR_SEQ,
+		       DMH.MPR_NO,
+		       DMH.MPR_DATE,
+		       DMH.STATUS,
+		       DPHI.PROJECT_CODE AS PROJECT_NO,
+		       DMH.PO_NO,
+		       DMH.PRODUCT_NAME,
+		       TO_CHAR(DMH.PO_PROMISED_DATE, 'YYYY/MM/DD') AS PO_PROMISED_DATE,
+		       NVL(DMH.RESULT_YN, 'Y') AS RESULT_YN,
+		       DMH.RESULT_REMARK,
+		       DMH.REQUEST_REMARK,
+		       DPHI.PROJECT_NAME,
+		       DPHI.PO_DESCRIPTION,
+		       DPHI.SUPPLIER_NUMBER,
+		       DPHI.SUPPLIER_NAME,
+		       (SELECT DMSM.USER_AD FROM DESM_MPR_SETUP_MAIL DMSM WHERE DMSM.PO_NO = DMH.PO_NO AND DMSM.MPR_NO = DMH.MPR_NO AND EXPEDITER_YN = 'Y') AS MANAGER
+		  FROM DESM_MPR_HEADER DMH,
+		       DESM_PO_HEADER_INT DPHI
+		 WHERE DMH.PO_NO = DPHI.PO_NO
+		   AND DMH.MPR_SEQ = #{MPR_SEQ}
+	</select>
+
+	<select id="getMobileMprDetailSummaryList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT *
+		  FROM (SELECT MST_CODE,
+		               DTL_CODE AS TYPE_CODE,
+		               CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                    WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME,
+		               ROW_NUMBER() OVER(ORDER BY DTL_ORDER) AS TYPE_RN
+		          FROM DESM_CODE_DTL
+		         WHERE MST_CODE = 'M001'
+		           AND DELEGATE_FLAG = 'N'
+		         UNION ALL
+		         SELECT 'T9999' AS MST_CODE,
+		                'T' AS TYPE_CODE,
+		                'Overall' AS TYPE_NAME,
+		                99999 TYPE_RN
+		           FROM DUAL ) CODE_DT,
+		        (SELECT TYPE_CODE,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(PLAN_VAR_PREV) / 100, 2) ELSE TRUNC(SUM(PLAN_VAR_PREV), 2) END) || '%' AS PLAN_VAR_PREV,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(ACTUAL_VAR_PREV) / 100, 2) ELSE TRUNC(SUM(ACTUAL_VAR_PREV), 2) END) || '%' AS ACTUAL_VAR_PREV,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(PLAN_VAR_CUR) / 100, 2) ELSE TRUNC(SUM(PLAN_VAR_CUR), 2) END) || '%' AS PLAN_VAR_CUR,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(ACTUAL_VAR_CUR) / 100, 2) ELSE TRUNC(SUM(ACTUAL_VAR_CUR), 2) END) || '%' AS ACTUAL_VAR_CUR,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(PLAN_VAR_NEXT) / 100, 2) ELSE TRUNC(SUM(PLAN_VAR_NEXT), 2) END) || '%' AS PLAN_VAR_NEXT,
+		                TO_CHAR(CASE WHEN TYPE_CODE = 'T' THEN TRUNC(SUM(ACTUAL_VAR_NEXT) / 100, 2) ELSE TRUNC(SUM(ACTUAL_VAR_NEXT), 2) END) || '%' AS ACTUAL_VAR_NEXT,
+		                TO_CHAR(SUM(WEIGHT)) || '%'  AS WEIGHT
+		            FROM (SELECT CASE WHEN LV.LV = 1 THEN TYPE_CODE ELSE 'T' END AS TYPE_CODE,
+		                         CASE WHEN LV.LV = 1 THEN PLAN_VAR_PREV ELSE PLAN_VAR_PREV * WEIGHT END AS PLAN_VAR_PREV,
+		                         CASE WHEN LV.LV = 1 THEN ACTUAL_VAR_PREV ELSE ACTUAL_VAR_PREV * WEIGHT END AS ACTUAL_VAR_PREV,
+		                         CASE WHEN LV.LV = 1 THEN PLAN_VAR_CUR ELSE PLAN_VAR_CUR * WEIGHT END AS PLAN_VAR_CUR,
+		                         CASE WHEN LV.LV = 1 THEN ACTUAL_VAR_CUR ELSE ACTUAL_VAR_CUR * WEIGHT END AS ACTUAL_VAR_CUR,
+		                         CASE WHEN LV.LV = 1 THEN PLAN_VAR_NEXT ELSE PLAN_VAR_NEXT * WEIGHT END AS PLAN_VAR_NEXT,
+		                         CASE WHEN LV.LV = 1 THEN ACTUAL_VAR_NEXT ELSE ACTUAL_VAR_NEXT * WEIGHT END AS ACTUAL_VAR_NEXT,
+		                         WEIGHT
+		                    FROM (SELECT TYPE_CODE,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_PREV_YYYY AND MM = MPR_DATE_PREV_MM AND GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR_PREV,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_PREV_YYYY AND MM = MPR_DATE_PREV_MM AND GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR_PREV,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_CUR_YYYY AND MM = MPR_DATE_CUR_MM AND GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR_CUR,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_CUR_YYYY AND MM = MPR_DATE_CUR_MM AND GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR_CUR,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_NEXT_YYYY AND MM = MPR_DATE_NEXT_MM AND GUBUN_CODE = 'P' THEN VAL END), 0) AS PLAN_VAR_NEXT,
+		                                 NVL(MAX(CASE WHEN YYYY = MPR_DATE_NEXT_YYYY AND MM = MPR_DATE_NEXT_MM AND GUBUN_CODE = 'R' THEN VAL END), 0) AS ACTUAL_VAR_NEXT,
+		                                 NVL(MAX(CASE WHEN GUBUN_CODE = 'P' THEN WEIGHT END), 0) AS WEIGHT
+		                            FROM (SELECT TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'YYYY') AS MPR_DATE_CUR_YYYY,
+		                                         TO_CHAR(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 'MM') AS MPR_DATE_CUR_MM,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 1), 'YYYY') AS MPR_DATE_NEXT_YYYY,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), 1), 'MM') AS MPR_DATE_NEXT_MM,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), -1), 'YYYY') AS MPR_DATE_PREV_YYYY,
+		                                         TO_CHAR(ADD_MONTHS(TO_DATE(DMH.MPR_DATE || '/01', 'YYYY/MM/DD'), -1), 'MM') AS MPR_DATE_PREV_MM,
+		                                         DT.*
+		                                    FROM DESM_MPR_HEADER DMH,
+		                                         (SELECT DMDP.YYYY,
+		                                                 DMDP.MM,
+		                                                 DMDP.VAL,
+		                                                 DMDP.TYPE_CODE,
+		                                                 DMDP.GUBUN_CODE,
+		                                                 0 AS WEIGHT
+		                                            FROM DESM_MPR_HEADER DMH,
+		                                                 DESM_MPR_DETAIL_PROGRESS DMDP
+		                                           WHERE DMH.MPR_SEQ = DMDP.MPR_SEQ
+		                                             AND DMH.MPR_SEQ = #{MPR_SEQ}
+		                                          UNION ALL
+		                                          SELECT DMSD.YYYY,
+		                                                 DMSD.MM,
+		                                                 DMSD.VAL,
+		                                                 DMSD.TYPE_CODE,
+		                                                 DMSD.GUBUN_CODE,
+		                                                 DMSR.WEIGHT
+		                                            FROM DESM_MPR_HEADER DMH,
+		                                                 DESM_MPR_SETUP_DATA DMSD,
+		                                                 DESM_MPR_SETUP_DATE DMSDE,
+		                                                 DESM_MPR_SETUP_REMARK DMSR
+		                                           WHERE DMH.PO_NO = DMSD.PO_NO
+		                                             AND DMH.MPR_NO = DMSD.MPR_NO
+		                                             AND DMSD.PO_NO = DMSDE.PO_NO
+		                                             AND DMSD.MPR_NO = DMSDE.MPR_NO
+		                                             AND DMSD.PO_NO = DMSR.PO_NO
+		                                             AND DMSD.MPR_NO = DMSR.MPR_NO
+		                                             AND DMSD.TYPE_CODE = DMSR.TYPE_CODE
+		                                             AND DMSR.GUBUN_CODE = DMSR.GUBUN_CODE
+		                                             AND DMH.MPR_SEQ = #{MPR_SEQ}
+		                                             AND DMSDE.STATUS = 'Confirmed') DT
+		                                   WHERE DMH.MPR_SEQ = #{MPR_SEQ})
+		                          GROUP BY TYPE_CODE),
+		                         (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ < ]]> 3) LV)
+		          GROUP BY TYPE_CODE) VAL_DT
+		 WHERE CODE_DT.TYPE_CODE = VAL_DT.TYPE_CODE
+		ORDER BY CODE_DT.TYPE_RN
+	</select>
+
+	<select id="getMobileMprDetailNoteList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.NOTE_SEQ,
+		       CD.TYPE_CODE,
+		       CD.TYPE_NAME,
+		       DT.CONTENTS
+		  FROM (SELECT MST_CODE,
+		               DTL_CODE AS TYPE_CODE,
+		               CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                    WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME
+		          FROM DESM_CODE_DTL
+		         WHERE MST_CODE = 'M001'
+		           AND DELEGATE_FLAG = 'N') CD,
+		        (SELECT A.NOTE_SEQ,
+		                A.TYPE,
+		                A.CONTENTS
+		           FROM DESM_MPR_PROGRESS_NOTE A
+		          WHERE A.MPR_SEQ = #{MPR_SEQ}) DT
+		 WHERE CD.TYPE_CODE = DT.TYPE
+		ORDER BY DT.NOTE_SEQ
+	</select>
+
+	<select id="getMobileMprDetailRemarksList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DT.REMARKS_SEQ,
+		       CD.TYPE_CODE,
+		       CD.TYPE_NAME,
+		       DT.CONTENTS
+		  FROM (SELECT MST_CODE,
+		               DTL_CODE AS TYPE_CODE,
+		               CASE WHEN #{LANG} = 'ko' THEN DTL_NAME_KO
+		                    WHEN #{LANG} = 'en' THEN DTL_NAME_EN END AS TYPE_NAME
+		          FROM DESM_CODE_DTL
+		         WHERE MST_CODE = 'M001'
+		           AND DELEGATE_FLAG = 'N') CD,
+		        (SELECT A.REMARKS_SEQ,
+		                A.TYPE,
+		                A.CONTENTS
+		           FROM DESM_MPR_REMARKS A
+		          WHERE A.MPR_SEQ = #{MPR_SEQ}) DT
+		 WHERE CD.TYPE_CODE = DT.TYPE
+		ORDER BY DT.REMARKS_SEQ
+	</select>
+	
+
+	<select id="getMobileMrrList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MobileMapper.xml -> getMobileMrrList : MRR 목록 조회 */
+		SELECT DT.*,
+		       CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+		            ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM ( SELECT ROW_NUMBER() OVER(ORDER BY DMH.MRR_HEADER_ID DESC) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		  			   DMH.MRR_HEADER_ID,
+			           DMH.MRR_NO,
+			           DMH.MRR_NAME,
+			           DMH.STATUS,
+			           --DMH.DESCRIPTION,
+			           --DMH.SUBCONTRACTOR,
+			           --DMH.SUBCON_MANAGER,
+			           TO_CHAR(DMH.RECEIVED_DATE_FROM, 'YYYY/MM/DD') AS RECEIVED_DATE_FROM,
+			           TO_CHAR(DMH.RECEIVED_DATE_TO, 'YYYY/MM/DD') AS RECEIVED_DATE_TO,
+			           TO_CHAR(DMH.INSPECTION_DATE_FROM, 'YYYY/MM/DD') AS INSPECTION_DATE_FROM,
+			           TO_CHAR(DMH.INSPECTION_DATE_TO, 'YYYY/MM/DD') AS INSPECTION_DATE_TO,
+			           TO_CHAR(DMH.PREPARED_DATE, 'YYYY/MM/DD') AS PREPARED_DATE,
+			           TO_CHAR(DMH.APPROVED_DATE, 'YYYY/MM/DD') AS APPROVED_DATE,
+			           
+			           DMH.CREATED_BY,
+			           TO_CHAR(DMH.CREATION_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CREATION_DATE,
+			           DMH.LAST_UPDATED_BY,
+			           TO_CHAR(DMH.LAST_UPDATE_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS LAST_UPDATE_DATE,
+			           
+			           CASE WHEN DMH.PREPARED_DATE IS NOT NULL THEN DU1.USER_NAME END AS PREPARED_BY_NAME,
+			           CASE WHEN DMH.CHECKED_DATE IS NOT NULL THEN DU2.USER_NAME END AS CHECKED_BY_NAME,
+			           CASE WHEN DMH.CONFIRMED_DATE IS NOT NULL THEN DU3.USER_NAME END AS CONFIRMED_BY_NAME,
+			           CASE WHEN DMH.APPROVED_DATE IS NOT NULL THEN DU4.USER_NAME END AS APPROVED_BY_NAME,
+			               
+			           CASE WHEN DMH.PREPARED_BY IS NOT NULL THEN DMH.PREPARED_BY END AS PREPARED_BY,
+			           CASE WHEN DMH.CHECKED_DATE IS NOT NULL THEN DMH.CHECKED_BY END AS CHECKED_BY,
+			           CASE WHEN DMH.CONFIRMED_DATE IS NOT NULL THEN DMH.CONFIRMED_BY END AS CONFIRMED_BY,
+			           CASE WHEN DMH.APPROVED_DATE IS NOT NULL THEN DMH.APPROVED_BY END AS APPROVED_BY,
+			           
+			           DMH.REMARK,
+			           DMH.ATTACH_GRP_CD,
+			             
+			           (SELECT COUNT(*)
+			              FROM ESAATTH A
+			             WHERE A.SYS_ID = 'EMRO'
+			               AND A.STS  <![CDATA[ <> ]]>   'D'
+			               AND A.GRP_CD = DMH.ATTACH_GRP_CD) AS ATT_CNT
+			      FROM DESM_MRR_HEADER DMH,
+			             (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+			                FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+			                     DESM_CODE_DTL DCD
+			               WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+			                 AND DCD.DELEGATE_FLAG = 'N'
+			                 AND DUDC.USER_AD = #{USER_AD}) CT,
+			             DESM_USER DU1,
+			             DESM_USER DU2,
+			             DESM_USER DU3,
+			             DESM_USER DU4
+			       WHERE DMH.PREPARED_BY = DU1.USER_AD(+)
+			         AND DMH.CHECKED_BY = DU2.USER_AD(+)
+			         AND DMH.CONFIRMED_BY = DU3.USER_AD(+)
+			         AND DMH.APPROVED_BY = DU4.USER_AD(+)
+				 <if test='STATUS != null and STATUS != ""'>
+				   AND DMH.STATUS = #{STATUS}
+				 </if>
+				 <if test='MRR_NO != null and MRR_NO != ""'>
+				   AND UPPER(DMH.MRR_NO) LIKE '%' || UPPER(#{MRR_NO}) || '%'
+				 </if>
+				 <if test='MRR_NAME != null and MRR_NAME != ""'>
+				   AND UPPER(DMH.MRR_NAME) LIKE '%' || UPPER(#{MRR_NAME}) || '%'
+				 </if>
+				 <if test='RECEIVED_DATE_FROM != null and RECEIVED_DATE_FROM != ""'>
+		   			AND DMH.RECEIVED_DATE_FROM <![CDATA[ >= ]]>TO_DATE(#{RECEIVED_DATE_FROM}, 'YYYY/MM/DD')
+				 </if>
+				 <if test='RECEIVED_DATE_TO != null and RECEIVED_DATE_TO != ""'>
+				   AND DMH.RECEIVED_DATE_TO <![CDATA[ < ]]> TO_DATE(#{RECEIVED_DATE_TO}, 'YYYY/MM/DD') + 1
+				 </if>
+				 
+				 <if test='INSPECTION_DATE_FROM != null and INSPECTION_DATE_FROM != ""'>
+				   AND DMH.INSPECTION_DATE_FROM <![CDATA[ >= ]]>TO_DATE(#{INSPECTION_DATE_FROM}, 'YYYY/MM/DD')
+				 </if>
+				 <if test='INSPECTION_DATE_TO != null and INSPECTION_DATE_TO != ""'>
+				   AND DMH.INSPECTION_DATE_TO <![CDATA[ < ]]> TO_DATE(#{INSPECTION_DATE_TO}, 'YYYY/MM/DD') + 1
+				 </if>
+				 
+				 
+				 
+				 <if test='PROJECT_NO != null and PROJECT_NO != ""'>
+				   AND DMH.PROJECT_NO = #{PROJECT_NO}
+				 </if>
+				 
+				 <if test='INVOICE_NO != null and INVOICE_NO != ""'>
+				     AND DMH.MRR_NO IN (
+				     			SELECT DISTINCT DMH2.MRR_NO
+								  FROM ZVTS_DESM_INVOICE ZDI,
+								       ZVTS_ITEM_MASTER ZIM,
+								       DESM_MRR_HEADER DMH2,
+								       DESM_MRR_LINE DML2 
+								WHERE 1=1
+								  AND ZDI.PROJECT_NO = ZIM.PROJECT_NO
+								  AND ZDI.TRK_ITEM_SEQ = ZIM.TRK_ITEM_SEQ
+								  AND ZIM.TRK_ITEM_NAME = DML2.TRK_ITEM_NAME
+								  AND ZIM.PROJECT_NO = DMH2.PROJECT_NO
+								  AND DMH2.MRR_HEADER_ID = DML2.MRR_HEADER_ID
+								  AND DMH2.PROJECT_NO = DMH.PROJECT_NO
+								  AND UPPER(ZDI.INVOICE_NUM) LIKE '%' || UPPER(#{INVOICE_NO}) || '%'
+				     
+				      )
+				 </if>
+				 
+				 <if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+				     AND DMH.MRR_NO IN (
+				     			SELECT DISTINCT DMH2.MRR_NO
+								  FROM DESM_MRR_HEADER DMH2,
+								       DESM_MRR_LINE DML2 
+								WHERE 1=1
+								  AND DMH2.MRR_HEADER_ID = DML2.MRR_HEADER_ID
+								  AND DMH2.PROJECT_NO = DMH.PROJECT_NO
+								  AND UPPER(DML2.PACKAGE_NO) LIKE '%' || UPPER(#{PACKAGE_NO}) || '%'
+				     
+				      )
+				 </if>
+				 
+				ORDER BY DMH.MRR_HEADER_ID DESC
+		     ) DT
+		WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		  AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+
+	<select id="getMobileMrrHeaderList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MobileMapper.xml -> getMobileMrrHeaderList : MRR Header List 조회 */
+		SELECT DT.*,
+		       CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+		            ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM ( SELECT ROW_NUMBER() OVER(ORDER BY DRH.MRR_HEADER_ID DESC) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		  			   DRH.PROJECT_NO,
+				       DRH.MRR_HEADER_ID,
+				       DRH.MRR_NO,
+				       DRH.MRR_NAME,
+				       DRH.STATUS,
+				       --DRH.DESCRIPTION,
+				       --DRH.SUBCONTRACTOR,
+				       --DRH.SUBCON_MANAGER,
+				       TO_CHAR(DRH.RECEIVED_DATE_FROM, 'YYYY/MM/DD') AS RECEIVED_DATE_FROM,
+				       TO_CHAR(DRH.RECEIVED_DATE_TO, 'YYYY/MM/DD') AS RECEIVED_DATE_TO,
+				       TO_CHAR(DRH.INSPECTION_DATE_FROM, 'YYYY/MM/DD') AS INSPECTION_DATE_FROM,
+				       TO_CHAR(DRH.INSPECTION_DATE_TO, 'YYYY/MM/DD') AS INSPECTION_DATE_TO,
+				       DRH.REMARK,
+				       DRH.ATTACH_GRP_CD,
+				       TO_CHAR(DRH.PREPARED_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS PREPARED_DATE,
+				       DRH.PREPARED_BY,
+				       DU1.USER_NAME AS PREPARED_BY_NAME,
+				       TO_CHAR(DRH.CHECKED_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CHECKED_DATE,
+				       DRH.CHECKED_BY,
+				       DU2.USER_NAME AS CHECKED_BY_NAME,
+				       TO_CHAR(DRH.CONFIRMED_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS CONFIRMED_DATE,
+				       DRH.CONFIRMED_BY,
+				       DU3.USER_NAME AS CONFIRMED_BY_NAME,
+				       TO_CHAR(DRH.APPROVED_DATE + CT.OPERATOR / (24 * 60), 'YYYY/MM/DD HH24:MI:SS') AS APPROVED_DATE,
+				       DRH.APPROVED_BY,
+				       DU4.USER_NAME AS APPROVED_BY_NAME
+				  FROM DESM_MRR_HEADER DRH,
+				       (SELECT NVL(TO_NUMBER(MAX(DCD.DTL_NAME_KO)), 0) AS OPERATOR
+				          FROM DESM_USER_DEFAULT_COUNTRY DUDC,
+				               DESM_CODE_DTL DCD
+				         WHERE DUDC.COUNTRY_CODE = DCD.DTL_CODE
+				           AND DCD.DELEGATE_FLAG = 'N'
+				           AND DUDC.USER_AD = #{USER_AD}) CT,
+				       DESM_USER DU1,
+				       DESM_USER DU2,
+				       DESM_USER DU3,
+				       DESM_USER DU4
+				 WHERE DRH.PREPARED_BY = DU1.USER_AD(+)
+				   AND DRH.CHECKED_BY = DU2.USER_AD(+)
+				   AND DRH.CONFIRMED_BY = DU3.USER_AD(+)
+				   AND DRH.APPROVED_BY = DU4.USER_AD(+)
+				   AND DRH.MRR_HEADER_ID = #{MRR_HEADER_ID}
+		     ) DT
+		WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		  AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+	
+	<select id="getMobileMrrLineList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MobileMapper.xml -> getMobileMrrLineList : MRR Line List 조회 */
+		SELECT DT.*
+		  FROM ( SELECT ROW_NUMBER() OVER(ORDER BY DRL.MRR_LINE_ID DESC) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		  			   DPM.PROJECT_NO,
+					   DRL.MRR_HEADER_ID,
+				       DRL.MRR_LINE_ID,
+				       DRL.TRK_ITEM_NAME,
+				       DRL.PACKING_LIST_NO AS PACKAGE_LIST_NO,
+				       DRL.PACKAGE_NO,
+				       DRL.DESCRIPTION,
+				       DRL.SHIPMENT_NO AS ATTRIBUTE10,
+				       DRL.PACKAGE_TYPE,
+				       DRL.QUANTITY AS QTY,
+				       DRL.VISUAL_CHECK ,
+				       DRL.VISUAL_CHECK_DATE ,
+				       DRL.VISUAL_CHECKED_BY ,
+				       --DRL.STORAGE_LOCATION ,
+				       DPM.STORAGE_LOCATION,
+				       --DRL.RECEIVED_DATE ,
+				       TO_CHAR(DRL.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE,
+				       DRL.REMARKS ,
+				       DRL.ATTACH_GRP_CD ,
+				       DRL.FILE_PATH ,
+				       NVL((SELECT CASE WHEN COUNT(*) = 0 THEN NULL ELSE COUNT(*) END 
+						       FROM ESAATTH ATT 
+						      WHERE ATT.GRP_CD  = DRL.ATTACH_GRP_CD 
+						      AND ATT.STS != 'D'),0)  ATTH_CNT,
+				       (SELECT ZDI.INVOICE_NUM
+						  FROM ZVTS_DESM_INVOICE ZDI,
+						       ZVTS_ITEM_MASTER ZIM
+						WHERE 1=1
+						  AND ZDI.PROJECT_NO = ZIM.PROJECT_NO
+						  AND ZDI.TRK_ITEM_SEQ = ZIM.TRK_ITEM_SEQ
+						  AND ZIM.TRK_ITEM_NAME = DRL.TRK_ITEM_NAME
+						  AND ZIM.PROJECT_NO = DPM.PROJECT_NO) AS SEL_INVOICE_NUM ,
+					  (SELECT TH.ATT_ID
+		                 FROM  ESAATTH TH
+		                 WHERE TH.SYS_ID = 'EMRO'
+		                   AND TH.GRP_CD = DRL.ATTACH_GRP_CD
+		                   AND TH.STS  <![CDATA[ <> ]]>   'D'
+		                   AND ROWNUM = 1 ) ATT_ID,	  
+			            (SELECT TH.ORGN_FILE_NM
+			                  FROM  ESAATTH TH
+			                  WHERE TH.SYS_ID = 'EMRO'
+			                  AND TH.GRP_CD = DRL.ATTACH_GRP_CD
+					          AND TH.STS  <![CDATA[ <> ]]>   'D'
+			                  AND ROWNUM = 1 ) ORGN_FILE_NM,
+		              CASE WHEN (SELECT COUNT(*)
+		                           FROM  ESAATTH TH
+		                           WHERE TH.SYS_ID = 'EMRO'
+		                             AND TH.GRP_CD = DRL.ATTACH_GRP_CD
+		                             AND TH.STS   <![CDATA[ <> ]]>   'D' ) = 0 THEN
+		                           'N'
+		                   ELSE 'Y'
+		                   END AS PIC_YN,
+		              (SELECT COUNT(*) FROM DESM_PACKING_DTL WHERE PACKAGE_NO = DPM.PACKAGE_NO AND PROJECT_NO = DPM.PROJECT_NO AND TRK_ITEM_NAME = DPM.TRK_ITEM_NAME) AS NUMBER_OF_ITEMS
+				  FROM DESM_PACKING_MST DPM,
+				       DESM_MRR_LINE DRL,
+				       DESM_MRR_HEADER DML
+				 WHERE DPM.PROJECT_NO = DML.PROJECT_NO
+				   AND DPM.TRK_ITEM_NAME = DRL.TRK_ITEM_NAME
+				   --AND DPM.PACKING_LIST_NO = DRL.PACKING_LIST_NO
+				   AND DPM.PACKAGE_NO = DRL.PACKAGE_NO
+				   AND DRL.MRR_HEADER_ID = DML.MRR_HEADER_ID
+				   --AND DPM.IS_CONFIRM_MATERIAL = 'Y'
+				   AND DRL.MRR_HEADER_ID = #{MRR_HEADER_ID}
+		     ) DT
+		WHERE 1=1
+	</select>
+
+	<select id="getMobileMrrLineList_paging" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MobileMapper.xml -> getMobileMrrLineList_paging : MRR Line List 조회 */
+		SELECT DT.*,
+		       CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+		            ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM ( SELECT ROW_NUMBER() OVER(ORDER BY DRL.MRR_LINE_ID DESC) AS RN,
+		               COUNT(*) OVER() AS TOTAL_CNT,
+		  			   DPM.PROJECT_NO,
+					   DRL.MRR_HEADER_ID,
+				       DRL.MRR_LINE_ID,
+				       DRL.TRK_ITEM_NAME,
+				       DRL.PACKING_LIST_NO AS PACKAGE_LIST_NO,
+				       DRL.PACKAGE_NO,
+				       DRL.DESCRIPTION,
+				       DRL.SHIPMENT_NO AS ATTRIBUTE10,
+				       DRL.PACKAGE_TYPE,
+				       DRL.QUANTITY AS QTY,
+				       DRL.VISUAL_CHECK ,
+				       DRL.VISUAL_CHECK_DATE ,
+				       DRL.VISUAL_CHECKED_BY ,
+				       --DRL.STORAGE_LOCATION ,
+				       DPM.STORAGE_LOCATION,
+				       --DRL.RECEIVED_DATE ,
+				       TO_CHAR(DRL.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE,
+				       DRL.REMARKS ,
+				       DRL.ATTACH_GRP_CD ,
+				       DRL.FILE_PATH ,
+				       NVL((SELECT CASE WHEN COUNT(*) = 0 THEN NULL ELSE COUNT(*) END 
+						       FROM ESAATTH ATT 
+						      WHERE ATT.GRP_CD  = DRL.ATTACH_GRP_CD 
+						      AND ATT.STS != 'D'),0)  ATTH_CNT,
+				       (SELECT ZDI.INVOICE_NUM
+						  FROM ZVTS_DESM_INVOICE ZDI,
+						       ZVTS_ITEM_MASTER ZIM
+						WHERE 1=1
+						  AND ZDI.PROJECT_NO = ZIM.PROJECT_NO
+						  AND ZDI.TRK_ITEM_SEQ = ZIM.TRK_ITEM_SEQ
+						  AND ZIM.TRK_ITEM_NAME = DRL.TRK_ITEM_NAME
+						  AND ZIM.PROJECT_NO = DPM.PROJECT_NO) AS SEL_INVOICE_NUM ,
+					  (SELECT TH.ATT_ID
+		                 FROM  ESAATTH TH
+		                 WHERE TH.SYS_ID = 'EMRO'
+		                   AND TH.GRP_CD = DRL.ATTACH_GRP_CD
+		                   AND TH.STS  <![CDATA[ <> ]]>   'D'
+		                   AND ROWNUM = 1 ) ATT_ID,		  
+		              (SELECT TH.ORGN_FILE_NM
+		                  FROM  ESAATTH TH
+		                  WHERE TH.SYS_ID = 'EMRO'
+		                    AND TH.GRP_CD = DRL.ATTACH_GRP_CD
+				            AND TH.STS  <![CDATA[ <> ]]>   'D'
+		                    AND ROWNUM = 1 ) ORGN_FILE_NM,  
+		              CASE WHEN (SELECT COUNT(*)
+		                           FROM  ESAATTH TH
+		                           WHERE TH.SYS_ID = 'EMRO'
+		                             AND TH.GRP_CD = DRL.ATTACH_GRP_CD
+		                             AND TH.STS   <![CDATA[ <> ]]>   'D' ) = 0 THEN
+		                           'N'
+		                   ELSE 'Y'
+		                   END AS PIC_YN 
+				       
+				  FROM DESM_PACKING_MST DPM,
+				       DESM_MRR_LINE DRL,
+				       DESM_MRR_HEADER DML
+				 WHERE DPM.PROJECT_NO = DML.PROJECT_NO
+				   AND DPM.TRK_ITEM_NAME = DRL.TRK_ITEM_NAME
+				   --AND DPM.PACKING_LIST_NO = DRL.PACKING_LIST_NO
+				   AND DPM.PACKAGE_NO = DRL.PACKAGE_NO
+				   AND DRL.MRR_HEADER_ID = DML.MRR_HEADER_ID
+				   --AND DPM.IS_CONFIRM_MATERIAL = 'Y'
+				   AND DRL.MRR_HEADER_ID = #{MRR_HEADER_ID}
+		     ) DT
+		WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		  AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+	
+	
+	<update id="saveMobileMrrHeaderSave" parameterType="java.util.Map">
+		MERGE INTO DESM_MRR_HEADER
+		USING DUAL
+		ON (MRR_HEADER_ID = #{MRR_HEADER_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+			        <if test='PREPARED_BY != null and PREPARED_BY != ""'>
+			            PREPARED_BY = #{PREPARED_BY},
+			            <if test='STATUS != null and STATUS == "Pre-Confirmed"'>
+			            	PREPARED_DATE = SYSDATE,
+			            </if>
+			        </if>
+			        <if test='CONFIRMED_BY != null and CONFIRMED_BY != ""'>
+			            CONFIRMED_BY = #{CONFIRMED_BY},
+			            <if test='STATUS != null and STATUS == "Confirmed"'>
+			            	CONFIRMED_DATE = SYSDATE,
+			            </if>
+			        </if>
+		         	MRR_NAME = #{MRR_NAME},
+		            STATUS = #{STATUS},
+		            RECEIVED_DATE_FROM = #{RECEIVED_DATE_FROM},
+		            RECEIVED_DATE_TO = #{RECEIVED_DATE_TO},
+		            <if test='INSPECTION_DATE_FROM != null and INSPECTION_DATE_FROM != ""'>
+			            INSPECTION_DATE_FROM = #{INSPECTION_DATE_FROM},
+			        </if>
+		            <if test='INSPECTION_DATE_TO != null and INSPECTION_DATE_TO != ""'>
+			            INSPECTION_DATE_TO = #{INSPECTION_DATE_TO},
+			        </if>
+			        <if test='ATTACH_GRP_CD != null and ATTACH_GRP_CD != ""'>
+			            ATTACH_GRP_CD = #{ATTACH_GRP_CD},
+			        </if>
+			        
+			        <if test='REMARK != null and REMARK != ""'>
+			            REMARK = #{REMARK},
+			        </if>
+			        LAST_UPDATED_BY = #{USER_AD},
+		            LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (MRR_HEADER_ID
+		     ,MRR_NO
+	       	 <if test='PREPARED_BY != null and PREPARED_BY != ""'>
+	         ,PREPARED_BY
+	             <if test='STATUS != null and STATUS == "Pre-Checked"'>
+		         	,PREPARED_DATE
+	             </if>
+	       	 </if>
+	       
+			<if test='CONFIRMED_BY != null and CONFIRMED_BY != ""'>
+	         ,CONFIRMED_BY
+             <if test='STATUS != null and STATUS == "Pre-Approved"'>
+	         	,CONFIRMED_DATE
+             </if>
+	       </if>
+	       
+	      
+	       
+	         ,MRR_NAME
+		     ,STATUS
+		     ,PROJECT_NO
+		     ,RECEIVED_DATE_FROM
+		     ,RECEIVED_DATE_TO
+		     
+		     <if test='INSPECTION_DATE_FROM != null and INSPECTION_DATE_FROM != ""'>
+			    ,INSPECTION_DATE_FROM
+			 </if>
+		     
+		     <if test='INSPECTION_DATE_TO != null and INSPECTION_DATE_TO != ""'>
+			    ,INSPECTION_DATE_TO
+			 </if>
+		     
+		     <if test='ATTACH_GRP_CD != null and ATTACH_GRP_CD != ""'>
+			    ,ATTACH_GRP_CD
+			 </if>
+		     
+		     <if test='REMARK != null and REMARK != ""'>
+			    ,REMARK
+			 </if>
+		     ,CREATED_BY
+		     ,CREATION_DATE
+		     ,LAST_UPDATED_BY
+		     ,LAST_UPDATE_DATE)
+		     VALUES
+		     (#{MRR_HEADER_ID}
+		     ,#{MRR_NO}
+	       <if test='PREPARED_BY != null and PREPARED_BY != ""'>
+	         ,#{PREPARED_BY}
+             <if test='STATUS != null and STATUS == "Pre-Checked"'>
+	         ,SYSDATE
+             </if>
+	       </if>
+	       
+	       <if test='CONFIRMED_BY != null and CONFIRMED_BY != ""'>
+	         ,#{CONFIRMED_BY}
+             <if test='STATUS != null and STATUS == "Pre-Approved"'>
+	         ,SYSDATE
+             </if>
+	       </if>
+	      
+	         ,#{MRR_NAME}
+		     ,#{STATUS}
+		     ,#{PROJECT_NO}
+		     ,#{RECEIVED_DATE_FROM}
+		     ,#{RECEIVED_DATE_TO}
+		     <if test='INSPECTION_DATE_FROM != null and INSPECTION_DATE_FROM != ""'>
+			     ,#{INSPECTION_DATE_FROM}
+			 </if>
+		     
+		     <if test='INSPECTION_DATE_TO != null and INSPECTION_DATE_TO != ""'>
+			    ,#{INSPECTION_DATE_TO}
+			 </if>
+		     
+		     <if test='ATTACH_GRP_CD != null and ATTACH_GRP_CD != ""'>
+			    ,#{ATTACH_GRP_CD}
+			 </if>
+		     
+		     <if test='REMARK != null and REMARK != ""'>
+			    ,#{REMARK}
+			 </if>
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+	
+	<update id="saveMobileMrrLineSave" parameterType="java.util.Map">
+		MERGE INTO DESM_MRR_LINE
+		USING DUAL
+		ON (MRR_LINE_ID = #{MRR_LINE_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		     		<if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+					    TRK_ITEM_NAME = #{TRK_ITEM_NAME},
+					</if>
+		            
+		            <if test='PACKING_LIST_NO != null and PACKING_LIST_NO != ""'>
+					    PACKING_LIST_NO = #{PACKING_LIST_NO},
+					</if>
+					
+					<if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+					    PACKAGE_NO = #{PACKAGE_NO},
+					</if>
+					
+		            <if test='DESCRIPTION != null and DESCRIPTION != ""'>
+					    DESCRIPTION = #{DESCRIPTION},
+					</if>
+		            
+		            <if test='SHIPMENT_NO != null and SHIPMENT_NO != ""'>
+					    SHIPMENT_NO = #{SHIPMENT_NO},
+					</if>
+					
+					<if test='PACKAGE_TYPE != null and PACKAGE_TYPE != ""'>
+					    PACKAGE_TYPE = #{PACKAGE_TYPE},
+					</if>
+		            
+		            <if test='QTY != null and QTY != ""'>
+					    QUANTITY = #{QTY},
+					</if>
+		            
+		            
+		            <if test='VISUAL_CHECK != null and VISUAL_CHECK != ""'>
+					    VISUAL_CHECK = #{VISUAL_CHECK},
+					</if>
+		            
+		            VISUAL_CHECK_DATE = SYSDATE,
+		            VISUAL_CHECKED_BY = #{VISUAL_CHECKED_BY},
+		            <if test='RECEIVED_DATE != null and RECEIVED_DATE != ""'>
+					    RECEIVED_DATE = TO_DATE(#{RECEIVED_DATE}, 'YYYY/MM/DD'),
+					</if>
+		            
+		            <if test='REMARKS != null and REMARKS != ""'>
+					    REMARKS = #{REMARKS},
+					</if>
+		            
+		            <if test='ATTACH_GRP_CD != null and ATTACH_GRP_CD != ""'>
+					    ATTACH_GRP_CD = #{ATTACH_GRP_CD},
+					</if>
+		            
+		            
+		            LAST_UPDATED_BY = #{USER_AD},
+		            LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (MRR_HEADER_ID
+		     ,MRR_LINE_ID
+		     <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+			    ,TRK_ITEM_NAME
+			 </if>
+		     <if test='PACKING_LIST_NO != null and PACKING_LIST_NO != ""'>
+			    ,PACKING_LIST_NO
+			 </if>
+		     <if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+			    ,PACKAGE_NO
+			 </if>
+			 <if test='DESCRIPTION != null and DESCRIPTION != ""'>
+			    ,DESCRIPTION
+			 </if>
+		     <if test='SHIPMENT_NO != null and SHIPMENT_NO != ""'>
+			    ,SHIPMENT_NO
+			 </if>
+		     
+		     <if test='PACKAGE_TYPE != null and PACKAGE_TYPE != ""'>
+			    ,PACKAGE_TYPE
+			 </if>
+		     
+		     <if test='QTY != null and QTY != ""'>
+			    ,QUANTITY
+			 </if>
+		    
+		     
+		     <if test='VISUAL_CHECK != null and VISUAL_CHECK != ""'>
+			    ,VISUAL_CHECK
+			 </if>
+		     ,VISUAL_CHECK_DATE
+		     ,VISUAL_CHECKED_BY
+		     
+		     <if test='RECEIVED_DATE != null and RECEIVED_DATE != ""'>
+			    ,RECEIVED_DATE
+			 </if>
+		     <if test='REMARKS != null and REMARKS != ""'>
+			    ,REMARKS
+			 </if>
+		     <if test='ATTACH_GRP_CD != null and ATTACH_GRP_CD != ""'>
+			    ,ATTACH_GRP_CD
+			 </if>
+		     ,CREATED_BY
+		     ,CREATION_DATE
+		     ,LAST_UPDATED_BY
+		     ,LAST_UPDATE_DATE)
+		     VALUES
+		     (#{MRR_HEADER_ID}
+		     ,SEQ_DESM_MRR_LINE.NEXTVAL
+		     
+		     <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+			    ,#{TRK_ITEM_NAME}
+			 </if>
+		     <if test='PACKING_LIST_NO != null and PACKING_LIST_NO != ""'>
+			     ,#{PACKING_LIST_NO}
+			 </if>
+		     <if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+			    ,#{PACKAGE_NO}
+			 </if>
+			 <if test='DESCRIPTION != null and DESCRIPTION != ""'>
+			     ,#{DESCRIPTION}
+			 </if>
+		     <if test='SHIPMENT_NO != null and SHIPMENT_NO != ""'>
+			   ,#{SHIPMENT_NO}
+			 </if>
+		     
+		     <if test='PACKAGE_TYPE != null and PACKAGE_TYPE != ""'>
+			     ,#{PACKAGE_TYPE}
+			 </if>
+		     
+		     <if test='QTY != null and QTY != ""'>
+			    ,#{QTY}
+			 </if>
+		     
+		     
+		     
+		     <if test='VISUAL_CHECK != null and VISUAL_CHECK != ""'>
+			    ,#{VISUAL_CHECK}
+			 </if>
+			 
+		     
+		     ,SYSDATE
+		     ,#{VISUAL_CHECKED_BY}
+		     
+		     <if test='RECEIVED_DATE != null and RECEIVED_DATE != ""'>
+			    ,TO_DATE(#{RECEIVED_DATE}, 'YYYY/MM/DD')
+			 </if>
+			 
+		     <if test='REMARKS != null and REMARKS != ""'>
+			    ,#{REMARKS}
+			 </if>
+		     <if test='ATTACH_GRP_CD != null and ATTACH_GRP_CD != ""'>
+			    ,#{ATTACH_GRP_CD}
+			 </if>
+		     
+		     
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+	
+	
+	<update id="saveMobileMrrLineSave2222" parameterType="java.util.Map">
+		MERGE INTO DESM_MRR_LINE
+		USING DUAL
+		ON (MRR_LINE_ID = #{MRR_LINE_ID})
+		WHEN MATCHED THEN
+		     UPDATE SET
+		            TRK_ITEM_NAME = #{TRK_ITEM_NAME},
+		            PACKING_LIST_NO = #{PACKING_LIST_NO},
+		            PACKAGE_NO = #{PACKAGE_NO},
+		            DESCRIPTION = #{DESCRIPTION},
+		            SHIPMENT_NO = #{SHIPMENT_NO},
+		            PACKAGE_TYPE = #{PACKAGE_TYPE},
+		            QUANTITY = #{QTY},
+		            
+		            
+		            
+		            LAST_UPDATED_BY = #{USER_AD},
+		            LAST_UPDATE_DATE = SYSDATE
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (MRR_HEADER_ID
+		     ,MRR_LINE_ID
+		     ,TRK_ITEM_NAME
+		     ,PACKING_LIST_NO
+		     ,PACKAGE_NO
+		     ,DESCRIPTION
+		     ,SHIPMENT_NO
+		     ,PACKAGE_TYPE
+		     ,QUANTITY
+		     
+		     
+		     ,CREATED_BY
+		     ,CREATION_DATE
+		     ,LAST_UPDATED_BY
+		     ,LAST_UPDATE_DATE)
+		     VALUES
+		     (#{MRR_HEADER_ID}
+		     ,SEQ_DESM_MRR_LINE.NEXTVAL
+		     ,#{TRK_ITEM_NAME}
+		     ,#{PACKING_LIST_NO}
+		     ,#{PACKAGE_NO}
+		     ,#{DESCRIPTION}
+		     ,#{SHIPMENT_NO}
+		     ,#{PACKAGE_TYPE}
+		     
+		     ,#{QTY}
+		     
+		    
+		     
+		     
+		     ,#{USER_AD}
+		     ,SYSDATE
+		     ,#{USER_AD}
+		     ,SYSDATE)
+	</update>
+
+	<update id="saveMobileMrrReject" parameterType="java.util.Map">
+		UPDATE DESM_MRR_HEADER
+		   SET STATUS = 'Rejected',
+		   	   --PREPARED_BY = '',
+		   	   PREPARED_DATE = '',
+		   	   --CHECKED_BY = '',
+		   	   CHECKED_DATE = '',
+		   	   --CONFIRMED_BY = '',
+		   	   CONFIRMED_DATE = '',
+		   	   --APPROVED_BY = '',
+		   	   APPROVED_DATE = ''
+			 <if test='REMARK != null and REMARK != ""'>
+			   ,REMARK = #{REMARK}
+			 </if>
+		 WHERE MRR_HEADER_ID = #{MRR_HEADER_ID}
+	</update>
+	
+	<select id="getIdsmOsSummaryMrrMobileList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		/* MobileMapper.xml -> getIdsmOsSummaryMrrMobileList : Package List 조회 */
+        SELECT DPM.PACKAGE_NO
+        ,      NVL(DPM.IS_CONFIRM_MATERIAL, 'N') AS IS_CONFIRM_MATERIAL
+        ,      DPM.PACKAGE_LIST_NO
+        ,      DPM.DESCRIPTION
+        ,      DPM.PACKAGE_TYPE
+        ,      TO_CHAR(DPM.L_CM, 'FM999,999,999,999,999') AS L_CM
+        ,      TO_CHAR(DPM.W_CM, 'FM999,999,999,999,999') AS W_CM
+        ,      TO_CHAR(DPM.H_CM, 'FM999,999,999,999,999') AS H_CM
+        ,      TO_CHAR(DPM.VOLUME, 'FM999,999,999,999,990.0') AS VOLUME
+        ,      TO_CHAR(DPM.NET, 'FM999,999,999,999,990.0') AS NET
+        ,      TO_CHAR(DPM.GROSS, 'FM999,999,999,999,990.0') AS GROSS
+        --,      DPM.REMARKS
+        ,      '' AS REMARKS
+        ,      DPM.COUNTRY
+        ,      DPM.TRK_ITEM_NAME
+        ,      DPM.PROJECT_NO
+        ,      DPM.REPORT_SHORT_QTY
+        ,      DPM.REPORT_OVER_QTY
+        ,      DPM.REPORT_DMG_QTY
+        ,      DPM.REPORT_MISSING_QTY
+        ,      CASE WHEN DPM.REPORT_SHORT = 'Y' THEN 1 ELSE 0 END AS REPORT_SHORT
+        ,      CASE WHEN DPM.REPORT_OVER = 'Y' THEN 1 ELSE 0 END AS REPORT_OVER
+        ,      CASE WHEN DPM.REPORT_DMG = 'Y' THEN 1 ELSE 0 END AS REPORT_DMG
+        ,      CASE WHEN DPM.REPORT_MISSING = 'Y' THEN 1 ELSE 0 END AS REPORT_MISSING
+        ,      DPM.REPORT_LOST
+        ,      DPM.REPORT_DESCRIPTION
+        ,      DPM.HAZARDOUS_MATERIAL
+        ,      DPM.QTY
+        ,      DPM.REMARK
+        ,      DPM.VENDOR
+        ,      DPM.OLD_INF_OF_VENDOR
+        ,      TO_CHAR(DPM.RECEIVED_DATE, 'YYYY-MM-DD') AS RECEIVED_DATE
+        ,      DPM.STORAGE_LOCATION
+        ,      DPM.SUB_CONTRACTOR
+        ,      TO_CHAR(DPM.CONFIRM_DATE, 'YYYY/MM/DD') AS CONFIRM_DATE
+        ,      T.SEL_INVOICE_NUM
+        ,      T.ATTRIBUTE3
+        ,      T.ATTRIBUTE9
+        ,      T.ATTRIBUTE10
+        ,      TO_CHAR( DPM.RECEIPT_DATE, 'YYYY/MM/DD') AS RECEIPT_DATE
+        ,      CASE WHEN (SELECT COUNT(*)
+                          FROM DESM_PACKING_DTL DETAIL
+                          WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                          AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO)
+                       = (SELECT COUNT(*)
+                          FROM DESM_PACKING_DTL DETAIL
+                          WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                          AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                          AND NVL(DETAIL.IN_QTY, 0) - NVL(DETAIL.OUT_QTY, 0) + NVL(DETAIL.RETURN_QTY, 0) = 0)
+                     THEN 'CLOSE'
+                     WHEN (SELECT COUNT(*)
+                          FROM DESM_PACKING_DTL DETAIL
+                          WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                          AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                          AND NVL(DETAIL.IN_QTY, 0) - NVL(DETAIL.OUT_QTY, 0) + NVL(DETAIL.RETURN_QTY, 0) = 0) > 0
+                     THEN 'PARTIALLY'
+                     ELSE ''
+               END AS PACKAGE_STATUS
+        ,      (SELECT COUNT(*)
+                FROM DESM_PACKING_DTL DETAIL
+                WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO)
+                || '/' ||
+               (SELECT COUNT(*)
+                FROM DESM_PACKING_DTL DETAIL
+                WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                AND NVL(DETAIL.IN_QTY, 0) - NVL(DETAIL.OUT_QTY, 0) + NVL(DETAIL.RETURN_QTY, 0) = 0) AS OUT_STATUS
+        ,      (SELECT SUM(DETAIL.IN_QTY)
+                FROM DESM_PACKING_DTL DETAIL
+                WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO)
+                || '/' ||
+               (SELECT SUM(NVL(DETAIL.OUT_QTY, 0) - NVL(DETAIL.RETURN_QTY, 0))
+                FROM DESM_PACKING_DTL DETAIL
+                WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                ) AS OUT_STATUS_QTY
+        ,      (SELECT TO_CHAR(MAX(DRO.HANDOVER_DATE), 'YYYY/MM/DD')
+                FROM DESM_PACKING_DTL DETAIL
+                ,    DESM_RSI_LINE DRL
+                ,    DESM_RSI_OUTGOING DRO
+                WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO})
+                AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO
+                AND DETAIL.MATERIAL_CODE = DRL.MATERIAL_CODE
+                AND DRL.RSI_LINE_ID = DRO.RSI_LINE_ID
+               ) AS LAST_OUTGOING_DATE
+        ,      ROUND(L_CM * W_CM / 10000, 1) AS SQM
+        ,      TO_CHAR(DPM.LOC_UPDATE_DATE, 'YYYY/MM/DD') AS LOC_UPDATE_DATE
+        ,      DPM.LOC_UPDATED_BY
+        ,      (SELECT SUM(DETAIL.IN_QTY)
+                FROM DESM_PACKING_DTL DETAIL
+                WHERE DETAIL.PROJECT_NO = UPPER(#{PROJECT_NO}) 
+                AND DETAIL.PACKAGE_NO = DPM.PACKAGE_NO) AS TOT_QTY
+        ,	   (SELECT COUNT(*) FROM DESM_PACKING_DTL WHERE PACKAGE_NO = DPM.PACKAGE_NO AND PROJECT_NO = DPM.PROJECT_NO AND TRK_ITEM_NAME = DPM.TRK_ITEM_NAME) AS NUMBER_OF_ITEMS
+        ,      1 AS TOTAL_PAGE_NUM
+        FROM (SELECT ZIM.TRK_ITEM_SEQ
+              ,      ZIM.TRK_ITEM_NAME
+              ,      ZIM.TRK_ITEM_GROUP
+              ,      ZIM.PROJECT_ID
+              ,      ZIM.PROJECT_NO
+              ,      ZIM.INVOICE_NUM
+              ,      ZIM.ATTRIBUTE3
+              ,      ZIM.ATTRIBUTE9
+              ,      ZIM.ATTRIBUTE10
+              ,      CASE WHEN DI.CNT = 1 THEN DI.INVOICE_NUM
+                          WHEN DI.CNT > 1 THEN DI.INVOICE_NUM || ' 외 ' || DI.CALC_CNT || '건'
+                     END AS SEL_INVOICE_NUM
+              FROM ZVTS_ITEM_MASTER ZIM
+              ,    PA_PROJECTS_ALL_INT PPA
+              ,    (SELECT ZDI.TRK_ITEM_SEQ
+              ,      COUNT(*) AS CNT
+              ,      COUNT(*) - 1 AS CALC_CNT
+              ,      MAX(ZDI.INVOICE_NUM) AS INVOICE_NUM
+              FROM ZVTS_DESM_INVOICE ZDI
+              GROUP BY ZDI.TRK_ITEM_SEQ) DI
+              WHERE ZIM.PROJECT_ID = PPA.PROJECT_ID
+              AND ZIM.TRK_ITEM_SEQ = DI.TRK_ITEM_SEQ(+)
+              AND ZIM.PROJECT_NO = UPPER(#{PROJECT_NO})
+              START WITH ZIM.TRK_ITEM_GROUP IS NULL
+              CONNECT BY PRIOR ZIM.TRK_ITEM_SEQ = ZIM.TRK_ITEM_GROUP
+             ) T
+        ,    DESM_PACKING_MST DPM
+        WHERE T.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+        AND T.PROJECT_NO = DPM.PROJECT_NO
+        AND NOT EXISTS (SELECT 1
+                         FROM DESM_MRR_LINE DML,
+                              DESM_MRR_HEADER DMH
+                        WHERE 1=1
+                          AND DMH.MRR_HEADER_ID = DML.MRR_HEADER_ID
+                          AND DMH.PROJECT_NO = DPM.PROJECT_NO
+                          AND DML.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+                          AND DML.PACKING_LIST_NO = DPM.PACKAGE_LIST_NO
+                          AND DML.PACKAGE_NO = DPM.PACKAGE_NO)
+		<if test='INVOICE_NO != null and INVOICE_NO != ""'>
+			AND UPPER(T.SEL_INVOICE_NUM) LIKE '%' || UPPER(#{INVOICE_NO}) || '%'
+		</if>
+        <if test='PACKAGE_LIST_NO != null and PACKAGE_LIST_NO !=""'>
+        	AND UPPER(DPM.PACKAGE_LIST_NO) LIKE '%' || UPPER(#{PACKAGE_LIST_NO}) || '%'
+        </if>
+        <if test='PACKAGE_NO != null and PACKAGE_NO !=""'>
+        	AND UPPER(DPM.PACKAGE_NO) LIKE '%' || UPPER(#{PACKAGE_NO}) || '%'
+        </if>
+        <if test='DESCRIPTION != null and DESCRIPTION !=""'>
+        	AND UPPER(DPM.DESCRIPTION) LIKE '%' || UPPER(#{DESCRIPTION}) || '%'
+        </if>
+        <if test='ATTRIBUTE10 != null and ATTRIBUTE10 !=""'>
+        	AND T.ATTRIBUTE10 = #{ATTRIBUTE10}
+        </if>
+        <if test='VENDOR != null and VENDOR !=""'>
+        	AND UPPER(T.ATTRIBUTE3) LIKE '%' || UPPER(#{VENDOR}) || '%'
+        </if>
+		<if test='LOCATION != null'>
+			AND DPM.STORAGE_LOCATION = #{LOCATION}
+		</if>
+	    ORDER BY T.SEL_INVOICE_NUM, DPM.PACKAGE_NO
+	</select>
+	
+	<select id="getMobileSearchMrrPackageSearch" parameterType="java.util.Map" resultType="java.util.HashMap">
+		 SELECT DT.*,
+	           CASE WHEN MOD(TOTAL_CNT, TO_NUMBER(#{PAGE_CNT})) > 0 THEN TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) + 1
+	                ELSE TRUNC(TOTAL_CNT / TO_NUMBER(#{PAGE_CNT})) END AS TOTAL_PAGE_NUM
+		  FROM ( SELECT TT.*,
+                ROW_NUMBER() OVER(ORDER BY TT.SEL_INVOICE_NUM, TT.PACKAGE_NO) AS RN,
+                COUNT(*) OVER() AS TOTAL_CNT
+          FROM (SELECT DPM.PACKAGE_NO,
+                       DPM.PACKAGE_LIST_NO,
+                       DPM.DESCRIPTION,
+                       DPM.PACKAGE_TYPE,
+                       TRUNC(DPM.L_CM) AS L_CM,
+                       TRUNC(DPM.W_CM) AS W_CM,
+                       TRUNC(DPM.H_CM) AS H_CM,
+                       TRUNC(DPM.VOLUME, 1) AS VOLUME,
+                       TRUNC(DPM.NET, 1) AS NET,
+                       TRUNC(DPM.GROSS, 1) AS GROSS,
+                       DPM.REMARKS,
+                       DPM.COUNTRY,
+                       DPM.TRK_ITEM_NAME,
+                       DPM.PROJECT_NO,
+                       DPM.REPORT_SHORT,
+                       DPM.REPORT_OVER,
+                       DPM.REPORT_DMG,
+                       DPM.REPORT_MISSING,
+                       DPM.REPORT_LOST,
+                       DPM.REPORT_DESCRIPTION,
+                       DPM.HAZARDOUS_MATERIAL,
+                       DPM.QTY,
+                       DPM.REMARK,
+                       DPM.VENDOR,
+                       DPM.OLD_INF_OF_VENDOR,
+                       TO_CHAR(DPM.RECEIVED_DATE, 'YYYY/MM/DD') AS RECEIVED_DATE,
+                       DPM.STORAGE_LOCATION,
+                       DPM.SUB_CONTRACTOR,
+                       T.SEL_INVOICE_NUM,
+                       CASE WHEN T.LV = 1 THEN T.TRK_ITEM_NAME
+                            ELSE SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 1) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 2) - (INSTR(T.ROOT_NAME, '!@#$', 1, 1) + 4))
+                            END AS LV1_ITEM_NAME,
+                       CASE WHEN T.LV = 2 THEN T.TRK_ITEM_NAME
+                            WHEN T.LV > 2 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 2) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 3) - (INSTR(T.ROOT_NAME, '!@#$', 1, 2) + 4))
+                            END AS LV2_ITEM_NAME,
+                       CASE WHEN T.LV = 3 THEN T.TRK_ITEM_NAME
+                            WHEN T.LV > 3 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 3) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 4) - (INSTR(T.ROOT_NAME, '!@#$', 1, 3) + 4))
+                            END AS LV3_ITEM_NAME,
+                       CASE WHEN T.LV = 4 THEN T.TRK_ITEM_NAME
+                            WHEN T.LV > 4 THEN SUBSTR(T.ROOT_NAME, INSTR(T.ROOT_NAME, '!@#$', 1, 4) + 4, INSTR(T.ROOT_NAME, '!@#$', 1, 5) - (INSTR(T.ROOT_NAME, '!@#$', 1, 4) + 4))
+                            END AS LV4_ITEM_NAME,
+                       (SELECT COUNT(*) FROM DESM_PACKING_DTL WHERE PACKAGE_NO = DPM.PACKAGE_NO AND PROJECT_NO = DPM.PROJECT_NO AND TRK_ITEM_NAME = DPM.TRK_ITEM_NAME) AS NUMBER_OF_ITEMS
+                  FROM (SELECT ZIM.TRK_ITEM_SEQ,
+                               ZIM.TRK_ITEM_NAME,
+                               ZIM.TRK_ITEM_GROUP,
+                               ZIM.ORGANIZATION_ID,
+                               ZIM.PROJECT_ID,
+                               ZIM.PROJECT_NO,
+                               PPA.NAME as PROJECT_NAME,
+                               ZIM.TASK_ID,
+                               ZIM.TASK_NUMBER,
+                               ZIM.BATCH,
+                               ZIM.OFFSHORE,
+                               ZIM.PRIMAVERA_ID,
+                               TO_CHAR(ZIM.MPS_PLAN_DATE, 'YYYY/MM/DD') as MPS_PLAN_DATE,
+                               TO_CHAR(ZIM.MPS_EXPECTED_DATE, 'YYYY/MM/DD') as MPS_EXPECTED_DATE,
+                               TO_CHAR(ZIM.MPS_ACTUAL_DATE, 'YYYY/MM/DD') as MPS_ACTUAL_DATE,
+                               ZIM.PURCHASE_DURATION,
+                               TO_CHAR(ZIM.PO_PLAN_DATE, 'YYYY/MM/DD') as PO_PLAN_DATE,
+                               TO_CHAR(ZIM.PO_EXPECTED_DATE, 'YYYY/MM/DD') as PO_EXPECTED_DATE,
+                               TO_CHAR(ZIM.PO_ATCUAL_DATE, 'YYYY/MM/DD') as PO_ATCUAL_DATE,
+                               ZIM.MAKE_DURATION,
+                               ZIM.PROGRESS,
+                               TO_CHAR(ZIM.CARGO_PLAN_DATE, 'YYYY/MM/DD') as CARGO_PLAN_DATE,
+                               TO_CHAR(ZIM.CARGO_EXPECTED_DATE, 'YYYY/MM/DD') as CARGO_EXPECTED_DATE,
+                               TO_CHAR(ZIM.CARGO_PROMISED_DATE, 'YYYY/MM/DD') as CARGO_PROMISED_DATE,
+                               TO_CHAR(ZIM.CARGO_ACTUAL_DATE, 'YYYY/MM/DD') as CARGO_ACTUAL_DATE,
+                               ZIM.SHIPMENT_DURATION,
+                               TO_CHAR(ZIM.FOB_PLAN_DATE, 'YYYY/MM/DD') as FOB_PLAN_DATE,
+                               TO_CHAR(ZIM.FOB_EXPECTED_DATE, 'YYYY/MM/DD') as FOB_EXPECTED_DATE,
+                               TO_CHAR(ZIM.FOB_ACTUAL_DATE, 'YYYY/MM/DD') as FOB_ACTUAL_DATE,
+                               ZIM.TRANS_DURATION,
+                               TO_CHAR(ZIM.ONSITE_PLAN_DATE, 'YYYY/MM/DD') as ONSITE_PLAN_DATE,
+                               TO_CHAR(ZIM.ONSITE_EXPECTED_DATE, 'YYYY/MM/DD') as ONSITE_EXPECTED_DATE,
+                               TO_CHAR(ZIM.ONSITE_ACTUAL_DATE, 'YYYY/MM/DD') as ONSITE_ACTUAL_DATE,
+                               ZIM.PAYMENT_MILESTONE,
+                               ZIM.TRK_ITEM_DEFAULT,
+                               ZIM.INVOICE_NUM,
+                               ZIM.ATTRIBUTE1,
+                               ZIM.ATTRIBUTE2,
+                               ZIM.ATTRIBUTE3,
+                               ZIM.ATTRIBUTE4,
+                               ZIM.ATTRIBUTE5,
+                               ZIM.ATTRIBUTE6,
+                               ZIM.ATTRIBUTE7,
+                               ZIM.ATTRIBUTE8,
+                               ZIM.ATTRIBUTE9,
+                               ZIM.ATTRIBUTE10,
+                               LEVEL AS LV,
+                               SYS_CONNECT_BY_PATH(ZIM.TRK_ITEM_NAME, '!@#$')  AS ROOT_NAME,
+                               CASE WHEN DI.CNT = 1 THEN DI.INVOICE_NUM
+                                    WHEN DI.CNT > 1 THEN DI.INVOICE_NUM || ' 외 ' || DI.CALC_CNT || '건' END AS SEL_INVOICE_NUM
+                          FROM ZVTS_ITEM_MASTER ZIM,
+                               PA_PROJECTS_ALL_INT PPA,
+                               (SELECT ZDI.TRK_ITEM_SEQ,
+                                       COUNT(*) AS CNT,
+                                       COUNT(*) - 1 AS CALC_CNT,
+                                       MAX(ZDI.INVOICE_NUM) AS INVOICE_NUM
+                                  FROM ZVTS_DESM_INVOICE ZDI
+                                GROUP BY ZDI.TRK_ITEM_SEQ) DI
+                         WHERE ZIM.PROJECT_ID = PPA.PROJECT_ID
+                           AND ZIM.TRK_ITEM_SEQ = DI.TRK_ITEM_SEQ(+)
+                           AND ZIM.PROJECT_NO = UPPER(#{PROJECT_NO})
+                        START WITH ZIM.TRK_ITEM_GROUP IS NULL
+                        CONNECT BY PRIOR ZIM.TRK_ITEM_SEQ = ZIM.TRK_ITEM_GROUP) T,
+                        DESM_PACKING_MST DPM
+                  WHERE T.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+                    AND T.PROJECT_NO = DPM.PROJECT_NO
+					AND NOT EXISTS (SELECT 1
+			                         FROM DESM_MRR_LINE DML,
+			                              DESM_MRR_HEADER DMH
+			                        WHERE 1=1
+			                          AND DMH.MRR_HEADER_ID = DML.MRR_HEADER_ID
+			                          AND DMH.PROJECT_NO = DPM.PROJECT_NO
+			                          AND DML.TRK_ITEM_NAME = DPM.TRK_ITEM_NAME
+			                          AND DML.PACKING_LIST_NO = DPM.PACKAGE_LIST_NO
+			                          AND DML.PACKAGE_NO = DPM.PACKAGE_NO)
+                    <if test='PACKAGE_LIST_NO != null and PACKAGE_LIST_NO != ""'>
+                    AND UPPER(DPM.PACKAGE_LIST_NO) LIKE '%' || UPPER(#{PACKAGE_LIST_NO}) || '%'
+                    </if>
+                    <if test='ATTRIBUTE10 != null and ATTRIBUTE10 != ""'>
+                    AND T.ATTRIBUTE10 = #{ATTRIBUTE10}
+                    </if>
+                    <if test='PACKAGE_NO != null and PACKAGE_NO != ""'>
+                    AND UPPER(DPM.PACKAGE_NO) LIKE '%' || UPPER(#{PACKAGE_NO}) || '%'
+                    </if>
+                    <if test='DESCRIPTION != null and DESCRIPTION != ""'>
+                    AND UPPER(DPM.DESCRIPTION) LIKE '%' || UPPER(#{DESCRIPTION}) || '%'
+                    </if>
+                    <if test='TRK_ITEM_NAME != null and TRK_ITEM_NAME != ""'>
+                    AND UPPER(DPM.TRK_ITEM_NAME) LIKE '%' || UPPER(#{TRK_ITEM_NAME}) || '%'
+                    </if>
+                 ) TT
+            WHERE 1 = 1
+            <if test='LV3_ITEM_NAME_F != null and LV3_ITEM_NAME_F != ""'>
+              AND UPPER(TT.LV3_ITEM_NAME) LIKE '%' || UPPER(#{LV3_ITEM_NAME_F}) || '%'
+            </if>
+            <if test='LV3_ITEM_NAME_S != null and LV3_ITEM_NAME_S != ""'>
+              AND UPPER(TT.LV3_ITEM_NAME) LIKE '%' || UPPER(#{LV3_ITEM_NAME_S}) || '%'
+            </if>
+            <if test='LV4_ITEM_NAME_F != null and LV4_ITEM_NAME_F != ""'>
+              AND UPPER(TT.LV4_ITEM_NAME) LIKE '%' || UPPER(#{LV4_ITEM_NAME_F}) || '%'
+            </if>
+            <if test='LV4_ITEM_NAME_S != null and LV4_ITEM_NAME_S != ""'>
+              AND UPPER(TT.LV4_ITEM_NAME) LIKE '%' || UPPER(#{LV4_ITEM_NAME_S}) || '%'
+            </if>
+                 ) DT
+		 WHERE RN > TO_NUMBER(#{PAGE_CNT}) * (TO_NUMBER(#{PAGE_NUM}) - 1)
+		   AND RN <![CDATA[ <= ]]> TO_NUMBER(#{PAGE_CNT}) * TO_NUMBER(#{PAGE_NUM})
+	</select>
+	
+	
+	
+	<select id="getMobileAttachList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT TH.ORGN_FILE_NM,
+		       TH.ATT_ID
+		  FROM ESAATTH TH
+		 WHERE TH.SYS_ID = 'EMRO'
+		   AND TH.STS    <![CDATA[ <> ]]>  'D'
+		   AND TH.GRP_CD = #{FILE_GRP_CD}
+    </select>
+	
+	<select id="getMobileMrrHeaderAttachList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ATT_ID AS ID
+	     , GRP_CD AS GROUPID
+	     , ORGN_FILE_NM AS NAME    
+	     , ATT_FILE_PATH AS REFERENCE
+	     , TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+	     , SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+	     , REM
+	  FROM  ESAATTH
+	  WHERE SYS_ID = 'EMRO'
+	    AND GRP_CD = #{FILE_GRP_CD}
+	    AND STS  <![CDATA[<>]]>  'D'   
+	  ORDER BY REG_DT, SEQ
+    </select>
+    
+    <select id="getMobileMrrLineId" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT DMLL.MRR_LINE_ID AS MRR_LINE_ID
+		FROM DESM_MRR_HEADER DMH
+		,    DESM_MRR_LINE DMLL
+		WHERE DMH.MRR_HEADER_ID = DMLL.MRR_HEADER_ID
+		AND DMH.PROJECT_NO = #{PROJECT_NO}
+		AND DMLL.TRK_ITEM_NAME = #{TRK_ITEM_NAME}
+		AND DMLL.PACKING_LIST_NO = #{PACKAGE_LIST_NO}
+		AND DMLL.PACKAGE_NO = #{PACKAGE_NO}
+    </select>
+    
+    <select id="getMobileUserList" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DU.USER_NAME,
+		       DU.USER_AD,
+		       NVL(NVL(DU.DEPT_NAME, ZE.ZORG_NM), ' ') AS DEPT_NAME
+		  FROM DESM_USER DU,
+		       DESM_USER_PROJECT_ALL DUPA,
+		       ZVTS_EMP ZE,
+		      (SELECT DUDP.PROJECT_CODE,
+		              DUP.USER_AD
+		         FROM DESM_USER_DEFAULT_PROJECT DUDP,
+		              DESM_USER_PROJECT DUP
+		        WHERE DUDP.PROJECT_CODE = DUP.PROJECT_CODE
+		          AND DUDP.USER_AD = #{USER_AD}) P_A
+		 WHERE DU.USER_AD = DUPA.USER_AD(+)
+		   AND DU.USER_AD = ZE.AD_USER_ID(+)
+		   AND DU.USER_AD = P_A.USER_AD(+)
+		   AND ZE.ZSTATUS_TYPE(+) = '재직'
+		   AND (DUPA.USER_AD IS NOT NULL OR
+		        (DUPA.USER_AD IS NULL AND P_A.USER_AD IS NOT NULL))
+		  <if test='KEYWORD != null and KEYWORD != ""'>
+		  AND (UPPER(DU.USER_NAME) LIKE '%'||UPPER(#{KEYWORD})||'%' OR UPPER(DU.USER_AD) LIKE '%'||UPPER(#{KEYWORD})||'%' )
+		  </if>
+	</select>
+	
+</mapper>

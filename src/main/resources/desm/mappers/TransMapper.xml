@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.TransMapper">
+
+	<update id="updateTransSetLanguage" parameterType="java.util.Map">
+	    <![CDATA[
+	    	alter session set nls_language = 'AMERICAN'
+	    ]]>	
+	</update>
+
+	<select id="getTransCodeCombo" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT G.GRP_CD
+		,      G.GRP_CD_NM
+		,      T.DTL_CD AS CODE -- DB에 저장되는 value(data)
+		,      L.DTL_CD_NM AS NAME -- 화면에 표시되는 label 
+		,      T.SORT_ORD 
+		,      T.USE_YN 
+		FROM ESACDDT T 
+		,    ESACDDL L 
+		,    ESACDGP G 
+		WHERE G.GRP_CD = T.GRP_CD
+		AND G.GRP_CD = L.GRP_CD 
+		AND T.DTL_CD = L.DTL_CD 
+		AND T.USE_YN = 'Y' 
+		AND G.GRP_CD = #{CODE} 
+		AND L.LANG_CD = 'ko_KR' 
+		ORDER BY T.SORT_ORD 
+	</select>	
+	
+	<select id="getTransComDay" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT TO_CHAR(SYSDATE, 'YYYY/MM/DD') AS CUR_DAY
+		      ,TO_CHAR(ADD_MONTHS(SYSDATE, -1), 'YYYY/MM/DD') AS PREV_1_MON_DAY
+		      ,TO_CHAR(ADD_MONTHS(SYSDATE, +1), 'YYYY/MM/DD') AS NEXT_1_MON_DAY      
+		  FROM DUAL 		
+	</select>	
+
+	<select id="chkUser" parameterType="java.util.Map" resultType="java.util.HashMap">
+	<![CDATA[
+		SELECT US.USR_ID 
+		,      EU.USER_NAME 
+		,      US.USR_CLS 
+		,      US.EMP_NO 
+		,      US.DEPT_CD 
+		,      DP.DEPT_NM 
+		,      US.VD_CD 
+		,      US.EMAIL 
+		,      (SELECT SUBSTR(MAX(ROLE_CD), 0 , 1) FROM ESAAURP WHERE SYS_ID = US.SYS_ID AND USR_ID = US.USR_ID) AS PRJ_ROLE_CD 
+		,      (SELECT MAX(ROLE_CD) FROM ESAAURP WHERE USR_ID = US.USR_ID) AS ROLE_CD 
+		,      DP.BG_CODE 
+		,      CASE EU.BG_NAME WHEN '원자력' THEN '원자력BG'
+		       ELSE NVL(EU.BG_NAME, DP.BG_NAME) 
+		       END AS BG_NAME 
+		FROM ESAUSER US
+		,    ESAOGDP DP 
+		,    (SELECT ZMFG_GET_PRIOR_ORG@LN_PROD_ZSHPIF(FUS.USER_ID, NULL, 'L3','I',SYSDATE) BG_CODE
+		      ,      (SELECT HHH.NAME 
+		              FROM   HR_ALL_ORGANIZATION_UNITS_INT HHH 
+		              WHERE  1=1 
+		              AND    HHH.ORGANIZATION_ID = ZMFG_GET_PRIOR_ORG@LN_PROD_ZSHPIF(FUS.USER_ID, NULL, 'L3','I',SYSDATE)
+		             ) BG_NAME 
+		      ,      FUS.USER_NAME AS COMPANY_NUMBER 
+		      ,      FUS.DESCRIPTION AS USER_NAME 
+		      FROM   HR_ALL_ORGANIZATION_UNITS_INT HOU 
+		      ,      PER_ALL_ASSIGNMENTS_F_INT PAA
+		      ,      FND_USER_INT FUS 
+		      WHERE  HOU.INTERNAL_ADDRESS_LINE = PAA.ASS_ATTRIBUTE1 
+		      AND    TRUNC(SYSDATE) BETWEEN PAA.EFFECTIVE_START_DATE AND NVL(PAA.EFFECTIVE_END_DATE,TRUNC(SYSDATE)) 
+		      AND    PAA.PERSON_ID = FUS.EMPLOYEE_ID 
+		      AND    FUS.USER_NAME = UPPER(#{USER_ID}) 
+		     ) EU 
+		WHERE 1=1 
+		AND US.COMP_CD = DP.ORG_CD(+) 
+		AND US.DEPT_CD = DP.DEPT_CD(+) 
+		AND US.USR_ID = EU.COMPANY_NUMBER 
+		AND US.USR_CLS = 'B'
+		AND (SELECT MAX(ROLE_CD) FROM ESAAURP WHERE USR_ID = US.USR_ID) IS NOT NULL 
+		AND US.USR_ID = UPPER(#{USER_ID})
+		UNION
+        SELECT DU.USER_AD AS USR_ID
+        ,      DU.USER_NAME
+        ,      'B' AS USR_CLS
+        ,      NULL AS EMP_NO
+        ,      NULL AS DEPT_CD
+        ,      DU.DEPT_NAME AS DEPT_NM
+        ,      '3388700492' AS VD_CD
+        ,      DU.MAIL AS EMAIL
+        ,      'S' AS PRJ_ROLE_CD
+        ,      'S500' AS ROLE_CD
+        ,      NULL AS BG_CODE
+        ,      NULL AS BG_NAME
+        FROM DESM_USER DU
+        WHERE 1=1
+        AND DU.USER_AD LIKE UPPER('%GLONET')
+        AND DU.USER_AD = UPPER(#{USER_ID})
+	]]>	 	   
+    </select>    
+    
+	<select id="getTransProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT TO_CHAR(PJT.PROJECT_ID) AS PROJECT_ID
+		     , PJT.PROJECT_CODE
+		     , NVL(PPA.NAME, PJT.NAME) AS PROJECT_DESC
+		     , PJT.BG_NAME
+		     , PJT.BU_NAME
+		     , PJT.BU_CODE
+		     , TO_CHAR(PJT.SCHEDULED_START_DATE, 'YYYYMMDD') AS SCHEDULED_START_DATE
+		     , TO_CHAR(PJT.SCHEDULED_FINISH_DATE, 'YYYYMMDD') AS SCHEDULED_FINISH_DATE
+		  FROM ZSHP_PROJECTS_INT PJT,
+		  	   PA_PROJECTS_ALL_INT PPA	
+		  WHERE PJT.PROJECT_CODE = PPA.SEGMENT1(+)
+		  <if test='TRANS_BG_CODE != null and TRANS_BG_CODE != "" and TRANS_BG_CODE == "J00"'>
+		  	AND PJT.PROJECT_CODE = 'J99999'
+		  </if>
+		  <if test='keyword != null and keyword !=""'>
+		   AND (UPPER(PJT.PROJECT_CODE) like '%'|| UPPER(#{keyword}) ||'%' OR UPPER(NVL(PPA.NAME, PJT.NAME)) like '%'|| UPPER(#{keyword}) ||'%')
+		  </if>
+		
+		  ORDER BY PJT.PROJECT_ID, PJT.PROJECT_CODE, PPA.NAME	
+	</select>  
+	
+	<select id="getTransSRProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT TO_CHAR(PJT.PROJECT_ID) AS PROJECT_ID
+		     , PJT.PROJECT_CODE
+		     , NVL(PPA.NAME, PJT.NAME) AS PROJECT_DESC
+		     , PJT.BG_NAME
+		     , PJT.BU_NAME
+		     , PJT.BU_CODE
+		     , TO_CHAR(PJT.SCHEDULED_START_DATE, 'YYYYMMDD') AS SCHEDULED_START_DATE
+		     , TO_CHAR(PJT.SCHEDULED_FINISH_DATE, 'YYYYMMDD') AS SCHEDULED_FINISH_DATE
+		  FROM ZSHP_SHIPPING_REQ_M REQ
+     		 , ZSHP_PROJECTS_INT PJT
+     		 , PA_PROJECTS_ALL_INT PPA
+		 WHERE 1=1
+		   AND REQ.PROJECT_ID = PJT.PROJECT_CODE
+		   AND PJT.PROJECT_CODE = PPA.SEGMENT1(+)
+		  <if test='keyword != null and keyword !=""'>
+		   AND (UPPER(PJT.PROJECT_CODE) like '%'|| UPPER(#{keyword}) ||'%' OR UPPER(NVL(PPA.NAME, PJT.NAME)) like '%'|| UPPER(#{keyword}) ||'%')
+		  </if>		  
+	 	  ORDER BY PJT.PROJECT_ID, PJT.PROJECT_CODE, PPA.NAME	
+	</select>  	 
+	
+	<select id="getTransVendorProject" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT DISTINCT TO_CHAR(PJT.PROJECT_ID) AS PROJECT_ID
+		     , PJT.PROJECT_CODE
+		     , NVL(PPA.NAME, PJT.NAME) AS PROJECT_DESC
+		     , PJT.BG_NAME
+		     , PJT.BU_NAME
+		     , PJT.BU_CODE
+		     , TO_CHAR(PJT.SCHEDULED_START_DATE, 'YYYYMMDD') AS SCHEDULED_START_DATE
+		     , TO_CHAR(PJT.SCHEDULED_FINISH_DATE, 'YYYYMMDD') AS SCHEDULED_FINISH_DATE
+        FROM ZSHP_PO_VENDOR_PJT_INT ZPVPI
+        ,    ZSHP_PROJECTS_INT PJT
+        ,    PA_PROJECTS_ALL_INT PPA
+        WHERE ZPVPI.PROJECT_ID = PJT.PROJECT_ID
+          AND PJT.PROJECT_CODE = PPA.SEGMENT1(+)
+        AND REPLACE(VENDOR_CODE, '-', '') = #{TRANS_VD_CD}
+		  <if test='keyword != null and keyword !=""'>
+		   AND (UPPER(PJT.PROJECT_CODE) like '%'|| UPPER(#{keyword}) ||'%' OR UPPER(NVL(PPA.NAME, PJT.NAME)) like '%'|| UPPER(#{keyword}) ||'%')
+		  </if>	
+        ORDER BY PJT.PROJECT_ID, PJT.PROJECT_CODE, PPA.NAME	
+	</select> 	 
+	
+	<select id="geTransFileById" parameterType="java.util.Map" resultType="java.util.HashMap">
+	  SELECT ATT_ID AS ID
+	     , GRP_CD AS GROUPID
+	     , ORGN_FILE_NM AS NAME    
+	     , ATT_FILE_PATH AS REFERENCE
+	     , TO_CHAR(ATT_FILE_SIZ) AS FILE_SIZE
+	     , SUBSTR(ORGN_FILE_NM, INSTR(ORGN_FILE_NM, '.', -1) + 1) AS EXT
+	  FROM  ESAATTH
+	  WHERE SYS_ID = 'EMRO'
+	    AND ATT_ID = #{ATT_ID}
+	    AND STS <![CDATA[<>]]> 'D'
+	</select>	  		
+</mapper>

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.TransShippingOrderViewMapper">
+	
+	<select id="getTransShippingOrderView" parameterType="java.util.Map" resultType="java.util.HashMap">
+        SELECT M.VOYAGE_NO AS OPER_ORG_CD
+        ,      'ROOT'      AS UP_OPER_ORG_CD
+        ,      M.ORDER_MASTER_ID
+        ,      M.VOYAGE_NO
+        ,      '' AS INVOICE_NO
+        ,      M.TITLE
+        ,      M.PROJECT_ID
+        ,      (
+                SELECT DISTINCT A.PJT_NAME
+                FROM ZSHP_SHIPPING_MASTER_DATA A
+                WHERE A.PROJECT_ID = M.PROJECT_ID
+               ) AS PROJECT_DESC
+        ,      M.STATUS
+        ,      M.TRANSPORT_TYPE
+        ,      M.TRANSPORT_METHOD
+        ,      M.TRANSPORT_TERMS
+        ,      M.LOADING_PORT
+        ,      (
+                SELECT T.PORT_NAME
+                FROM ZSHP_SHIPPING_PORT T
+                WHERE T.PORT_CODE = LOADING_PORT
+               ) LOADING_PORT_NAME
+        ,      M.DESTINATION_PORT
+        ,      (
+                SELECT T.PORT_NAME
+                FROM ZSHP_SHIPPING_PORT T
+                WHERE T.PORT_CODE = DESTINATION_PORT
+               ) DESTINATION_PORT_NAME
+        ,      SRT.PKG AS PACKAGE_COUNT
+        ,      SRT.GROSS_WEIGHT AS TOTAL_GROSS_WEIGHT
+        ,      SRT.SHIPPING_VOLUME AS TOTAL_SHIPPING_VOLUME
+        ,      ROUND(SRT.RT, 2) AS TOTAL_REVENUE_TON
+        ,      M.FINAL_DESTINATION_ADDR
+        ,      TO_CHAR(M.CARGO_READY_DATE, 'YYYY/MM/DD') AS CARGO_READY_DATE
+        ,      M.CONTENT
+        ,      SRT.DF AS DANGER_FLAG
+        ,	   M.CONTACT_POINT
+        ,      M.CREATED_BY
+        ,      TO_CHAR(M.CREATION_DATE, 'YYYY/MM/DD') CREATION_DATE
+        ,      M.LAST_UPDATED_BY
+        ,      TO_CHAR(M.CREATION_DATE, 'YYYY/MM/DD') LAST_UPDATE_DATE
+        FROM ZSHP_SHIPPING_ORDER_M M
+        ,    (
+              SELECT OM.ORDER_MASTER_ID
+              ,      SUM(D.GROSS_WEIGHT) AS GROSS_WEIGHT
+              ,      SUM(D.SHIPPING_VOLUME) AS SHIPPING_VOLUME
+              /* OM.TOTAL_REVENUE_TON RT, */ /* ZSHP_SHIPPING_ORDER_M의 TOTAL_REVENUE_TON 에 입력된 값 조회, 저장시점에서 값 입력되어져야함 */
+              ,      SUM(CASE WHEN D.GROSS_WEIGHT / 1000 > D.SHIPPING_VOLUME THEN D.GROSS_WEIGHT / 1000
+                         ELSE D.SHIPPING_VOLUME
+                         END
+                        ) AS RT /* ZSHP_SHIPPING_REQ_D 정보를 이용하여 계산하여 보여줌 */
+              ,      COUNT(D.REQ_DETAIL_ID) AS PKG
+              ,      MAX(DDF.DF) AS DF
+              FROM ZSHP_SHIPPING_REQ_D D
+              ,    ZSHP_SHIPPING_REQ_M M
+              ,    ZSHP_SHIPPING_INVOICE I
+              ,    ZSHP_SHIPPING_ORDER_M OM
+              ,    (
+                    SELECT CASE WHEN COUNT(M.REQ_MASTER_ID) > 0 THEN 'Y'
+                           ELSE 'N'
+                           END DF
+                    ,      INVOICE_NO_ID
+                    FROM ZSHP_SHIPPING_REQ_M M
+                    WHERE M.DANGER_FLAG = 'Y'
+                    GROUP BY INVOICE_NO_ID
+                   ) DDF
+              WHERE M.REQ_MASTER_ID = D.REQ_MASTER_ID
+              AND M.INVOICE_NO_ID = I.INVOICE_NO_ID
+              AND I.ORDER_MASTER_ID = OM.ORDER_MASTER_ID
+              AND I.INVOICE_NO_ID = DDF.INVOICE_NO_ID(+)
+              GROUP BY OM.VOYAGE_NO
+              ,        OM.ORDER_MASTER_ID
+              ,        OM.TOTAL_REVENUE_TON
+             ) SRT
+        ,    ZSHP_PROJECTS_INT P
+        WHERE 1=1
+        AND M.ORDER_MASTER_ID = SRT.ORDER_MASTER_ID
+        AND M.PROJECT_ID = P.PROJECT_CODE
+        <if test='FROM_SO_DATE != null and FROM_SO_DATE != ""'>
+			AND M.CARGO_READY_DATE <![CDATA[ >= ]]> #{FROM_SO_DATE}
+        </if>
+        <if test='TO_SO_DATE != null and TO_SO_DATE != ""'>
+			AND M.CARGO_READY_DATE <![CDATA[ <= ]]> #{TO_SO_DATE}
+		</if>
+        <if test="PROJECT_CODE != null and PROJECT_CODE != ''">
+            AND P.PROJECT_CODE = #{PROJECT_CODE}
+        </if>
+        <if test = 'TRANSPORT_B_TYPE != null and TRANSPORT_B_TYPE != ""' >
+        	AND TRANSPORT_METHOD LIKE '%' || #{TRANSPORT_B_TYPE} || '%'
+        </if>
+        <if test = 'VOYAGE_NO != null and VOYAGE_NO != ""' >
+        	AND VOYAGE_NO LIKE '%' || #{VOYAGE_NO} || '%'
+        </if>
+        <if test = 'TRANSPORT_U_TYPE != null and TRANSPORT_U_TYPE != ""' >
+        	AND TRANSPORT_TYPE LIKE '%' || #{TRANSPORT_U_TYPE} || '%'
+        </if>
+        <choose>
+     		<when test='STATUS != null and STATUS !=""'>
+				AND M.STATUS = #{STATUS}
+			</when>
+			<otherwise>
+				AND M.STATUS IN ('운송요청', '발주결재중', '발주반려', '발주취소중')
+			</otherwise>
+     	</choose>
+        UNION ALL
+        -- Root 의 항차에 연결되는 Invoice List
+        SELECT I.INVOICE_NO AS OPER_ORG_CD
+        ,      OM.VOYAGE_NO AS UP_OPER_ORG_CD
+        ,      0 AS ORDER_MASTER_ID
+        ,      '' AS VOYAGE_NO
+        ,      I.INVOICE_NO
+        ,      I.DESCRIPTION AS TITLE
+        ,      '' AS PROJECT_ID
+        ,      '' AS PROJECT_DESC
+        ,      '' AS STATUS --I.STATUS
+        ,      '' AS TRANSPORT_TYPE
+        ,      '' AS TRANSPORT_METHOD
+        ,      '' AS TRANSPORT_TERMS
+        ,      '' AS LOADING_PORT
+        ,      '' AS LOADING_PORT_NAME
+        ,      '' AS DESTINATION_PORT
+        ,      '' AS DESTINATION_PORT_NAME
+        ,      SRT2.PKG PACKAGE_COUNT
+        ,      SRT2.GROSS_WEIGHT TOTAL_GROSS_WEIGHT
+        ,      SRT2.SHIPPING_VOLUME TOTAL_SHIPPING_VOLUME
+        ,      SRT2.RT TOTAL_REVENUE_TON
+        ,      '' AS FINAL_DESTINATION_ADDR
+        ,      '' AS CARGO_READY_DATE
+        ,      '' AS CONTENT
+        ,      SRT2.DF AS DANGER_FLAG
+        ,	   '' AS CONTACT_POINT
+        ,      I.CREATED_BY
+        ,      TO_CHAR(I.CREATION_DATE, 'YYYY/MM/DD') CREATION_DATE
+        ,      I.LAST_UPDATED_BY
+        ,      TO_CHAR(I.CREATION_DATE, 'YYYY/MM/DD') LAST_UPDATE_DATE
+        FROM ZSHP_SHIPPING_INVOICE I
+        ,    ZSHP_SHIPPING_ORDER_M OM
+        ,    (
+              SELECT I.INVOICE_NO
+              ,      SUM(D.GROSS_WEIGHT) AS GROSS_WEIGHT
+              ,      SUM(D.SHIPPING_VOLUME) AS SHIPPING_VOLUME
+              ,      SUM(CASE WHEN D.GROSS_WEIGHT / 1000 > D.SHIPPING_VOLUME THEN D.GROSS_WEIGHT / 1000
+                         ELSE D.SHIPPING_VOLUME END
+                         ) RT
+              ,      COUNT(D.REQ_DETAIL_ID) AS PKG
+              ,      DDF.*
+              FROM ZSHP_SHIPPING_REQ_D D
+              ,    ZSHP_SHIPPING_REQ_M M
+              ,    ZSHP_SHIPPING_INVOICE I
+              ,    (
+                    SELECT CASE WHEN COUNT(M.REQ_MASTER_ID) > 0 THEN 'Y'
+                           ELSE 'N'
+                           END DF
+                    ,      INVOICE_NO_ID
+                    FROM ZSHP_SHIPPING_REQ_M M
+                    WHERE M.DANGER_FLAG = 'Y'
+                    GROUP BY INVOICE_NO_ID
+                   ) DDF
+              WHERE M.REQ_MASTER_ID = D.REQ_MASTER_ID
+              AND M.INVOICE_NO_ID = I.INVOICE_NO_ID
+              AND I.INVOICE_NO_ID = DDF.INVOICE_NO_ID(+)
+              GROUP BY I.INVOICE_NO
+              ,        DDF.DF
+              ,        DDF.INVOICE_NO_ID
+             ) SRT2
+        ,    ZSHP_PROJECTS_INT     P
+        WHERE 1=1
+        AND I.ORDER_MASTER_ID = OM.ORDER_MASTER_ID 
+        AND I.INVOICE_NO = SRT2.INVOICE_NO
+        AND OM.PROJECT_ID = P.PROJECT_CODE
+        <if test="PROJECT_CODE != null and PROJECT_CODE != ''">
+        	AND P.PROJECT_CODE = #{PROJECT_CODE}
+        </if>
+        <if test = 'TRANSPORT_TERMS != null and TRANSPORT_TERMS != ""' >
+        	AND OM.TRANSPORT_TERMS LIKE '%' || #{TRANSPORT_TERMS} || '%'
+        </if>
+        <if test = 'VOYAGE_NO != null and VOYAGE_NO != ""' >
+        	AND OM.VOYAGE_NO LIKE '%' || #{VOYAGE_NO} || '%'
+        </if>
+        <choose>
+     		<when test='STATUS != null and STATUS !=""'>
+				AND OM.STATUS = #{STATUS}
+			</when>
+			<otherwise>
+				AND OM.STATUS IN ('운송요청', '발주결재중', '발주반려', '발주취소중')
+			</otherwise>
+     	</choose>
+        ORDER BY PROJECT_ID, ORDER_MASTER_ID DESC	
+	</select>		
+	
+	<select id="getTransDlgTransRequestInvoiceGridView" parameterType="java.util.Map" resultType="java.util.HashMap">
+		SELECT ROWNUM AS RNUM
+        ,      T.*
+        , SUM(PKG) OVER() AS PKG_SUM
+        , SUM(NET_WEIGHT) OVER() AS NET_WEIGHT_SUM
+        , SUM(GROSS_WEIGHT) OVER() AS GROSS_WEIGHT_SUM        
+        , SUM(SHIPPING_VOLUME) OVER() AS SHIPPING_VOLUME_SUM           
+        FROM (
+              SELECT DISTINCT ZSI.INVOICE_NO_ID
+              ,      ZSI.INVOICE_NO
+              ,      ZSI.PROJECT_ID
+              ,      ZSI.DUTY_REFUND_OPTION
+              ,      ZSI.DELIVERY_TERMS
+              ,      ZSI.DESCRIPTION
+              ,      ZSI.DOCUMENT_GRP_ID              
+              ,      ZSI.ORDER_MASTER_ID
+              ,      (
+                        SELECT CASE WHEN COUNT(TZSRM.REQ_MASTER_ID) > 0 THEN '1' ELSE '0' END
+                        FROM ZSHP_SHIPPING_REQ_M TZSRM
+                        WHERE TZSRM.INVOICE_NO_ID = ZSRM.INVOICE_NO_ID
+                        AND ZSRM.DANGER_FLAG = 'Y'
+                       ) AS DANGER_FLAG
+              ,      (
+                        SELECT B.DTL_CD_NM /*상세 코드 명*/
+                        FROM ESACDDT A, ESACDDL B
+                        WHERE A.SYS_ID = B.SYS_ID
+                        AND A.GRP_CD = B.GRP_CD
+                        AND A.DTL_CD = B.DTL_CD
+                        AND B.LANG_CD = 'KO_KR'
+                        AND A.GRP_CD = 'C101'
+                        AND A.STS != 'D'
+                        AND A.DTL_CD = ZSI.DUTY_REFUND_OPTION
+                       ) AS DUTY_REFUND_OPTION_NM
+                ,      DETAIL.PKG
+                ,      DETAIL.NET_WEIGHT
+                ,      DETAIL.GROSS_WEIGHT
+                ,      DETAIL.SHIPPING_VOLUME -- CBM
+                ,      DETAIL.RT -- RT, 사용안할듯
+                ,      LISTAGG(SUPPLIER_INFO.SUPPLIER, ',') WITHIN GROUP (ORDER BY SUPPLIER_INFO.SUPPLIER)
+                                 OVER(PARTITION BY ZSI.INVOICE_NO_ID) AS SUPPLIERS
+                ,      LISTAGG(ZSRM.CONTACT_POINT, CHR(10)) WITHIN GROUP (ORDER BY ZSRM.CONTACT_POINT)
+                           OVER(PARTITION BY ZSI.INVOICE_NO_ID) AS CONTACT_POINTS
+                ,      LISTAGG(ZSRM.SHOP_OUT_DATE, ',') WITHIN GROUP (ORDER BY ZSRM.SHOP_OUT_DATE)
+                           OVER(PARTITION BY ZSI.INVOICE_NO_ID) AS SHOP_OUT_DATES
+              FROM ZSHP_SHIPPING_INVOICE ZSI
+              ,    ZSHP_SHIPPING_REQ_M ZSRM
+              ,    (
+                    SELECT INVOICE.INVOICE_NO_ID
+                    ,      INVOICE.INVOICE_NO
+                    ,      SUM(PACKING.NET_WEIGHT) AS NET_WEIGHT
+                    ,      SUM(PACKING.GROSS_WEIGHT) AS GROSS_WEIGHT
+                    ,      SUM(PACKING.SHIPPING_VOLUME) AS SHIPPING_VOLUME
+                    ,      SUM(PACKING.RT_AMT) AS RT
+                    ,      COUNT(PACKING.REQ_DETAIL_ID) AS PKG
+                    FROM (
+                          SELECT CASE WHEN D.GROSS_WEIGHT / 1000 > D.SHIPPING_VOLUME THEN D.GROSS_WEIGHT / 1000
+                                      ELSE D.SHIPPING_VOLUME
+                                 END RT_AMT
+                          ,      D.*
+                          FROM ZSHP_SHIPPING_REQ_D D
+                         ) PACKING
+                    ,    ZSHP_SHIPPING_REQ_M REQ
+                    ,    ZSHP_SHIPPING_INVOICE INVOICE
+                    WHERE REQ.REQ_MASTER_ID = PACKING.REQ_MASTER_ID
+                    AND   REQ.INVOICE_NO_ID = INVOICE.INVOICE_NO_ID
+                    GROUP BY INVOICE.INVOICE_NO_ID, INVOICE.INVOICE_NO
+                   ) DETAIL
+              ,    (
+                    SELECT SUBSTR(EU.USR_ID, 0, LENGTH(EU.USR_ID)-6) AS SUPPLIER_ID
+		            ,      EU.USR_NM AS SUPPLIER
+		            FROM ESAUSER EU
+		            WHERE EU.USR_CLS = 'S'
+                    UNION
+                    SELECT EO.DEPT_CD AS SUPPLIER_ID
+                    ,      EO.DEPT_NM AS SUPPLIER
+                    FROM ESAOGDP EO
+                   ) SUPPLIER_INFO
+              WHERE ZSI.INVOICE_NO_ID = ZSRM.INVOICE_NO_ID
+              AND DETAIL.INVOICE_NO_ID = ZSI.INVOICE_NO_ID
+              AND (SUPPLIER_INFO.SUPPLIER_ID = ZSRM.VENDOR_ID OR SUPPLIER_INFO.SUPPLIER_ID = ZSRM.DEPT_ID)
+              AND ZSI.ORDER_MASTER_ID = #{ORDER_MASTER_ID}
+              ORDER BY ZSI.INVOICE_NO
+             ) T      	
+	</select>		
+	
+	<select id="getTransDlgTransRequestMailGridView" parameterType="java.util.Map" resultType="java.util.HashMap">
+	    SELECT ZSM.ORDER_MASTER_ID
+        ,      ZSM.MAILING_ID
+        ,      UINFO.DEPT_CD AS DEPT_CODE
+        ,      UINFO.USR_ID AS EMP_AD
+        ,      UINFO.USR_NM AS EMP_NAME
+        ,      UINFO.EMAIL
+        ,      (
+                SELECT DEPT_NM
+                FROM ESAOGDP
+                WHERE DEPT_CD = UINFO.DEPT_CD
+               ) AS DEPT_NAME
+        FROM ZSHP_SHIPPING_MAILING ZSM
+        ,    (
+              SELECT *
+              FROM (
+                    SELECT DEPT_CD, USR_ID, USR_NM, EMAIL
+                    FROM ESAUSER
+                    WHERE USE_YN = 'Y'
+                    UNION ALL
+                    SELECT '' AS DEPT_CD, USR_ID, USR_NM, EMAIL
+                    FROM ZSHP_SHIPPING_USER
+                   )
+             ) UINFO
+        WHERE ZSM.RECEIVER_AD = UINFO.USR_ID
+        AND ZSM.ORDER_MASTER_ID = #{ORDER_MASTER_ID}  
+        AND UINFO.EMAIL IS NOT NULL		 	
+	</select>	
+	
+	<delete id="deleteTransDlgTransRequestMailGridView" parameterType="java.util.Map">
+    	DELETE ZSHP_SHIPPING_ORDER_M ZSOM
+        WHERE ZSOM.ORDER_MASTER_ID = #{ORDER_MASTER_ID}
+	</delete>			
+
+	<update id="deleteTransDlgTransRequestMailGridViewInInvoice" parameterType="java.util.Map">
+        UPDATE ZSHP_SHIPPING_INVOICE ZSI
+        SET ZSI.ORDER_MASTER_ID = NULL
+        WHERE ZSI.ORDER_MASTER_ID = #{ORDER_MASTER_ID}
+	</update>		
+	
+	<delete id="deleteTransDlgTransRequestMailGridViewMail" parameterType="java.util.Map">
+        DELETE ZSHP_SHIPPING_MAILING ZSM
+        WHERE ZSM.ORDER_MASTER_ID = #{ORDER_MASTER_ID}
+	</delete>					
+				
+	<select id="getTransShippingOrderViewPackage" parameterType="java.util.Map" resultType="java.util.HashMap">
+	      SELECT D.*,M.INVOICE_NO,#{OPER_ORG_CD} AS OPER_ORG_CD
+		       ,SUM(SHIPPING_DIMENSION_L) OVER() AS SHIPPING_DIMENSION_L_SUM
+		       ,SUM(SHIPPING_DIMENSION_W) OVER() AS SHIPPING_DIMENSION_W_SUM
+		       ,SUM(SHIPPING_DIMENSION_H) OVER() AS SHIPPING_DIMENSION_H_SUM
+		       ,SUM(NET_WEIGHT) OVER() AS NET_WEIGHT_SUM
+		       ,SUM(GROSS_WEIGHT) OVER() AS GROSS_WEIGHT_SUM
+		       ,SUM(SHIPPING_VOLUME) OVER() AS SHIPPING_VOLUME_SUM	      
+	      FROM ZSHP_SHIPPING_REQ_D D,
+	           ZSHP_SHIPPING_REQ_M M 
+	      WHERE D.REQ_MASTER_ID  IN ( SELECT REQ_MASTER_ID FROM ZSHP_SHIPPING_REQ_M 
+	                              WHERE INVOICE_NO_ID IN ( SELECT INVOICE_NO_ID FROM ZSHP_SHIPPING_INVOICE WHERE ORDER_MASTER_ID = #{ORDER_MASTER_ID}))
+	      AND   D.REQ_MASTER_ID = M.REQ_MASTER_ID 	
+	      ORDER BY OPER_ORG_CD, M.INVOICE_NO	  	
+	</select>					
+															 						
+</mapper>

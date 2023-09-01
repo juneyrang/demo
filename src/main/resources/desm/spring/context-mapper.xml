@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd">
+
+	<!-- SqlSession setup for MyBatis Database Layer -->
+	<bean id="sqlSession" class="egovframework.desm.cmmn.factory.RefreshableSqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="configLocation" value="classpath:/egovframework/desm/sql-mapper-config.xml" />
+		<property name="mapperLocations" value="classpath:/egovframework/desm/mappers/*.xml" />
+	</bean>
+	
+	<!-- 
+	<bean id="transSqlSession" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource_trans" />
+		<property name="configLocation" value="classpath:/egovframework/desm/sql-mapper-config_trans.xml" />
+		<property name="mapperLocations" value="classpath:/egovframework/desm/mappers/trans/*.xml" />
+	</bean>
+	 -->	
+
+	<!-- 
+	<bean id="idsmSqlSession" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource_idsm" />
+		<property name="configLocation" value="classpath:/egovframework/desm/sql-mapper-config_idsm.xml" />
+		<property name="mapperLocations" value="classpath:/egovframework/desm/mappers/idsm/*.xml" />
+	</bean>	
+	
+	<bean id="idsmFileSqlSession" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource_idsm_file" />
+		<property name="configLocation" value="classpath:/egovframework/desm/sql-mapper-config_idsm_file.xml" />
+		<property name="mapperLocations" value="classpath:/egovframework/desm/mappers/idsmFile/*.xml" />
+	</bean>		
+	 -->
+	 
+	 
+	<!-- MapperConfigurer setup for MyBatis Database Layer with @Mapper("deptMapper") in DeptMapper Interface -->
+ 	<bean class="egovframework.rte.psl.dataaccess.mapper.MapperConfigurer">
+		<property name="basePackage" value="egovframework.desm.service.impl" />
+		<property name="sqlSessionFactoryBeanName" value="sqlSession" />
+	</bean>
+    
+    <!-- 
+ 	<bean class="egovframework.rte.psl.dataaccess.mapper.MapperConfigurer">
+		<property name="basePackage" value="egovframework.desm.service.transImpl" />
+		<property name="sqlSessionFactoryBeanName" value="transSqlSession" />
+	</bean>    
+	 -->
+	 	
+	<!-- 
+ 	<bean class="egovframework.rte.psl.dataaccess.mapper.MapperConfigurer">
+		<property name="basePackage" value="egovframework.desm.service.idsmImpl" />
+		<property name="sqlSessionFactoryBeanName" value="idsmSqlSession" />
+	</bean>  
+	
+ 	<bean class="egovframework.rte.psl.dataaccess.mapper.MapperConfigurer">
+		<property name="basePackage" value="egovframework.desm.service.idsmFileImpl" />
+		<property name="sqlSessionFactoryBeanName" value="idsmFileSqlSession" />
+	</bean> 
+	 -->		
+</beans>

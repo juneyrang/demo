@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sql.FirebaseMapper">	
+	<update id="saveFcmToken" parameterType="java.util.Map">
+		/* FirebaseMapper.saveFcmToken : 사용자 기기의 FCM Token 저장 */
+		MERGE INTO DESM_FCM_TOKEN
+		USING DUAL
+		ON (FCM_TOKEN = #{FCM_TOKEN})
+		WHEN MATCHED THEN
+			UPDATE SET LAST_UPDATE_DATE = SYSDATE
+			,	USER_AD = #{USER_AD}
+		WHEN NOT MATCHED THEN
+			INSERT (USER_AD, FCM_TOKEN, CREATION_DATE, PLATFORM, LAST_UPDATE_DATE)
+			VALUES (#{USER_AD}, #{FCM_TOKEN}, SYSDATE, #{PLATFORM}, SYSDATE)
+	</update>
+	
+	<insert id="saveFcmTokenHistory" parameterType="java.util.Map">
+		/* FirebaseMapper.saveFcmTokenHistory */
+		INSERT INTO DESM_FCM_HISTORY 
+		(PROJECT_NO
+		,USER_AD
+		,FCM_TOKEN
+		,SENT_DATE
+		,TITLE
+		,BODY
+		,DATA
+		,RESPONSE
+		,PLATFORM)
+		VALUES
+		(#{PROJECT_NO}
+		,#{USER_AD}
+		,#{FCM_TOKEN}
+		,SYSDATE
+		,#{TITLE}
+		,#{BODY}
+		,#{DATA}
+		,#{RESPONSE}
+		,#{PLATFORM})		
+	</insert>	
+	
+	<select id="selectTokenByUserAd" parameterType="java.util.Map" resultType="string">
+		/*FirebaseMapper.selectTokenByUserAd : userAd로 마지막 Token 가져오기 */
+		SELECT FCM_TOKEN
+		FROM (SELECT FCM_TOKEN
+			  FROM DESM_FCM_TOKEN
+			  WHERE USER_AD = #{USER_AD}
+			  ORDER BY LAST_UPDATE_DATE DESC)
+		WHERE ROWNUM = 1
+	</select>										         	 		  	    															
+</mapper>
