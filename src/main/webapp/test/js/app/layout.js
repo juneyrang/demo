@@ -13,7 +13,7 @@
 		htmlPath: '/test/views/layout/',
 		jsPath: '/test/js/layout/',
 		header: function() {
-			Common.loadDiv('.navbar-menu-wrapper', this.htmlPath + 'header.html', this.jsPath + 'header.js');
+			Common.loadDiv('.navbar-menu-wrapper', this.getPath('html', 'header'), this.getPath('js', 'header'));
 		},
 		sidebar: function() {
 			mainPageObj.sidebar.init();
@@ -23,6 +23,11 @@
 		},
 		theme: function() {
 			Common.loadDiv('.theme-setting-wrapper', this.htmlPath + 'theme.html');
+		},
+		getPath: function(type, page) {
+			return '{0}{1}.{2}'.format(
+						(type == 'js') ? this.jsPath : this.htmlPath, page, type
+					)
 		}
 	},
 	sidebar: {
@@ -84,7 +89,11 @@
 				$('.home-tab .tab-content > .tab-pane:last').attr('id', 'tab-content-' + id);
 
 				$('[href="' + tabId + '"]').tab('show');
-//				$('.home-tab .tab-content > .tab-pane:last').find('.tab-content-body').text(id);
+				$('.home-tab .tab-content > .tab-pane:last').find('.tab-content-body').load('/test/views/system/menu.html', null, function(data, status, xhr) {
+					if(status == "success") {
+						Common.loadJavascript('/test/js/app/system/menu.js');
+					}
+				});
 			}
 		}
 	},
