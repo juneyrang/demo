@@ -1,119 +1,58 @@
-const Commons = {
-    init: function() {
-    },
-    form: {
-        init: function() {
-        },
-        checkRequiredField: function(areaID) {
-            var chkValidation = true;
-
-            $("#" + areaID + " input:visible, #" + areaID + " select:visible, #" + areaID + " textarea:visible").each(function () {
-                if ($(this).hasClass("required") && $(this).attr("type") == "file") {
-                    if (getAttachedFilesCount(($(this).attr("id"))) == 0) {
-                        $(".file-input").addClass("validation-error");
-                        chkValidation = false;
-                    } else {
-                        $(".file-input").removeClass("validation-error");
-                        $(this).removeClass("validation-error");
-                    }
-                }
-                else if ($(this).hasClass("required") && ($(this).val() == null || $(this).val().IsNullOrEmpty())) {
-                    $(this).addClass("validation-error");
-                    chkValidation = false;
-                } else {
-                    $(this).removeClass("validation-error");
-                }
-            });
-
-            return chkValidation;
-        },
-        removeDisabled: function() {
-            $("input:disabled").attr("disabled", false);
-            $("select:disabled").attr("disabled", false);
-        }
-    },
-    search: {
-        init: function() {
-        }
-    },
-    grid: {
-        init: function() {
-        }
-    },
-    popup: {
-        init: function() {
-        },
-        modal: {
-            regist: function(id, showCallback, hideCallback) {
-                $(document).on('show.bs.modal', id, showCallback);
-                $(document).on('hidden.bs.modal', id, hideCallback);
-            }
-        }
-    },
-    ajax: {
-        loading: function(id, cls, clsView) {
-            $(document).ajaxStart(function( event, request, settings ) {
-                $(cls).removeClass(clsView);
-            });
-            //jquery ajax 호출 완료시 로딩 이미지 제거
-            $(document).ajaxComplete(function (event, request, settings) {
-                $(cls).addClass(clsView);
-                $(id).addClass(clsView); //로딩중 화면 제거
-            });
-        }
-    }
-    util: {
-        number: {
-        },
-        date: {
-        }
-    },
-    ajaxCall: function(param) {
-        $.ajax($.extend({
-            contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
-            url: '',
-            data: {},
-            type: 'POST',
-            dataType: 'json',
-            async: false,
-            timeout: 10000
-        }, param));
-    }
-};
-
-function itp_fn_open_tab(param) {
-	const id = param.navId;
-	const tabSize = $('#ITP_HEADER .itp_tab_list li').size();
-
-	if (tabSize > 15) {
-		itp_fn_modal_alert(ITP_MSG_LOCALE.message.page.noMoreTab);
-		return false;
+//const Common = (function($) {
+//	var util = {
+//		net: {
+//			ajax : function(param) {
+//				$.ajax($.extend({
+//					async: true,
+//					type: "POST",
+//					data: {},
+//			        dataType: "json"
+//			    }, param));
+//			}
+//		}
+//	}
+//	
+//	var ajaxCall = Common.util.net.ajax;
+//	
+//	return Common;
+//})(jQuery);
+const Common = {
+	loadDiv: function(id, url, js, callback) {
+		$(id).load(url, null, function(data, status, xhr) {
+			if(status == "success") {
+				if(js) Common.loadJavascript(js, callback);
+			}
+		});
+	},
+	loadJavascript : function(url, callback, charset) {
+		var head= document.getElementsByTagName('head')[0];
+	    var script= document.createElement('script');
+	    script.type= 'text/javascript';
+	    if (charset != null) {
+	        script.charset = "euc-kr";
+	    }
+	    var loaded = false;
+	    script.onreadystatechange= function () {
+	        if (this.readyState == 'loaded' || this.readyState == 'complete') {
+	            if (loaded) {
+	                return;
+	            }
+	            loaded = true;
+	            if(callback) callback();
+	        }
+	    };
+	    script.onload = function () {
+            if(callback) callback();
+	    };
+	    script.src = url;
+	    head.appendChild(script);
+	},
+	ajax : function(param) {
+		$.ajax($.extend({
+			async: true,
+			type: "POST",
+			data: {},
+	        dataType: "json"
+	    }, param));
 	}
-
-	let isDup = false;
-	$('#ITP_HEADER .itp_tab_list li').each(function() {
-		const tab_id = $(this).find('.itp_tab_close').attr('data-itp-tab-id');
-		if (tab_id == id) {
-			isDup = true;
-			$('#ITP_HEADER .itp_tab_list li').removeClass('active');
-        	$('#ITP_CONTAINER .itp_contents .itp_sec').removeClass('active');
-        	$(this).addClass('active');
-        	$('#ITP_TAB_' + id).addClass('active');
-			return false;
-		}
-	});
-
-	if (!isDup) {
-		const href = '/' + id;
-		let text = $('#' + id + '_PAGE_NO').children('.itp_tt').text();
-		if (param.titId !== null && param.titId !== undefined && param.titId != '') {
-			text = $('#' + param.titId + '_PAGE_NO').children('.itp_tt').text();
-		}
-		const tab = '<li class="active"><a href="#ITP_TAB_' + id + '" role="tab" data-toggle="tab" class="itp_tab_open">' + text + ' <i class="glyphicon glyphicon-remove itp_tab_close" data-itp-tab-id="' + id + '"></i></a></li>';
-		itp_fn_load_page(href, tab);
-	} else {
-		itp_fn_fire_window_resize();
-	}
-
-	return false;
 };
