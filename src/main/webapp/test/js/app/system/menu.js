@@ -30,7 +30,12 @@
 			},
 			formatter: {
 				management: function(cell, formatterParams) {
-					return '<i class="mdi mdi-airballoon m-auto text-primary" data-menu-no="' + cell.getRow().getData().MENU_SEQ + '"></i>';
+					var html = 	'<div>' +
+								'<i class="mdi mdi-menu m-auto text-primary" data-menu-no="' + cell.getRow().getData().MENU_SEQ + '"></i>' + 
+								'<i class="mdi mdi-airballoon m-auto text-primary" data-menu-no="' + cell.getRow().getData().MENU_SEQ + '"></i>' + 
+								'<i class="mdi mdi-trash-can-outline m-auto text-primary" data-menu-no="' + cell.getRow().getData().MENU_SEQ + '"></i>' + 
+								'</div>';
+					return html;
 				}
 			},
 		    event: {
@@ -73,12 +78,32 @@
 			    	}
 			    },
 				formatter: function() {
+		    		$(document).on('click', '.mdi-menu', function(i) {
+		    			console.log('mdi-menu', this);
+		    		});
 		    		$(document).on('click', '.mdi-airballoon', function(i) {
-		    			console.log(this);
+		    			console.log('mdi-airballoon', this);
+		    		});
+		    		$(document).on('click', '.mdi-trash-can-outline', function(i) {
+		    			console.log('mdi-trash-can-outline', this);
 		    		});
 				},
 			    showDetail: function(e, cell) {
 			    	console.log(e, cell, cell.getRow().getData().MENU_NAME);
+					var param = { "data" : cell.getRow().getData() };
+
+					$('#dlgReceivedPopUp').load("/test/views/system/popup/userDetail.html", param, function(data, status, xhr) {
+						if(status == "success"){
+
+							dlgUserDetailContentObj.init(param, function (key, returnParam) {
+
+								if(key == "save-item"){
+									$('#btnSearch').trigger('click');
+								}
+							});
+
+						}
+					});
 			    },
 			    rownum: function(e, cell) {
 			    	console.log(e, cell);
@@ -101,7 +126,7 @@
 	    		if(row.MENU_UP_SEQ == '0') {
 		    		var item = {
 				    	  'MENU_SEQ' 	: row['MENU_SEQ']
-					    , 'MENU_NAME' 	: row['MENU_NAME']
+					    , 'MENU_NAME' 	: row['MENU_NAME'] 
 					    , 'MENU_UP_SEQ' : row['MENU_UP_SEQ']
 					    , 'MENU_PATH' 	: row['MENU_PATH']
 					    , 'MENU_ORDER' 	: row['MENU_ORDER']

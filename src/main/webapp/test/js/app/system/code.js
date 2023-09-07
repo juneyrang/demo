@@ -16,10 +16,13 @@
 					ajaxLoaderLoading:"<span>Loading Data</span>",
 					placeholder:"데이터가 존재하지 않습니다.",
 				    columns:[
-				    {title:"Mst Code", field:"MST_CODE", width:200, responsive:0}, //never hide this column
-				    {title:"Mst Name", field:"MST_NAME", width:350},
-				    {title:"Use YN", field:"USE_YN", width:150, responsive:2}, //hide this column first
-				    {formatter:"Management", field:"dob", hozAlign:"center", sorter:"date", width:150},
+				            {formatter:"rowSelection", titleFormatter:"rowSelection", hozAlign:"center", headerSort:false, cellClick:function(e, cell){
+				            	cell.getRow().toggleSelect();
+				            }},
+					    	{title:"Mst Code", field:"MST_CODE", width:200, responsive:0}, //never hide this column
+					    	{title:"Mst Name", field:"MST_NAME", width:350},
+					    	{title:"Use YN", field:"USE_YN", width:150, responsive:2}, //hide this column first
+					    	{formatter:"Management", field:"dob", hozAlign:"center", sorter:"date", width:150},
 				    ],
 				});
 				this.load();
