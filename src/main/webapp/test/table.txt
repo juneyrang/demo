@@ -1,3 +1,5 @@
+bluetooth 참조 : https://www.youtube.com/watch?v=r2e2bmcfdL0
+
 코드관리
 CREATE TABLE JS_CODE (
 	CD_KEY VARCHAR(10) PRIMARY KEY,
