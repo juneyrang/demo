@@ -89,9 +89,14 @@
 				$('.home-tab .tab-content > .tab-pane:last').attr('id', 'tab-content-' + id);
 
 				$('[href="' + tabId + '"]').tab('show');
-				$('.home-tab .tab-content > .tab-pane:last').find('.tab-content-body').load('/test/views/system/menu.html', null, function(data, status, xhr) {
+				var src = '/test/views/system/{0}.html';
+				if(id == 'MENU1360') src = src.format('user');
+				else if(id == 'MENU1361') src = src.format('code');
+				else src = src.format('menu');
+				console.log(id, src);
+				$('.home-tab .tab-content > .tab-pane:last').find('.tab-content-body').load(src, null, function(data, status, xhr) {
 					if(status == "success") {
-						Common.loadJavascript('/test/js/app/system/menu.js');
+//						Common.loadJavascript('/test/js/app/system/menu.js');
 					}
 				});
 			}
