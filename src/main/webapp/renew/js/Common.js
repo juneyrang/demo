@@ -7,11 +7,11 @@ const Common = {
 		});
 	},
 	loadJavascript : function(url, parentId, callback, charset) {
-		var attach = (parentId == 'head') ? document.getElementsByTagName(parent)[0] :  document.getElementById(parentId);
+		var attach = (parentId && parentId != 'head') ? document.getElementById(parentId) : document.getElementsByTagName('head')[0];
 	    var script = document.createElement('script');
 	    script.type = 'text/javascript';
+        script.charset = (charset) ? charset : "euc-kr";
 	    if (charset != null) {
-	        script.charset = "euc-kr";
 	    }
 	    var loaded = false;
 	    script.onreadystatechange = function () {
