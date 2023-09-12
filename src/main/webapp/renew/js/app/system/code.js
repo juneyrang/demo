@@ -60,7 +60,19 @@
 					var id = $(e.target).attr('id');
 					console.log(id, keyVal);
 					switch(id) {
-					case 'btnDlgCodeAdd': break;
+					case 'btnDlgCodeAdd':
+						var param = {};
+						Common.loadDiv(
+								'#dlgCodePopUp'
+								, 'dlgCodeDetail'
+								, '/renew/views/system/popup/codeDetail.html'
+								, '/renew/js/app/system/popup/codeDetail.js'
+								, function() {
+									dlgCodeDetailContentObj.init(param, function (key, returnParam) {
+									});
+								}
+						);
+						break;
 					case 'btnDlgCodeDel': break;
 					}
 				}
