@@ -30,7 +30,6 @@ const Common = {
 	    attach.appendChild(script);
 	},
 	ajax : function(param) {
-		console.log(param);
 		$.ajax($.extend({
 			async: true,
 			type: "POST",
