@@ -12,7 +12,7 @@
 			},
 			create: function() {
 				var _this = this;
-				menuContentObj.menuTable = new Tabulator('#menu-data-grid', {
+				MenuDataGrid = new Tabulator('#menu-data-grid', {
 					layout:"fitColumns",
 					placeholder:"데이터가 존재하지 않습니다.",
 				    dataTree:true,
@@ -41,14 +41,15 @@
 			},
 		    event: {
 		    	init: function() {
-		    		menuContentObj.menuTable.on('tableBuilt', this.func.tableBuilt);
-//		    		menuContentObj.menuTable.on('dataLoaded', this.func.dataLoaded);
-//		    		menuContentObj.menuTable.on('rowSelected', this.func.rowSelected);
-//		    		menuContentObj.menuTable.on('rowClick', this.func.rowClick);
-//		    		menuContentObj.menuTable.on('rowDblClick', this.func.rowDblClick);
-//		    		menuContentObj.menuTable.on('cellClick', this.func.cellClick);
-//		    		menuContentObj.menuTable.on('cellDblClick', this.func.cellDblClick);
-//		    		menuContentObj.menuTable.on('cellEdited', this.func.cellEdited);
+		    		MenuDataGrid.on('tableBuilt', this.func.tableBuilt);
+//		    		MenuDataGrid.on('dataLoaded', this.func.dataLoaded);
+//		    		MenuDataGrid.on('cellClick', this.func.cellClick);
+//		    		MenuDataGrid.on('cellDblClick', this.func.cellDblClick);
+//		    		MenuDataGrid.on('cellEdited', this.func.cellEdited);
+//		    		MenuDataGrid.on('rowSelected', this.func.rowSelected);
+//		    		MenuDataGrid.on('rowClick', this.func.rowClick);
+//		    		MenuDataGrid.on('rowDblClick', this.func.rowDblClick);
+//		    		MenuDataGrid.on('renderComplete', this.func.renderComplete);
 		    		this.formatter();
 			    },
 			    func: {
@@ -113,12 +114,12 @@
 		},
 		load: function() {
 			var cbGetMenu = this.callback.getMenu;
-			Common.ajax({url: "/getMenu.do", success: cbGetMenu});
+			ajaxCall({url: "/getMenu.do", success: cbGetMenu});
 		},
 		callback: {
 			getMenu: function (data, textStatus, jqXHR) {
 				console.log(data.results);
-				menuContentObj.menuTable.setData(menuContentObj.getTreeData(data.results));
+				MenuDataGrid.setData(menuContentObj.getTreeData(data.results));
 			}
 	    },
 	    getTreeData: function(data) {
@@ -146,6 +147,7 @@
 	    	return arrData;
 	    }
 	};
-	
+
+	let MenuDataGrid = menuContentObj.menuTable;
 	menuContentObj.init();
 })(jQuery);

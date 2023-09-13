@@ -12,7 +12,7 @@
 			},
 			create: function() {
 				var _this = this;
-				userContentObj.userTable = new Tabulator('#user-data-grid', {
+				UserDataGrid = new Tabulator('#user-data-grid', {
 					layout:"fitColumns",
 					pagination:"local",
 				    paginationSize:20,
@@ -43,24 +43,24 @@
 			},
 			load: function() {
 				var cbGetUser = this.callback.getUser;
-				Common.ajax({url: '/getUser.do', success: cbGetUser});
+				ajaxCall({url: '/getUser.do', success: cbGetUser});
 			},
 			callback: {
 				getUser: function (data, textStatus, jqXHR) {
 					console.log(data.results);
-					userContentObj.userTable.setData(data.results);
+					UserDataGrid.setData(data.results);
 				}
 		    },
 		    event: {
 		    	init: function() {
-		    		userContentObj.userTable.on('tableBuilt', this.func.tableBuilt);
-		    		userContentObj.userTable.on('dataLoaded', this.func.dataLoaded);
-		    		userContentObj.userTable.on('rowSelected', this.func.rowSelected);
-		    		userContentObj.userTable.on('rowClick', this.func.rowClick);
-		    		userContentObj.userTable.on('rowDblClick', this.func.rowDblClick);
-		    		userContentObj.userTable.on('cellClick', this.func.cellClick);
-		    		userContentObj.userTable.on('cellDblClick', this.func.cellDblClick);
-		    		userContentObj.userTable.on('cellEdited', this.func.cellEdited);
+		    		UserDataGrid.on('tableBuilt', this.func.tableBuilt);
+		    		UserDataGrid.on('dataLoaded', this.func.dataLoaded);
+		    		UserDataGrid.on('rowSelected', this.func.rowSelected);
+		    		UserDataGrid.on('rowClick', this.func.rowClick);
+		    		UserDataGrid.on('rowDblClick', this.func.rowDblClick);
+		    		UserDataGrid.on('cellClick', this.func.cellClick);
+		    		UserDataGrid.on('cellDblClick', this.func.cellDblClick);
+		    		UserDataGrid.on('cellEdited', this.func.cellEdited);
 			    },
 			    func: {
 			    	tableBuilt: function() {
@@ -92,6 +92,7 @@
 		    }
 		}
 	};
-	
+
+	let UserDataGrid = userContentObj.userTable;
 	userContentObj.init();
 })(jQuery);

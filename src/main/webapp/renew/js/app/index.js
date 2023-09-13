@@ -15,19 +15,19 @@
 			htmlPath: '/renew/views/include/',
 			jsPath: '/renew/js/include/',
 			header: function() {
-				Common.loadDiv('.navbar-menu-wrapper', this.getPath('html', 'header'), this.getPath('js', 'header'));
+				CommonUtil.loadDiv('.navbar-menu-wrapper', this.getPath('html', 'header'), this.getPath('js', 'header'));
 			},
 			sidebar: function() {
 				SideBar.init();
 			},
 			footer: function() {
-				Common.loadDiv('.footer', this.htmlPath + 'footer.html');
+				CommonUtil.loadDiv('.footer', this.htmlPath + 'footer.html');
 			},
 			right: function() {
-				Common.loadDiv('.settings-panel', this.htmlPath + 'right.html');
+				CommonUtil.loadDiv('.settings-panel', this.htmlPath + 'right.html');
 			},
 			theme: function() {
-				Common.loadDiv('.theme-setting-wrapper', this.htmlPath + 'theme.html');
+				CommonUtil.loadDiv('.theme-setting-wrapper', this.htmlPath + 'theme.html');
 			},
 			getPath: function(type, page) {
 				return '{0}{1}.{2}'.format(
@@ -40,7 +40,7 @@
 				this.load();
 			},
 			load: function() {
-				Common.ajax({url: "/getLeftMenu.do", success: SideBar.callback, beforeSend: null, complete: null});
+				ajaxCall({url: "/getLeftMenu.do", success: SideBar.callback, beforeSend: null, complete: null});
 			},
 			callback: function(data, textStatus, jqXHR) {
 				SideBar.setMenu(data.results);
@@ -101,7 +101,7 @@
 					console.log(id, src);
 					$('.home-tab .tab-content > .tab-pane:last').find('.tab-content-body').load(src, null, function(data, status, xhr) {
 						if(status == "success") {
-//								Common.loadJavascript('/test/js/app/system/menu.js');
+//								CommonUtil.loadJavascript('/test/js/app/system/menu.js');
 						}
 					});
 				}

@@ -60,7 +60,7 @@
 					var id = $(e.target).attr('id');
 					console.log(id, keyVal);
 					switch(id) {
-					case 'btnDlgCodeAdd':
+					case 'btnDlgCodeAdd': 
 						var param = {};
 						Common.loadDiv(
 								'#dlgCodePopUp'
@@ -79,7 +79,7 @@
 			},
 			load: function() {
 				var cbGetCode = this.callback.getLargeCode;
-				Common.ajax({url: '/getCode.do', success: cbGetCode, beforeSend: null, complete: null});
+				ajaxCall({url: '/getCode.do', success: cbGetCode, beforeSend: null, complete: null});
 			},
 			callback: {
 				getLargeCode: function (data, textStatus, jqXHR) {
@@ -114,7 +114,7 @@
 			    	cellClick: function(e, cell) {
 			    		console.log('cellClick', e, cell);
 						var mstCode = cell.getRow().getData().MST_CODE;
-						Common.ajax({url: '/getCodeDetail.do', data: {"MST_CODE": mstCode}, success: codeContentObj.table.callback.getSmallCode});
+						ajaxCall({url: '/getCodeDetail.do', data: {"MST_CODE": mstCode}, success: codeContentObj.table.callback.getSmallCode});
 			    	},
 			    	cellDblClick: function(e, cell) {
 			    		console.log('cellDblClick', e, cell);
