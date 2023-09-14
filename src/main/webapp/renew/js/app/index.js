@@ -9,8 +9,8 @@
 				this.header();
 				this.sidebar();
 				this.footer();
-//					this.right();
-//					this.theme();
+//                this.right();
+//                this.theme();
 			},
 			htmlPath: '/renew/views/include/',
 			jsPath: '/renew/js/include/',

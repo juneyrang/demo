@@ -64,6 +64,12 @@ var CommonObj = {
 			}
 		}
 	},
+	form: {
+	    chkValid: function(id) {
+	        var isValid = true;
+            return isValid;
+	    }
+	},
 	string : {
 		
 	},
