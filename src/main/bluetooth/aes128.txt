@@ -195,3 +195,44 @@ public class FirstApp {
 		return data;
 	}
 }
+
+
+예를 들어 키는 57616C6B697A3532383332694C6F636B 입니다.
+토큰을 얻기 위한 일반 텍스트 명령은 다음과 같습니다. 030000000000000000000000000000000
+암호화된 버전은 39E1CBB7EFC7127DE387EDF4A0075D66 입니다
+
+
+5.	잠금해제
+예를 들어 키는 57616C6B697A3532383332694C6F636B 입니다.
+예를 들어 잠금 해제 비밀번호는 313130303634 입니다.
+예를 들어 토큰은 AB568E21 입니다.
+잠금을 해제하는 일반 텍스트 명령은 다음과 같습니다.
+200031313030363400000000AB568E21
+암호화된버전은 70E8CDAD64B0E3061FA5ACB22EE52AA0 입니다
+
+
+
+public static byte[] Encrypt(byte[] sSrc, byte[] sKey){
+    try{
+        SecretKeySpec skeySpec = new SecretKeySpec(sKey, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
+        byte[] encrypted = cipher.doFinal(sSrc);
+        return encrypted;
+    }catch(Exception ex){
+        return null;
+    }
+}
+
+public static byte[] Decrypt(byte[] sSrc, byte[] sKey){
+    try{
+        SecretKeySpec skeySpec = new SecretKeySpec(sKey, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+        byte[] dncrypted = cipher.doFinal(sSrc);
+        return dncrypted;
+    }catch(Exception ex){
+        return null;
+    }
+}
+
