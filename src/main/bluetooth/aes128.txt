@@ -211,6 +211,12 @@ public class FirstApp {
 암호화된버전은 70E8CDAD64B0E3061FA5ACB22EE52AA0 입니다
 
 
+public static void main(String[] args) throws Exception {
+    System.out.println("Hello, World!");
+    byte[] key = { 0x57,0x61,0x6C,0x6B,0x69,0x7A,0x35,0x32,0x38,0x33,0x32,0x69,0x4C,0x6F,0x63,0x6B };
+    byte[] src = { 0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    System.out.println(" ===> " + bytesToHex(Encrypt(src, key)));
+}
 
 public static byte[] Encrypt(byte[] sSrc, byte[] sKey){
     try{
@@ -236,3 +242,13 @@ public static byte[] Decrypt(byte[] sSrc, byte[] sKey){
     }
 }
 
+public static String bytesToHex(byte[] bytes) {
+    char[] hexArray = "0123456789ABCDEF".toCharArray();
+    char[] hexChars = new char[bytes.length * 2];
+    for ( int j = 0; j < bytes.length; j++ ) {
+        int v = bytes[j] & 0xFF;
+        hexChars[j * 2] = hexArray[v >>> 4];
+        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+    }
+    return new String(hexChars);
+}
