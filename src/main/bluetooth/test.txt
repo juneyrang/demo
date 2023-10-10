@@ -9,7 +9,7 @@ using System.IO;
 class Program
 {
     /*
-     *  예를 들어 키는 57616C6B697A3532383332694C6F636B 입니다.
+     *  예를 들어 키는 57616C6B697A3532383332694C6F636B 입니다.Walkiz52832iLock
         토큰을 얻기 위한 일반 텍스트 명령은 다음과 같습니다. 030000000000000000000000000000000
         암호화된 버전은 39E1CBB7EFC7127DE387EDF4A0075D66 입니다
                        39e1cbb7efc7127de387edf4a0075d66
@@ -23,25 +23,31 @@ class Program
         200031313030363400000000AB568E21
         암호화된버전은 70E8CDAD64B0E3061FA5ACB22EE52AA0 입니다
      */
-    static byte[] key = { 0x57,0x61,0x6C,0x6B,0x69,0x7A,0x35,0x32,0x38,0x33,0x32,0x69,0x4C,0x6F,0x63,0x6B };
+    static byte[] KeyArray = { 0x57,0x61,0x6C,0x6B,0x69,0x7A,0x35,0x32,0x38,0x33,0x32,0x69,0x4C,0x6F,0x63,0x6B };
     public static void Main()
     {
         // See https://aka.ms/new-console-template for more information
         Console.WriteLine("Hello, World!!!");
 
         byte[] src = { 0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
-        string encStr = Encrypt(key, src);
-        Console.WriteLine($"key ===> {UTF8Encoding.UTF8.GetString(key)}");
-        Console.WriteLine($"Encrypt ===> {encStr}");
-        Console.WriteLine($"Decrypt ===> {Decrypt(key, encStr)}");
+        string srcStr = "03006C000000007A0000000000000000";
+
+        //Test test = new(src);
+
+        Encryption svc = new(src);
+
+        Console.WriteLine($"key ===> {UTF8Encoding.UTF8.GetString(KeyArray)}");
+        Console.WriteLine($"Encrypt ===> {Encrypt(srcStr)}");
+        Console.WriteLine($"Decrypt ===> {Decrypt(Encrypt(srcStr))}");
 
         String s = "TEST08";
-        String keys = "nfaator!plaeemo!";
-        Console.WriteLine($"[40] ===> {Encrypt(s, key)}");
-        Console.WriteLine($"[41] ===> {Decrypt(Encrypt(s, key), key)}");
+        Console.WriteLine($"[40] ===> {Encrypt(s)}");
+        Console.WriteLine($"[41] ===> {Decrypt(Encrypt(s))}");
+        /*
+        */
     }
 
-    private static string Encrypt(byte[] KeyArray, byte[] EncryptArray)
+    private static string Encrypt(byte[] EncryptArray)
     {
         RijndaelManaged Rdel = new RijndaelManaged();
         Rdel.Mode = CipherMode.ECB;
@@ -50,11 +56,12 @@ class Program
 
         ICryptoTransform CtransForm = Rdel.CreateEncryptor();
         byte[] ResultArray = CtransForm.TransformFinalBlock(EncryptArray, 0, EncryptArray.Length);
+        Console.WriteLine($"[59] ===> {Decrypt(ResultArray)}");
 
         return ByteToHex(ResultArray);
     }
 
-    private static string Encrypt(string s, byte[] KeyArray)
+    private static string Encrypt(string s)
     {
         StringBuilder sbResult = new StringBuilder();
 
@@ -76,7 +83,7 @@ class Program
         return sbResult.ToString();
     }
 
-    private static string Decrypt(byte[] KeyArray, string EncryptStr)
+    private static string Decrypt(string EncryptStr)
     {
         byte[] EncryptArray = HexToByte(EncryptStr);
 
@@ -90,21 +97,7 @@ class Program
         return UTF8Encoding.UTF8.GetString(ResultArray);
     }
 
-    private static string Decrypt(string EncryptStr, byte[] KeyArray)
-    {
-        byte[] EncryptArray = HexToByte(EncryptStr);
-
-        RijndaelManaged Rdel = new RijndaelManaged();
-        Rdel.Mode = CipherMode.ECB;
-        Rdel.Padding = PaddingMode.Zeros;
-        Rdel.Key = KeyArray;
-
-        ICryptoTransform CtransForm = Rdel.CreateDecryptor();
-        byte[] ResultArray = CtransForm.TransformFinalBlock(EncryptArray, 0, EncryptArray.Length);
-        return UTF8Encoding.UTF8.GetString(ResultArray);
-    }
-
-    private static string Decrypt(byte[] KeyArray, byte[] EncryptArray)
+    private static string Decrypt(byte[] EncryptArray)
     {
         try
         {
@@ -191,4 +184,350 @@ class Program
         return UTF8Encoding.UTF8.GetString(ResultArray);
     }
 
+}
+
+
+using System.Text;
+using System.Security.Cryptography;
+
+class Test
+{
+    private byte[] KeyArray = { 0x57,0x61,0x6C,0x6B,0x69,0x7A,0x35,0x32,0x38,0x33,0x32,0x69,0x4C,0x6F,0x63,0x6B };
+
+	public Test(byte[] EncryptArray)
+	{
+        Console.WriteLine($"Test Start");
+
+        Console.WriteLine($"Encrypt : {ByteToHex(Encrypt(EncryptArray))}");
+        Console.WriteLine($"Decrypt : {ByteToHex(Decrypt(Encrypt(EncryptArray)))}");
+
+        Console.WriteLine($"Test End");
+	}
+
+    private byte[] Encrypt(byte[] EncryptArray)
+    {
+        RijndaelManaged Rdel = new RijndaelManaged();
+        Rdel.Mode = CipherMode.ECB;
+        Rdel.Padding = PaddingMode.Zeros;
+        Rdel.KeySize = 128;
+        Rdel.Key = KeyArray;
+
+        ICryptoTransform CtransForm = Rdel.CreateEncryptor();
+        byte[] ResultArray = CtransForm.TransformFinalBlock(EncryptArray, 0, EncryptArray.Length);
+
+        return ResultArray;
+        //return ByteToHex(ResultArray);
+    }
+
+    private byte[] Decrypt(byte[] DecryptArray)
+    {
+        RijndaelManaged Rdel = new RijndaelManaged();
+        Rdel.Mode = CipherMode.ECB;
+        Rdel.Padding = PaddingMode.Zeros;
+        Rdel.KeySize = 128;
+        Rdel.Key = KeyArray;
+
+        ICryptoTransform CtransForm = Rdel.CreateDecryptor();
+        byte[] ResultArray = CtransForm.TransformFinalBlock(DecryptArray, 0, DecryptArray.Length);
+        return ResultArray;
+        //return UTF8Encoding.UTF8.GetString(ResultArray);
+    }
+
+    private byte[] HexToByte(string msg)
+    {
+        msg = msg.Replace(" ", "");
+        byte[] comBuffer = new byte[msg.Length / 2];
+        for(int i = 0; i < msg.Length; i+=2)
+        {
+            try
+            {
+                comBuffer[i / 2] = (byte)Convert.ToByte(msg.Substring(i, 2), 16);
+            }
+            catch(ArgumentOutOfRangeException ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+        return comBuffer;
+    }
+
+    private String ByteToHex(byte[] ResultArray)
+    {
+        StringBuilder sbResult = new StringBuilder();
+        foreach (byte b in ResultArray)
+        {
+            sbResult.AppendFormat("{0:x2}", b);
+        }
+
+        return sbResult.ToString();
+    }
+
+}
+
+
+
+using System.Text;
+using System.Security.Cryptography;
+
+public class Encryption
+{
+    private string keyStr = "57616C6B697A3532383332694C6F636B";
+	private byte[] key = { 0x57,0x61,0x6C,0x6B,0x69,0x7A,0x35,0x32,0x38,0x33,0x32,0x69,0x4C,0x6F,0x63,0x6B };
+
+	public Encryption(byte[] EncryptArray)
+	{
+        Console.WriteLine($"Encryption Start");
+		// key here
+		byte[] keyArray = HexToByte(keyStr);
+
+        /*
+        Console.WriteLine($"AesEncrypt : { ByteToHex(EncryptArray)}");
+        Console.WriteLine($"AesEncrypt : { HexToByte(ByteToHex(EncryptArray))}");
+        Console.WriteLine($"keyStr : {ByteToHex(keyArray)}");
+        Console.WriteLine($"keyStr : {HexToByte(ByteToHex(keyArray))}");
+        Console.WriteLine($"AesEncrypt : {UTF8Encoding.UTF8.GetString(key)}");
+        */
+
+        /*
+        string encStr = ByteToHex(Encrypt(EncryptArray, keyArray));
+        string decStr = ByteToHex(Decrypt(Encrypt(EncryptArray, keyArray), keyArray));
+        Console.WriteLine($"AesEncrypt : {encStr}");
+        Console.WriteLine($"AesDecrypt : {decStr}");
+
+        string encStr = Encrypt(ByteToHex(EncryptArray), key);
+        string decStr = Decrypt(Encrypt(ByteToHex(EncryptArray), key), key);
+        */
+
+        string encStr = Encrypt(ByteToHex(EncryptArray), key);
+        string decStr = Decrypt(Encrypt(ByteToHex(EncryptArray), key), key);
+        Console.WriteLine($"AesEncrypt : {encStr}");
+        Console.WriteLine($"AesDecrypt : {decStr}");
+
+        Console.WriteLine($"Encryption End");
+	}
+
+    /*
+	public byte[] Encrypt(byte[] data, byte[] key)
+    {
+        using (var aes = Aes.Create())
+        {
+            aes.KeySize = 128;
+            aes.BlockSize = 128;
+            aes.Padding = PaddingMode.Zeros;
+
+            aes.Key = key;
+
+            using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
+            {
+                return PerformCryptography(data, encryptor);
+            }
+        }
+    }
+
+    public byte[] Decrypt(byte[] data, byte[] key)
+    {
+        using (var aes = Aes.Create())
+        {
+            aes.KeySize = 128;
+            aes.BlockSize = 128;
+            aes.Padding = PaddingMode.Zeros;
+
+            aes.Key = key;
+
+            using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
+            {
+                return PerformCryptography(data, decryptor);
+            }
+        }
+    }
+
+    private byte[] PerformCryptography(byte[] data, ICryptoTransform cryptoTransform)
+    {
+        using (var ms = new MemoryStream())
+        using (var cryptoStream = new CryptoStream(ms, cryptoTransform, CryptoStreamMode.Write))
+        {
+            cryptoStream.Write(data, 0, data.Length);
+            cryptoStream.FlushFinalBlock();
+
+            return ms.ToArray();
+        }
+    }
+    */
+
+    public string Decrypt(byte[] encryptedData, byte[] keyBytes)
+    {
+        RijndaelManaged rijndaelCipher = new RijndaelManaged();
+        rijndaelCipher.Mode = CipherMode.ECB;
+        rijndaelCipher.Padding = PaddingMode.Zeros;
+
+        rijndaelCipher.KeySize = 128;
+        rijndaelCipher.BlockSize = 128;
+        //byte[] encryptedData = Convert.FromBase64String(textToDecrypt);
+        /*
+        byte[] pwdBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = new byte[16];
+        int len = pwdBytes.Length;
+        if (len > keyBytes.Length)
+        {
+            len = keyBytes.Length;
+        }
+        Array.Copy(pwdBytes, keyBytes, len);
+        */
+        rijndaelCipher.Key = keyBytes;
+        rijndaelCipher.IV = keyBytes;
+        byte[] plainText = rijndaelCipher.CreateDecryptor().TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+        return Encoding.UTF8.GetString(plainText);
+    }
+
+    public string Encrypt(byte[] textToEncrypt, byte[] keyBytes)
+    {
+        RijndaelManaged rijndaelCipher = new RijndaelManaged();
+        rijndaelCipher.Mode = CipherMode.ECB;
+        rijndaelCipher.Padding = PaddingMode.Zeros;
+
+        rijndaelCipher.KeySize = 128;
+        rijndaelCipher.BlockSize = 128;
+        /*
+        byte[] pwdBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = new byte[16];
+        int len = pwdBytes.Length;
+        if (len > keyBytes.Length)
+        {
+            len = keyBytes.Length;
+        }
+        Array.Copy(pwdBytes, keyBytes, len);
+        */
+        rijndaelCipher.Key = keyBytes;
+        rijndaelCipher.IV = keyBytes;
+        ICryptoTransform transform = rijndaelCipher.CreateEncryptor();
+        //byte[] plainText = Encoding.UTF8.GetBytes(textToEncrypt);
+        return Convert.ToBase64String(transform.TransformFinalBlock(textToEncrypt, 0, textToEncrypt.Length));
+    }
+
+    private String ByteToHex(byte[] ResultArray)
+    {
+        StringBuilder sbResult = new StringBuilder();
+        foreach (byte b in ResultArray)
+        {
+            sbResult.AppendFormat("{0:x2}", b);
+        }
+
+        return sbResult.ToString();
+    }
+
+    private byte[] HexToByte(string msg)
+    {
+        msg = msg.Replace(" ", "");
+        byte[] comBuffer = new byte[msg.Length / 2];
+        for(int i = 0; i < msg.Length; i+=2)
+        {
+            try
+            {
+                comBuffer[i / 2] = (byte)Convert.ToByte(msg.Substring(i, 2), 16);
+            }
+            catch(ArgumentOutOfRangeException ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+        return comBuffer;
+    }
+
+    public string Decrypt(string textToDecrypt, string key)
+    {
+        RijndaelManaged rijndaelCipher = new RijndaelManaged();
+        rijndaelCipher.Mode = CipherMode.ECB;
+        rijndaelCipher.Padding = PaddingMode.Zeros;
+
+        rijndaelCipher.KeySize = 128;
+        rijndaelCipher.BlockSize = 128;
+        byte[] encryptedData = Convert.FromBase64String(textToDecrypt);
+        byte[] pwdBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = new byte[16];
+        int len = pwdBytes.Length;
+        if (len > keyBytes.Length)
+        {
+            len = keyBytes.Length;
+        }
+        Array.Copy(pwdBytes, keyBytes, len);
+        rijndaelCipher.Key = keyBytes;
+        rijndaelCipher.IV = keyBytes;
+        byte[] plainText = rijndaelCipher.CreateDecryptor().TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+        return Encoding.UTF8.GetString(plainText);
+    }
+
+    public string Encrypt(string textToEncrypt, string key)
+    {
+        RijndaelManaged rijndaelCipher = new RijndaelManaged();
+        rijndaelCipher.Mode = CipherMode.ECB;
+        rijndaelCipher.Padding = PaddingMode.Zeros;
+
+        rijndaelCipher.KeySize = 128;
+        rijndaelCipher.BlockSize = 128;
+        byte[] pwdBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = new byte[16];
+        int len = pwdBytes.Length;
+        if (len > keyBytes.Length)
+        {
+            len = keyBytes.Length;
+        }
+        Array.Copy(pwdBytes, keyBytes, len);
+        rijndaelCipher.Key = keyBytes;
+        rijndaelCipher.IV = keyBytes;
+        ICryptoTransform transform = rijndaelCipher.CreateEncryptor();
+        byte[] plainText = Encoding.UTF8.GetBytes(textToEncrypt);
+        Console.WriteLine($"Encrypt Key : {ByteToHex(keyBytes)}");
+        Console.WriteLine($"AesEncrypt : {ByteToHex(transform.TransformFinalBlock(plainText, 0, plainText.Length))}");
+        return Convert.ToBase64String(transform.TransformFinalBlock(plainText, 0, plainText.Length));
+    }
+
+    public string Decrypt(string textToDecrypt, byte[] keyBytes)
+    {
+        RijndaelManaged rijndaelCipher = new RijndaelManaged();
+        rijndaelCipher.Mode = CipherMode.ECB;
+        rijndaelCipher.Padding = PaddingMode.Zeros;
+
+        rijndaelCipher.KeySize = 128;
+        rijndaelCipher.BlockSize = 128;
+        byte[] encryptedData = Convert.FromBase64String(textToDecrypt);
+        /*
+        byte[] pwdBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = new byte[16];
+        int len = pwdBytes.Length;
+        if (len > keyBytes.Length)
+        {
+            len = keyBytes.Length;
+        }
+        Array.Copy(pwdBytes, keyBytes, len);
+        */
+        rijndaelCipher.Key = keyBytes;
+        rijndaelCipher.IV = keyBytes;
+        byte[] plainText = rijndaelCipher.CreateDecryptor().TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+        return Encoding.UTF8.GetString(plainText);
+    }
+
+    public string Encrypt(string textToEncrypt, byte[] keyBytes)
+    {
+        RijndaelManaged rijndaelCipher = new RijndaelManaged();
+        rijndaelCipher.Mode = CipherMode.ECB;
+        rijndaelCipher.Padding = PaddingMode.Zeros;
+
+        rijndaelCipher.KeySize = 128;
+        rijndaelCipher.BlockSize = 128;
+        /*
+        byte[] pwdBytes = Encoding.UTF8.GetBytes(key);
+        byte[] keyBytes = new byte[16];
+        int len = pwdBytes.Length;
+        if (len > keyBytes.Length)
+        {
+            len = keyBytes.Length;
+        }
+        Array.Copy(pwdBytes, keyBytes, len);
+        */
+        rijndaelCipher.Key = keyBytes;
+        rijndaelCipher.IV = keyBytes;
+        ICryptoTransform transform = rijndaelCipher.CreateEncryptor();
+        byte[] plainText = Encoding.UTF8.GetBytes(textToEncrypt);
+        return Convert.ToBase64String(transform.TransformFinalBlock(plainText, 0, plainText.Length));
+    }
 }
