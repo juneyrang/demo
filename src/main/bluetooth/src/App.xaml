@@ -1,0 +1,5 @@
+
+
+<vm:ViewModelLocator xmlns:vm="clr-namespace:BluetoothSample.ViewModel"
+                                 x:Key="Locator"
+                                 d:IsDataSource="True" />

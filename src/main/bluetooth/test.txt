@@ -1,3 +1,6 @@
+
+https://www.c-sharpcorner.com/UploadFile/3789b7/how-to-send-data-through-bluetooth-in-a-wpf-application-usin/
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
