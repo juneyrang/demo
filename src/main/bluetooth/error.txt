@@ -1,6 +1,292 @@
-OKGSS101(Mac Addr : E8: CD: DF: 85: DD: DD)
-key : 58,96,67,42,92,1,33,31,41,30,15,78,12,19,40,37 => 16진수로 변환
-key String : 3A60432A5C01211F291E0F4E0C132825
-전송 Encrypt String : 40 98 0A 42 46 DA 92 14 76 46 01 E0 1A F7 A5 A3
-전송 Decrypt String : 06010101000000000000000000000000
-=> 데이터 전송 실패
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.WindowsRuntime;
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.GenericAttributeProfile;
+using Windows.Devices.Enumeration;
+using Windows.Foundation;
+using Windows.Storage.Streams;
+using System.Threading;
+
+namespace BLEMinimumApp
+{
+    class Program
+    {
+        private List<string> foundDevices = new List<string>(5);
+
+        static void Main(string[] args)
+        {
+            new Program().Execute();
+        }
+
+        private void Execute()
+        {
+            Console.WriteLine("Starting device watcher...");
+
+            string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
+            String query = "";
+            //query for Bluetooth LE devices
+            query += "(System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\")";
+            //query for devices with controllers' name
+            query += " AND (System.ItemNameDisplay:=\"GPLeft\" OR System.ItemNameDisplay:=\"GPRight\")";
+
+            var deviceWatcher = DeviceInformation.CreateWatcher(query, requestedProperties, DeviceInformationKind.AssociationEndpoint);
+            deviceWatcher.Added += DeviceWatcher_OnAdded;
+            deviceWatcher.Start();
+
+            Console.ReadLine();
+        }
+
+        private async void DeviceWatcher_OnAdded(DeviceWatcher sender, DeviceInformation deviceInfo)
+        {
+            lock (foundDevices)
+            {
+                if (foundDevices.Contains(deviceInfo.Name))
+                {
+                    return;
+                }
+                foundDevices.Add(deviceInfo.Name);
+            }
+
+            Console.WriteLine($"[{deviceInfo.Name}] DeviceWatcher_OnAdded...");
+            await ConnectTo(deviceInfo);
+        }
+
+        private async Task ConnectTo(DeviceInformation deviceInfo)
+        {
+            try
+            {
+                // get the device
+                BluetoothLEDevice device = await BluetoothLEDevice.FromIdAsync(deviceInfo.Id);
+                Console.WriteLine($"[{device.Name}] Device found: connectionStatus={device?.ConnectionStatus}");
+
+                // get the GATT service
+                Thread.Sleep(150);
+                Console.WriteLine($"[{device.Name}] Get GATT Services");
+                var gattServicesResult = await device.GetGattServicesForUuidAsync(new Guid("<GUID REMOVED FOR SO POST"));
+                Console.WriteLine($"[{device.Name}] GATT services result: status={gattServicesResult?.Status}, count={gattServicesResult?.Services?.Count}, cx={device.ConnectionStatus}");
+
+                if (gattServicesResult == null 
+                    || gattServicesResult.Status != GattCommunicationStatus.Success 
+                    || gattServicesResult.Services == null 
+                    || gattServicesResult.Services?.Count < 1)
+                {
+                    Console.WriteLine($"[{device.Name}] Failed to find GATT service.");
+                    return;
+                }
+
+                var service = gattServicesResult.Services[0];
+                Console.WriteLine($"[{device?.Name}] GATT service found: gattDeviceService={service.Uuid}");
+
+                // get the GATT characteristic
+                Thread.Sleep(150);
+                Console.WriteLine($"[{device.Name}] Get GATT characteristics");
+                var gattCharacteristicsResult = await service.GetCharacteristicsForUuidAsync(new Guid("<GUID REMOVED FOR SO POST>"));
+                Console.WriteLine($"[{device.Name}] GATT Characteristics result: status={gattCharacteristicsResult?.Status}, count={gattCharacteristicsResult?.Characteristics?.Count}, cx={device.ConnectionStatus}");
+
+                if (gattCharacteristicsResult == null
+                    || gattCharacteristicsResult.Status != GattCommunicationStatus.Success
+                    || gattCharacteristicsResult.Characteristics == null
+                    || gattCharacteristicsResult.Characteristics?.Count < 1)
+                {
+                    Console.WriteLine($"[{device.Name}] Failed to find GATT characteristic.");
+                    return;
+                }
+
+                var characteristic = gattCharacteristicsResult.Characteristics[0];
+
+                // register for notifications
+                Thread.Sleep(150);
+
+                characteristic.ValueChanged += (sender, args) =>
+                {
+                    Console.WriteLine($"[{device.Name}] Received notification containing {args.CharacteristicValue.Length} bytes");
+                };
+                Console.WriteLine($"[{device.Name}] Writing CCCD...");
+                GattWriteResult result =
+                    await characteristic.WriteClientCharacteristicConfigurationDescriptorWithResultAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
+                Console.WriteLine($"[{device?.Name}] Characteristics write result: status={result.Status}, protocolError={result.ProtocolError}");
+
+                // send configuration to device 
+                await SendConfiguration(device, characteristic);
+            }
+            catch (Exception ex) when((uint) ex.HResult == 0x800710df)
+            {
+                Console.WriteLine("bluetooth error 1");
+                // ERROR_DEVICE_NOT_AVAILABLE because the Bluetooth radio is not on.
+            }
+        }
+
+        private async Task SendConfiguration(BluetoothLEDevice device, GattCharacteristic characteristic)
+        {
+            if (characteristic != null)
+            {
+                var writer = new DataWriter();
+                // CONFIGURATION REMOVED, but this code writes device-specific bytes to the DataWriter
+
+                await SendMessage(device, characteristic, writer.DetachBuffer());
+            }
+        }
+
+        private async Task SendMessage(BluetoothLEDevice device, GattCharacteristic characteristic, IBuffer message)
+        {
+            if (characteristic != null && device.ConnectionStatus.Equals(BluetoothConnectionStatus.Connected) && message != null)
+            {
+                Console.WriteLine($"[{device.Name}] Sending message...");
+                GattCommunicationStatus result = await characteristic.WriteValueAsync(message);
+                Console.WriteLine($"[{device.Name}] Result: {result}");
+            }
+        }
+    }
+}
+
+COM 보안으로 인해 앱이 알림을 받지 못할 수도 있습니다. 해결 방법은 다음 스레드를 참조하세요. 
+레지스트리 해킹을 사용하는 것이 좋습니다.
+
+https://social.msdn.microsoft.com/Forums/en-US/58da3fdb-a0e1-4161-8af3-778b6839f4e1/bluetooth-bluetoothledevicefromidasync-does-not-complete-on-10015063?forum=wdk
+
+비슷한 문제가 있었고 위의 레지스트리 변경으로 인해 내 앱은 알림을 거의 받지 못하고 뚜렷한 이유 없이 중지됩니다. 
+이 문제로 인해 많은 시간을 낭비하고 Microsoft의 패치를 기다리고 있습니다.
+
+
+COM 또는 WinRT 호출을 수행하기 전에 애플리케이션의 Main 함수에서 CoInitializeSecurity를 호출하세요 .
+실행 파일에 대한 AppId를 제공하십시오 .
+
+
+public partial class App : Application
+{
+   App()
+    {
+		CoInitializeSecurity(IntPtr.Zero, -1, IntPtr.Zero, IntPtr.Zero, RpcAuthnLevel.Default, RpcImpLevel.Impersonate, IntPtr.Zero, EoAuthnCap.StaticCloaking, IntPtr.Zero);
+    }
+}
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+스캐닝
+
+이는 범위 내의 장치가 감지되었음을 의미합니다. 
+
+// mac is mac address of local bluetooth device
+BluetoothEndPoint localEndpoint = new BluetoothEndPoint(mac, BluetoothService.SerialPort);
+// client is used to manage connections
+BluetoothClient localClient = new BluetoothClient(localEndpoint);
+// component is used to manage device discovery
+BluetoothComponent localComponent = new BluetoothComponent(localClient);
+// async methods, can be done synchronously too
+localComponent.DiscoverDevicesAsync(255, true, true, true, true, null);
+localComponent.DiscoverDevicesProgress += new EventHandler<DiscoverDevicesEventArgs>(component_DiscoverDevicesProgress);
+localComponent.DiscoverDevicesComplete += new EventHandler<DiscoverDevicesEventArgs>(component_DiscoverDevicesComplete);
+
+private void component_DiscoverDevicesProgress(object sender, DiscoverDevicesEventArgs e)
+{
+    // log and save all found devices
+    for (int i = 0; i < e.Devices.Length; i++)
+    {           
+        if (e.Devices[i].Remembered)
+        {
+            Print(e.Devices[i].DeviceName + " (" + e.Devices[i].DeviceAddress + "): Device is known");
+        }
+        else
+        {
+            Print(e.Devices[i].DeviceName + " (" + e.Devices[i].DeviceAddress + "): Device is unknown");
+        }
+        this.deviceList.Add(e.Devices[i]);         
+    }
+}
+
+private void component_DiscoverDevicesComplete(object sender, DiscoverDevicesEventArgs e)
+{
+    // log some stuff
+}
+
+편성
+
+이는 장치가 로컬 블루투스 장치와 결합됨을 의미합니다. 
+이는 양쪽의 코드를 입력하여 한 번 수행해야 합니다. 
+사용자가 장치가 추가되었다는 사실조차 인식하지 못하도록 코드를 통해 수행할 수 있습니다. 
+
+// get a list of all paired devices
+BluetoothDeviceInfo[] paired = localClient.DiscoverDevices(255, false, true, false, false);
+// check every discovered device if it is already paired 
+foreach (BluetoothDeviceInfo device in this.deviceList)
+{
+    bool isPaired = false;
+    for (int i = 0; i < paired.Length; i++)
+    {
+        if (device.Equals(paired[i]))
+        {
+            isPaired = true;
+            break;
+        }
+    }
+
+    // if the device is not paired, pair it!
+    if (!isPaired)
+    {
+        // replace DEVICE_PIN here, synchronous method, but fast
+        isPaired = BluetoothSecurity.PairRequest(device.DeviceAddress, DEVICE_PIN);
+        if (isPaired)
+        {
+            // now it is paired
+        }
+        else
+        {
+            // pairing failed
+        }
+    }
+}
+
+연결 중
+
+이는 연결을 설정하고 데이터를 교환하는 것을 의미합니다.
+
+// check if device is paired
+if (device.Authenticated)
+{
+    // set pin of device to connect with
+    localClient.SetPin(DEVICE_PIN);
+    // async connection method
+    localClient.BeginConnect(device.DeviceAddress, BluetoothService.SerialPort, new AsyncCallback(Connect), device);
+}
+
+// callback
+private void Connect(IAsyncResult result)
+{
+    if (result.IsCompleted)
+    {
+        // client is connected now :)
+    }
+}
+
+스캔, 페어링, 연결 순서를 유지하면 모든 것이 잘 작동합니다. 
+데이터를 보내거나 받으려면 GetStream()의 방법을 사용하십시오 BluetoothClient. 
+조작할 수 있는 네트워크 스트림을 제공합니다.
+
+연결 수신
+
+다른 장치를 귀하의 장치와 연결하려면 들어오는 연결 요청을 수신해야 합니다. 이는 장치가 이전에 이미 페어링된 경우에만 작동합니다.
+
+BluetoothListener l = new BluetoothListener(LOCAL_MAC, BluetoothService.SerialPort);
+l.Start(10);
+l.BeginAcceptBluetoothClient(new AsyncCallback(AcceptConnection), l);
+
+void AcceptConnection(IAsyncResult result){
+    if (result.IsCompleted){
+        BluetoothClient remoteDevice = ((BluetoothListener)result.AsyncState).EndAcceptBluetoothClient(result);    
+    }    
+}
+LOCAL_MAC유효한 BluetoothAddress로 바꿉니다 (예: 사용 BluetoothAddress.Parse();). 
+장치가 연결된 후에는 기본 스트림을 통해 메시지를 교환할 수 있습니다. 
+연결이 작동하지 않으면 인증 문제가 있을 수 있으므로 리스너에서 로컬 장치 핀을 설정해 보세요(l.SetPin(LOCAL_MAC, MY_PASSWORD);
+
+
+
