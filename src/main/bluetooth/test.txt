@@ -1,4 +1,189 @@
 
+using System;
+using System.IO;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.Advertisement;
+using Windows.Devices.Bluetooth.GenericAttributeProfile;
+
+namespace gatt_client
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Task.Run(AsyncMain).Wait();
+        }
+
+        static async Task AsyncMain()
+        {
+            var deviceName = "여기에 장치 이름을 넣는 것";
+            try
+            {
+                //광고 검색
+                var watcher = new BluetoothLEAdvertisementWatcher();
+                ulong btaddr = 0;
+
+                watcher.Received += (BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args) =>
+                {
+                    //감지시 콜백
+                    Console.WriteLine("+ " + args.Advertisement.LocalName);
+                    if (args.Advertisement.LocalName == deviceName)
+                    {
+                    //기기 찾기
+                    Console.WriteLine("Found: " + args.BluetoothAddress);
+                        btaddr = args.BluetoothAddress;
+                    }
+                };
+                watcher.ScanningMode = BluetoothLEScanningMode.Active;
+                watcher.Start();
+
+                Console.WriteLine("Scan Start.");
+
+                //5초간 스캔
+                await Task.Delay(5000);
+                watcher.Stop();
+
+                Console.WriteLine("Scan Stop.");
+
+                if (btaddr == 0)
+                {
+                    Console.WriteLine("Not found.");
+                    return;
+                }
+
+                //기기에 연결
+                Console.WriteLine("Connect...");
+                var device = await BluetoothLEDevice.FromBluetoothAddressAsync(btaddr);
+
+
+                //UUID에서 서비스 얻기
+                Console.Write("Service: ");
+                var services = await device.GetGattServicesForUuidAsync(new Guid("00000000-0000-4000-A000-000000000000"));
+                Console.WriteLine(services.Status);
+
+                //UUID에서 Characteristic 얻기
+                Console.Write("Characteristic: ");
+                var characteristics = await services.Services[0].GetCharacteristicsForUuidAsync(new Guid("00000000-0000-4000-A000-000000000001"));
+                Console.WriteLine(characteristics.Status);
+
+                var c = characteristics.Characteristics[0];
+
+                //알림을 받을 콜백 설정
+                c.ValueChanged += (GattCharacteristic sender, GattValueChangedEventArgs args) =>
+                {
+                    Console.Write("Notify: ");
+                    var streamNotify = args.CharacteristicValue.AsStream();
+                    PrintFromStream(streamNotify);
+                };
+                //알림 구독 등록
+                await c.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
+
+                //간단한 값 로드
+                Console.Write("Read: ");
+                var d = await c.ReadValueAsync();
+                var streamRead = d.Value.AsStream();
+                PrintFromStream(streamRead);
+
+                //간단한 값 쓰기
+                Console.WriteLine("Write");
+                await c.WriteValueAsync(new byte[1] { 0xAA }.AsBuffer());
+
+
+                //60초 기다린다(알림이 날아올 것)
+                await Task.Delay(60*1000);
+
+                //개방하면 자동으로 절단된다
+            }
+            catch (Exception e) {
+                Console.WriteLine(e);
+            }
+        }
+
+        static void PrintFromStream(Stream s)
+        {
+            //1byte씩 로드하여 표시
+            int d = 0;
+            while ((d = s.ReadByte()) != -1)
+            {
+                Console.Write(d.ToString("X"));
+                Console.Write(",");
+            }
+            Console.WriteLine();
+        }
+
+    }
+}
+
+
+
+
+32피트.NET. PC와 장치를 어떻게 페어링하나요?
+질문:
+PC와 장치 페어링이 필요한 Windows Form 응용 프로그램을 개발 중입니다.
+현재는 기기를 켜고 프로그램을 실행한 뒤 블루투스 연결을 위한 기기를 추가한 뒤 연결 버튼을 누르면 프로그램이 작동된다.
+이 기능을 달성하기 위해 다음 기능을 활용하고 있습니다.
+
+public BluetoothClient client = new BluetoothClient();
+public string selectedItem { get; set; }
+public BluetoothDeviceInfo[] AllDevices;
+public void GetDevices()
+{
+	AllDevices = client.DiscoverDevicesInRange();
+	foreach (BluetoothDeviceInfo Device in AllDevices)
+	{
+		if(Device.DeviceName.Contains("Kortes"))
+			onSetDevices(Device.DeviceName); // event to get device name and add it to ComoBox element on form
+	}
+	onSetProgress(); // event, that all devices were found, set progress bar and etc.
+}
+public void GoConnect()
+{
+	foreach (BluetoothDeviceInfo Device in AllDevices)
+	{
+		if (Device.DeviceName.Equals(selectedItem)) // item from ComboBox
+		{
+			if (!client.Connected)
+				client = new BluetoothClient();
+			client.BeginConnect(Device.DeviceAddress, Device.InstalledServices[0], this.BluetoothClientConnectCallback, client);
+			break;
+		}
+		else
+		{
+			MessageBox.Show("Choose the device");
+		}
+	}
+}
+private void BluetoothClientConnectCallback(IAsyncResult ar)
+{
+	//Have no problem with this
+}
+필요한 장치를 찾고 연결하는 기능은 효율적으로 수행되지만 해결해야 할 문제가 있습니다.
+기능을 사용하기 전에 운영 체제의 Bluetooth 장치에 장치를 추가하고 PIN 코드를 삽입해야 합니다.
+이 장애물을 극복하기 위해 코드를 어떻게 수정할 수 있습니까?
+
+장치를 추가하는 대신 직접 작업하는 것을 선호합니다.
+프로그래밍 방식으로 PIN 코드를 입력할 수 있는 방법이 있습니까?
+프로그램은 다음 순서를 따라야 합니다.
+장치를 켜고 프로그램을 시작한 다음 연결 버튼을 클릭합니다.
+
+
+해결책:
+
+페어링이 되지 않아 연결 설정 시도가 실패했습니다.
+코드가 작동하지 않는 이유는 연결하기 전에 페어링이 필요하기 때문입니다.
+
+바꾸다
+client = new BluetoothClient();
+client.BeginConnect(Device.DeviceAddress, Device.InstalledServices[0], this.BluetoothClientConnectCallback, client);
+BluetoothSecurity.PairRequest(Device.DeviceAddress,"123456");
+
+보다 포괄적인 설명을 보려면 http://mrbikash.com/bluetooth-discovery-pairing-32feet-net/#pairing을 방문하세요.
+
+
+
+
 https://www.c-sharpcorner.com/UploadFile/3789b7/how-to-send-data-through-bluetooth-in-a-wpf-application-usin/
 
 using System;
