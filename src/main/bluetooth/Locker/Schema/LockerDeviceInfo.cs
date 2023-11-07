@@ -20,4 +20,11 @@ namespace Locker.Bluetooth.Helper
         public Dictionary<string, object> Properties { get; set; }
         public int BatteryPercent { get; set; }
     }
+
+    public class ConnectionStatusChangedEventArgs: EventArgs
+    {
+        public bool IsConnected { get; set; }
+        public string Result { get; set; }
+    }
+
 }

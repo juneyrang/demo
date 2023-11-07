@@ -25,12 +25,12 @@ namespace Locker.Bluetooth.Core
         /// <summary>
         /// Occurs when [connection status changed].
         /// </summary>
-        public event EventHandler<Events.ConnectionStatusChangedEventArgs> ConnectionStatusChanged;
+        public event EventHandler<ConnectionStatusChangedEventArgs> ConnectionStatusChanged;
         /// <summary>
         /// Raises the <see cref="E:ConnectionStatusChanged" /> event.
         /// </summary>
-        /// <param name="e">The <see cref="Events.ConnectionStatusChangedEventArgs"/> instance containing the event data.</param>
-        protected virtual void OnConnectionStatusChanged(Events.ConnectionStatusChangedEventArgs e)
+        /// <param name="e">The <see cref="ConnectionStatusChangedEventArgs"/> instance containing the event data.</param>
+        protected virtual void OnConnectionStatusChanged(ConnectionStatusChangedEventArgs e)
         {
             ConnectionStatusChanged?.Invoke(this, e);
         }
@@ -134,6 +134,35 @@ namespace Locker.Bluetooth.Core
             {
                 return false;
             }
+        }
+
+        async Task<bool> WriteDataAndReadAsync(byte[] data)
+        {
+            if (writeCharacteristic != null)
+            {
+                var writer = new DataWriter();
+                writer.WriteBytes(data);
+                var result = await writeCharacteristic.WriteValueAsync(writer.DetachBuffer());
+                if (result == GattCommunicationStatus.Success)
+                {
+                    if (readResult.Status == GattCommunicationStatus.Success)
+                    {
+                        Debug.WriteLine("Data sent successfully");
+                        return false;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"Failed to read data, status: {readResult.Status}");
+                        return false;
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine($"Failed to send data, status: {result}");
+                    return false;
+                }
+            }
+            return false;
         }
 
         // Read data change handler
@@ -247,5 +276,17 @@ namespace Locker.Bluetooth.Core
             }
             return isDisconnect;
         }
+
+        private void DeviceConnectionStatusChanged(BluetoothLEDevice sender, object args)
+        {
+            var result = new ConnectionStatusChangedEventArgs()
+            {
+                IsConnected = sender != null && (sender.ConnectionStatus == BluetoothConnectionStatus.Connected)
+                Result = args != null ? args as string : '';
+            };
+
+            OnConnectionStatusChanged(result);
+        }
+
     }
 }
