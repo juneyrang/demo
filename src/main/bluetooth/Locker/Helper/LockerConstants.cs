@@ -1,5 +1,5 @@
 
-namespace locker.core
+namespace Locker.Bluetooth.Core
 {
     public class LockerConstants
     {
