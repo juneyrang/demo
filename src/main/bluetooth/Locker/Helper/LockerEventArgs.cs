@@ -9,6 +9,7 @@ namespace Locker.Bluetooth.Helper
     public class ConnectionStatusChangedEventArgs: EventArgs
     {
         public bool IsConnected { get; set; }
+        public string Result { get; set; }
     }
 
     public class DeviceLockerEventArgs

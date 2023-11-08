@@ -71,7 +71,7 @@ namespace Locker.Bluetooth.Core
                     return new Schema.ConnectionResult()
                     {
                         IsConnected = false,
-                        ErrorMessage = "Heart rate device is unreachable (i.e. out of range or shutoff)"
+                        ErrorMessage = "Locker device is unreachable (i.e. out of range or shutoff)"
                     };
                 }
 
@@ -83,9 +83,6 @@ namespace Locker.Bluetooth.Core
                     {
                         await SetGattCharacteristic(service);
                     }
-                    /*
-                    await AccessDeviceInformationAsync();
-                    */
                 }
             }
             catch (Exception ex)
@@ -143,24 +140,8 @@ namespace Locker.Bluetooth.Core
                 var writer = new DataWriter();
                 writer.WriteBytes(data);
                 var result = await writeCharacteristic.WriteValueAsync(writer.DetachBuffer());
-                if (result == GattCommunicationStatus.Success)
-                {
-                    if (readResult.Status == GattCommunicationStatus.Success)
-                    {
-                        Debug.WriteLine("Data sent successfully");
-                        return false;
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"Failed to read data, status: {readResult.Status}");
-                        return false;
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine($"Failed to send data, status: {result}");
-                    return false;
-                }
+                Console.WriteLine($"Data Write, status: {result}");
+                return result == GattCommunicationStatus.Success;
             }
             return false;
         }
@@ -173,7 +154,7 @@ namespace Locker.Bluetooth.Core
 
             byte[] resultBytes = PacketHelper.Decrypt(readBytes, PacketHelper.key);
             string message = System.Text.Encoding.UTF8.GetString(readBytes);
-            Debug.WriteLine($"IncomingData_ValueChanged ReadData : {message}");
+            Console.WriteLine($"IncomingData_ValueChanged ReadData : {message}");
             if(message != null)
             {
                 if(message.StartsWith("0602")) // Token 획득
@@ -227,7 +208,7 @@ namespace Locker.Bluetooth.Core
             }
 
             byte[] resultToken = new byte[4];
-            Debug.WriteLine("resultToken: " + BitConverter.ToString(resultToken));
+            Console.WriteLine("resultToken: " + BitConverter.ToString(resultToken));
             Array.Copy(resultBytes, 3, resultToken, 0, resultToken.Length);
             bool value = await OpenLock(PacketHelper.LockOpenPacket(resultToken));
         }
@@ -279,9 +260,13 @@ namespace Locker.Bluetooth.Core
 
         private void DeviceConnectionStatusChanged(BluetoothLEDevice sender, object args)
         {
+            var isStatus = sender != null && (sender.ConnectionStatus == BluetoothConnectionStatus.Connected);
+            if(!isStatus)
+            {
+            }
             var result = new ConnectionStatusChangedEventArgs()
             {
-                IsConnected = sender != null && (sender.ConnectionStatus == BluetoothConnectionStatus.Connected)
+                IsConnected = isStatus
                 Result = args != null ? args as string : '';
             };
 
