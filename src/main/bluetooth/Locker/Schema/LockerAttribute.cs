@@ -18,16 +18,50 @@ namespace Locker.Bluetooth.Helper
             IncomingDataChanged?.Invoke(this, e);
         }
 
+        public string DeviceId { get; set; }
+
         public LockerAttribute(GattDeviceService service)
         {
             this.service = service;
+            SetAttributeCharacteristic();
         }
 
-        public string DeviceId { get; set; }
-
-        public string GetName(BluetoothAttributeType attributeType)
+        private void SetAttributeCharacteristic()
         {
+            if (service.Uuid.Equals(LockerConstants.ServiceUuid))
+            {
+                readCharacteristic = service.GetCharacteristics(LockerConstants.ReadCharacteristicUuid)[0];
+                readCharacteristic.ValueChanged += IncomingData_ValueChanged;
+                await readCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
 
+                GattCharacteristicsResult characteristicsResult = await service.GetCharacteristicsAsync();
+                if (characteristicsResult.Status == GattCommunicationStatus.Success)
+                {
+                    foreach (var characteristic in characteristicsResult.Characteristics)
+                    {
+                        if (characteristic.Uuid.Equals(LockerConstants.WriteCharacteristicUuid))
+                        {
+                            writeCharacteristic = characteristic;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        public string GetAttributeName(BluetoothAttributeType attributeType)
+        {
+            switch (attributeType)
+            {
+                case BluetoothAttributeType.Service:
+                    return DisplayHelper.GetServiceName(service);
+                case BluetoothAttributeType.ReadCharacteristic:
+                    return DisplayHelper.GetCharacteristicName(readCharacteristic);
+                case BluetoothAttributeType.WriteCharacteristic:
+                    return DisplayHelper.GetCharacteristicName(writeCharacteristic);
+                default:
+                    return "Invalid";
+            }
         }
 
         async void IncomingData_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs eventArgs)
@@ -38,12 +72,12 @@ namespace Locker.Bluetooth.Helper
             byte[] resultBytes = PacketHelper.Decrypt(readBytes, PacketHelper.key);
             string message = System.Text.Encoding.UTF8.GetString(readBytes);
 
-            OnIncomingDataChanged(new IncomingDataChangedEventArgs() { Message = message; });
+            OnIncomingDataChanged(new IncomingDataChangedEventArgs() { ID = DeviceId, Message = message; });
         }
 
         public void Dispose()
         {
-            readCharacteristic.ValueChanged += IncomingData_ValueChanged;
+            readCharacteristic.ValueChanged -= IncomingData_ValueChanged;
         }
     }
 }

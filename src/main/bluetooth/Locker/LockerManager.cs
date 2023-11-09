@@ -64,8 +64,8 @@ namespace Locker.Bluetooth.Core
                 lockerDevice.ConnectionStatusChanged -= DeviceConnectionStatusChanged;
                 lockerDevice.ConnectionStatusChanged += DeviceConnectionStatusChanged;
 
-                var isReachable = await GetGattDeviceService();
-                if (!isReachable)
+                var service = await GetGattDeviceService();
+                if (service == null)
                 {
                     _heartRateDevice = null;
                     return new Schema.ConnectionResult()
@@ -74,15 +74,14 @@ namespace Locker.Bluetooth.Core
                         ErrorMessage = "Locker device is unreachable (i.e. out of range or shutoff)"
                     };
                 }
-
-
                 else
                 {
-                    var service = await GetGattDeviceService();
-                    if(service != null)
+                    var isCharacteristic = await SetGattCharacteristic(service);
+                    return new Schema.ConnectionResult()
                     {
-                        await SetGattCharacteristic(service);
-                    }
+                        IsConnected = isCharacteristic,
+                        ErrorMessage = isCharacteristic ? "" : "Locker device is unreachable (i.e. out of range or shutoff)"
+                    };
                 }
             }
             catch (Exception ex)
@@ -92,9 +91,8 @@ namespace Locker.Bluetooth.Core
 
         }
 
-        private async Task<bool> GetGattDeviceService()
+        private async Task<GattDeviceService> GetGattDeviceService()
         {
-            GattDeviceService s = null;
             GattDeviceServicesResult result = await lockerDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
             if (result.Status == GattCommunicationStatus.Success)
             {
@@ -102,35 +100,40 @@ namespace Locker.Bluetooth.Core
                 {
                     if (DisplayHelper.GetServiceName(service) == "65255")
                     {
-                        s = service;
-                        break;
-                    }
-                    if (service.Uuid.Equals(LockerConstants.ServiceUuid))
-                    {
-                        readCharacteristic = service.GetCharacteristics(LockerConstants.ReadCharacteristicUuid)[0];
-                        readCharacteristic.ValueChanged += IncomingData_ValueChanged;
-                        await readCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
-
-                        GattCharacteristicsResult characteristicsResult = await service.GetCharacteristicsAsync();
-                        if (characteristicsResult.Status == GattCommunicationStatus.Success)
-                        {
-                            foreach (var characteristic in characteristicsResult.Characteristics)
-                            {
-                                Console.WriteLine($"Characteristic UUID: {characteristic.Uuid}");
-                                if (characteristic.Uuid.Equals(LockerConstants.WriteCharacteristicUuid))
-                                {
-                                    writeCharacteristic = characteristic;
-                                }
-                            }
-                        }
+                        return service;
                     }
                 }
-                return true;
+                return null;
             }
             else
             {
-                return false;
+                return null;
             }
+        }
+
+        async Task<bool> SetGattCharacteristic(GattDeviceService service)
+        {
+            if (service.Uuid.Equals(LockerConstants.ServiceUuid))
+            {
+                readCharacteristic = service.GetCharacteristics(LockerConstants.ReadCharacteristicUuid)[0];
+                readCharacteristic.ValueChanged += IncomingData_ValueChanged;
+                await readCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
+
+                GattCharacteristicsResult characteristicsResult = await service.GetCharacteristicsAsync();
+                if (characteristicsResult.Status == GattCommunicationStatus.Success)
+                {
+                    foreach (var characteristic in characteristicsResult.Characteristics)
+                    {
+                        Console.WriteLine($"Characteristic UUID: {characteristic.Uuid}");
+                        if (characteristic.Uuid.Equals(LockerConstants.WriteCharacteristicUuid))
+                        {
+                            writeCharacteristic = characteristic;
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         async Task<bool> WriteDataAndReadAsync(byte[] data)

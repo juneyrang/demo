@@ -19,6 +19,7 @@ namespace Locker.Bluetooth.Helper
 
     public class IncomingDataChangedEventArgs
     {
+        public string ID { get; set; }
         public string Message { get; set; }
     }
 }
