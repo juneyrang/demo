@@ -7,6 +7,14 @@ namespace Locker.Bluetooth.Core
         ErrorMessage
     };
 
+    public enum BluetoothAttributeType
+    {
+        Service = 0,
+        ReadCharacteristic = 1,
+        WriteCharacteristic = 2,
+        Descriptor = 3
+    }
+
     public enum PacketType
     {
         LOCKER_OPEN,

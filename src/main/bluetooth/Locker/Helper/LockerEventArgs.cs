@@ -16,4 +16,9 @@ namespace Locker.Bluetooth.Helper
     {
         public LockerDeviceInfo Device { get; set; }
     }
+
+    public class IncomingDataChangedEventArgs
+    {
+        public string Message { get; set; }
+    }
 }
