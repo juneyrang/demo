@@ -18,7 +18,7 @@ namespace Locker.Bluetooth.Helper
             IncomingDataChanged?.Invoke(this, e);
         }
 
-        public string DeviceId { get; set; }
+        public LockerDeviceInfo DeviceInfo { get; set; }
 
         public LockerAttribute(GattDeviceService service)
         {
@@ -72,7 +72,7 @@ namespace Locker.Bluetooth.Helper
             byte[] resultBytes = PacketHelper.Decrypt(readBytes, PacketHelper.key);
             string message = System.Text.Encoding.UTF8.GetString(readBytes);
 
-            OnIncomingDataChanged(new IncomingDataChangedEventArgs() { ID = DeviceId, Message = message; });
+            OnIncomingDataChanged(new IncomingDataChangedEventArgs() { ID = DeviceInfo.DeviceId, Message = message; });
         }
 
         public void Dispose()
