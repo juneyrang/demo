@@ -9,6 +9,7 @@ namespace Pas.Bluetooth
     public class LockerDeviceInfo
     {
         public string DeviceId { get; set; }
+        public byte[] Token { get; set; }
         public bool IsEnabled { get; set; }
         public bool IsDefault { get; set; }
         public string Name { get; set; }
