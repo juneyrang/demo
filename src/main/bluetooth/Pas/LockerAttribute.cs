@@ -71,8 +71,6 @@ namespace Pas.Bluetooth
         {
             DeviceInfo = null;
             Service?.Dispose();
-            CurrentDevice?.Dispose();
-            CurrentDevice = null;
             CurrentService = null;
             WriteCharacteristic = null;
             ReadCharacteristic = null;
