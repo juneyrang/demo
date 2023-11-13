@@ -15,6 +15,11 @@ namespace Pas.Bluetooth.Core
         Descriptor = 3
     }
 
+    public class ConnectionStatusChangedEventArgs: EventArgs
+    {
+        public bool IsConnected { get; set; }
+    }
+
     public enum PacketType
     {
         LOCKER_OPEN,

@@ -8,8 +8,8 @@ namespace Locker.Bluetooth.Helper
 {
     public class ConnectionStatusChangedEventArgs: EventArgs
     {
+        public string DeviceId { get; set; }
         public bool IsConnected { get; set; }
-        public string Result { get; set; }
     }
 
     public class DeviceLockerEventArgs
@@ -17,9 +17,9 @@ namespace Locker.Bluetooth.Helper
         public LockerDeviceInfo Device { get; set; }
     }
 
-    public class IncomingDataChangedEventArgs
+    public class IncomingValueChangedEventArgs
     {
-        public string ID { get; set; }
+        public string DeviceId { get; set; }
         public string Message { get; set; }
     }
 }
