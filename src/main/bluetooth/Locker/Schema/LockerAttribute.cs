@@ -51,12 +51,13 @@ namespace Locker.Bluetooth.Helper
             }
         }
 
-        public async Task<CharacteristicResult> SetGattCharacteristic()
+        public async Task<CharacteristicResult> GetGattCharacteristic()
         {
             if (service.Uuid.Equals(LockerConstants.ServiceUuid))
             {
-                readCharacteristic = service.GetCharacteristics(LockerConstants.ReadCharacteristicUuid)[0];
-                readCharacteristic.ValueChanged += IncomingData_ValueChanged;
+                ReadCharacteristic = service.GetCharacteristics(LockerConstants.ReadCharacteristicUuid)[0];
+                ReadCharacteristic.ValueChanged -= IncomingData_ValueChanged;
+                ReadCharacteristic.ValueChanged += IncomingData_ValueChanged;
                 await readCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
 
                 GattCharacteristicsResult characteristicsResult = await service.GetCharacteristicsAsync();
@@ -67,8 +68,12 @@ namespace Locker.Bluetooth.Helper
                         Console.WriteLine($"Characteristic UUID: {characteristic.Uuid}");
                         if (characteristic.Uuid.Equals(LockerConstants.WriteCharacteristicUuid))
                         {
-                            writeCharacteristic = characteristic;
-                            return true;
+                            WriteCharacteristic = characteristic;
+                            return new CharacteristicResult()
+                            {
+                                IsSuccess = true,
+                                Message = "Cannot find HeartRate service"
+                            };
                         }
                     }
                 }

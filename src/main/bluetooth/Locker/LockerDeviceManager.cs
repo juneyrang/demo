@@ -11,7 +11,7 @@ using Windows.Security.Cryptography;
 
 namespace Pas.Bluetooth
 {
-    public class LockerManager
+    public class LockerDeviceManager
     {
         private byte[] LockerToken = new byte[4];
         private BluetoothLEDevice _lockerDevice = null;
