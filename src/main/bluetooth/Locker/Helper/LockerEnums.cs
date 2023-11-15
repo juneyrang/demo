@@ -15,13 +15,14 @@ namespace Locker.Bluetooth.Core
         Descriptor = 3
     }
 
-    public enum PacketType
+    public enum RequestType
     {
-        LOCKER_OPEN,
-        LOCKER_CLOSE,
-        LOCKER_STATUS,
-        LOCKER_BATTERY,
-        LOCKER_CHANGE_PASSWORD,
-        LOCKER_TIME_CLOSED
+        REQUEST_NONE,
+        REQUEST_OPEN,
+        REQUEST_CLOSE,
+        REQUEST_STATUS,
+        REQUEST_BATTERY,
+        REQUEST_CHANGE_PASSWORD,
+        REQUEST_TIME_CLOSED
     };
 }

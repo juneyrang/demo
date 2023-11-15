@@ -29,18 +29,12 @@ namespace Pas.Bluetooth
         /// </summary>
         public GattCharacteristic ReadCharacteristic { get; private set; }
 
-        /// <summary>
-        /// Store detected devices
-        /// </summary>
-        public List<BluetoothLEDevice> DeviceList { get; private set; }
-
         public LockerDeviceInfo DeviceInfo { get; set; }
 
         #endregion
 
         public LockerAttribute()
         {
-            DeviceList = new List<BluetoothLEDevice>();
         }
 
         /// <summary>

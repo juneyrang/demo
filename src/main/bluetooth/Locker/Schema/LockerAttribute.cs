@@ -12,22 +12,64 @@ namespace Locker.Bluetooth.Helper
         public GattCharacteristic readCharacteristic;
         public GattCharacteristic writeCharacteristic;
 
+        private RequestAttribute requestAttribute;
+
+        public event EventHandler<Events.ConnectionStatusChangedEventArgs> ConnectionStatusChanged;
+        protected virtual void OnConnectionStatusChanged(Events.ConnectionStatusChangedEventArgs e)
+        {
+            ConnectionStatusChanged?.Invoke(this, e);
+        }
         public event EventHandler<IncomingDataChangedEventArgs> IncomingDataChanged;
         protected virtual void OnIncomingDataChanged(IncomingDataChangedEventArgs e)
         {
             IncomingDataChanged?.Invoke(this, e);
         }
 
-        public string DeviceId { get; private set; }
-        public byte[] LockerToken { get; private set; }
+        public byte[] LockerToken = new byte[4];
 
-        public BluetoothLEDevice LockerDevice { get; private set; }
+        public BluetoothLEDevice _LockerDevice { get; private set; }
 
-        public LockerAttribute(BluetoothLEDevice _lockerDevice )
+        public LockerAttribute(string deviceId)
         {
-            this.LockerDevice = _lockerDevice;
-            this.DeviceId = _lockerDevice.DeviceId;
-            this.LockerToken = new byte[4];
+            this.requestAttribute = new RequestAttribute()
+            {
+                DeviceId = deviceId
+            }
+        }
+
+        public LockerAttribute(RequestAttribute requestAttribute)
+        {
+            this.requestAttribute = requestAttribute;
+            await ConnectAsync(requestAttribute.DeviceId);
+        }
+
+        public async Task<ConnectionResult> ConnectAsync()
+        {
+            ConnectionResult result = await ConnectAsync(requestAttribute.DeviceId);
+            return result;
+        }
+
+        public async Task<ConnectionResult> ConnectAsync(string deviceId)
+        {
+            _LockerDevice = await BluetoothLEDevice.FromIdAsync(deviceId);
+            if (_heartRateDevice == null)
+            {
+                return new ConnectionResult()
+                {
+                    IsConnected = false,
+                    ErrorMessage = "Could not find specified heart rate device"
+                };
+            }
+
+            if (!_heartRateDevice.DeviceInformation.Pairing.IsPaired)
+            {
+                _heartRateDevice = null;
+                return new ConnectionResult()
+                {
+                    IsConnected = false,
+                    ErrorMessage = "Heart rate device is not paired"
+                };
+            }
         }
 
         public async Task<bool> SetDeviceServiceAsync()
@@ -119,6 +161,19 @@ namespace Locker.Bluetooth.Helper
             }
         }
 
+        async Task<bool> WriteDataAndReadAsync(byte[] data)
+        {
+            if (writeCharacteristic != null)
+            {
+                var writer = new DataWriter();
+                writer.WriteBytes(data);
+                var result = await writeCharacteristic.WriteValueAsync(writer.DetachBuffer());
+                Console.WriteLine($"Data Write, status: {result}");
+                return result == GattCommunicationStatus.Success;
+            }
+            return false;
+        }
+
         async void IncomingData_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs eventArgs)
         {
             byte[] readBytes = new byte[eventArgs.CharacteristicValue.Length];
@@ -182,7 +237,7 @@ namespace Locker.Bluetooth.Helper
                 {
                 }
             }
-            OnIncomingDataChanged(new IncomingDataChangedEventArgs() { ID = DeviceInfo.DeviceId, Message = message; });
+            OnIncomingDataChanged(new IncomingDataChangedEventArgs() { ID = requestAttribute.DeviceId, Message = message; });
         }
 
         public void Dispose()

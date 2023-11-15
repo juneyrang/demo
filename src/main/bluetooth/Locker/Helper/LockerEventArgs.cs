@@ -6,15 +6,19 @@ using System.Threading.Tasks;
 
 namespace Locker.Bluetooth.Helper
 {
+    public class ConnectionResult
+    {
+        public string DeviceId { get; set; }
+        public string Name { get; set; }
+        public bool IsConnected { get; set; }
+        public bool HasError { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+
     public class ConnectionStatusChangedEventArgs: EventArgs
     {
         public string DeviceId { get; set; }
         public bool IsConnected { get; set; }
-    }
-
-    public class DeviceLockerEventArgs
-    {
-        public LockerDeviceInfo Device { get; set; }
     }
 
     public class IncomingValueChangedEventArgs
@@ -22,4 +26,10 @@ namespace Locker.Bluetooth.Helper
         public string DeviceId { get; set; }
         public string Message { get; set; }
     }
+
+    public class DeviceLockerEventArgs
+    {
+        public LockerDeviceInfo Device { get; set; }
+    }
+
 }
